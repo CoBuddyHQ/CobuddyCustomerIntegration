@@ -14,7 +14,7 @@ import {useNavigation} from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { MOCK_CHAT_LIST } from '../../services/mock';
-import { chatApi, ChatConversation as ChatConversationType } from '../../services/api';
+import { chatApi, Conversation } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -35,7 +35,7 @@ export const ChatListScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
-  const [conversations, setConversations] = useState<ChatConversationType[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const activeBookings = [
     { id: 'CB-REQ-9401', name: 'Kabir Singh', role: 'Event Companion', online: true, companionId: 'c6' },
     { id: 'CB-REQ-9402', name: 'Sneha Verma', role: 'Local Guide', online: false, companionId: 'c7' },
@@ -43,7 +43,7 @@ export const ChatListScreen = () => {
 
   React.useEffect(() => {
     let isMounted = true;
-    chatApi.getConversations().then(list => {
+    chatApi.listConversations().then(list => {
       if (isMounted && list && list.length > 0) {
         setConversations(list);
       }
@@ -54,13 +54,14 @@ export const ChatListScreen = () => {
   const displayChats = conversations.length > 0
     ? conversations.map(c => ({
         id: c.id,
-        name: c.participantName,
-        companionId: c.participantId,
-        avatar: c.participantAvatar || `https://i.pravatar.cc/150?u=${c.participantId}`,
+        name: c.companionName || 'Companion',
+        companionId: c.companionId || 'c1',
         lastMessage: c.lastMessage || 'Tap to chat',
         time: c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now',
-        unreadCount: c.unreadCount || 0,
-        isOnline: c.isOnline ?? true,
+        unread: c.unreadCount || 0,
+        isOnline: true,
+        isTyping: false,
+        readReceipt: 'read',
       }))
     : MOCK_CHAT_LIST;
 

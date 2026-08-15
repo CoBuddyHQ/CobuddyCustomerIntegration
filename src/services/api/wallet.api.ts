@@ -11,6 +11,8 @@ export interface WalletBalance {
   totalSpent?: number;
   totalAdded?: number;
   pendingAmount?: number;
+  pendingRefund?: number;
+  escrowHeld?: number;
 }
 
 export interface Transaction {

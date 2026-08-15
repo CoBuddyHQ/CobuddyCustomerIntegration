@@ -47,6 +47,7 @@ export const BookingsListScreen = () => {
   const displayList = apiBookings.length > 0
     ? apiBookings.map(b => ({
         id: b.id,
+        type: 'companion',
         companionId: b.companionId,
         companionName: b.companionName || 'Companion',
         rating: '5.0',

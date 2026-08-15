@@ -33,11 +33,11 @@ export const CompanionChatScreen = () => {
   React.useEffect(() => {
     let isMounted = true;
     chatApi.getMessages(companionId).then(apiMsgs => {
-      if (isMounted && apiMsgs && apiMsgs.length > 0) {
-        setMessages(apiMsgs.map(m => ({
+      if (isMounted && apiMsgs?.data && apiMsgs.data.length > 0) {
+        setMessages(apiMsgs.data.map(m => ({
           id: m.id,
           type: 'text',
-          text: m.content || m.text,
+          text: m.text || '',
           sender: m.senderId === companionId ? 'them' : 'me',
           time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now',
         })));
@@ -62,10 +62,7 @@ export const CompanionChatScreen = () => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      await chatApi.sendMessage({
-        conversationId: companionId,
-        content: text.trim(),
-      });
+      await chatApi.sendMessage(companionId, text.trim());
     } catch {
       // Optimistic update retained
     }
