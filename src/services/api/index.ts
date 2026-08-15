@@ -3,20 +3,37 @@
  * Import everything from here: import { authApi, profileApi } from '@/services/api'
  */
 
-export * as authApi from './auth.api';
-export * as profileApi from './profile.api';
-export * as discoveryApi from './discovery.api';
-export * as bookingApi from './booking.api';
-export * as sessionApi from './session.api';
-export * as walletApi from './wallet.api';
-export * as safetyApi from './safety.api';
-export * as supportApi from './support.api';
-export * as notificationsApi from './notifications.api';
-export * as chatApi from './chat.api';
-export * as kycApi from './kyc.api';
-export * as paymentApi from './payment.api';
-export * as reviewsApi from './reviews.api';
-export * as accountApi from './account.api';
+import * as authApi from './auth.api';
+import * as profileApi from './profile.api';
+import * as discoveryApi from './discovery.api';
+import * as bookingApi from './booking.api';
+import * as sessionApi from './session.api';
+import * as walletApi from './wallet.api';
+import * as safetyApi from './safety.api';
+import * as supportApi from './support.api';
+import * as notificationsApi from './notifications.api';
+import * as chatApi from './chat.api';
+import * as kycApi from './kyc.api';
+import * as paymentApi from './payment.api';
+import * as reviewsApi from './reviews.api';
+import * as accountApi from './account.api';
+
+export {
+  authApi,
+  profileApi,
+  discoveryApi,
+  bookingApi,
+  sessionApi,
+  walletApi,
+  safetyApi,
+  supportApi,
+  notificationsApi,
+  chatApi,
+  kycApi,
+  paymentApi,
+  reviewsApi,
+  accountApi,
+};
 
 export { default as apiClient, getApiError, TokenStorage, setLogoutListener, BASE_URL } from './apiClient';
 
