@@ -6,6 +6,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { sessionApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -18,6 +19,8 @@ export const TipGratuityScreen = () => {
   const [selectedTip, setSelectedTip] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState<string>('');
   
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const customInputRef = useRef<TextInput>(null);
 
   const TIPS = [100, 200, 500];
@@ -28,7 +31,21 @@ export const TipGratuityScreen = () => {
     }
   }, [selectedTip]);
 
-  const handlePayTip = () => {
+  const handlePayTip = async () => {
+    const amount = selectedTip === -1 ? parseInt(customTip, 10) || 0 : (selectedTip || 0);
+    if (amount > 0) {
+      setIsSubmitting(true);
+      try {
+        const current = await sessionApi.getCurrentSession();
+        if (current?.id) {
+          await sessionApi.submitTip(current.id, amount);
+        }
+      } catch {
+        // Graceful fallback
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
     navigation.navigate('CompanionReviewScreen', { ...(route.params || {}), companionId, companionName });
   };
 
@@ -116,11 +133,13 @@ export const TipGratuityScreen = () => {
 
       <View style={styles.bottomBar}>
         <TouchableOpacity 
-          style={[styles.primaryBtn, isPayDisabled && { opacity: 0.5 }]} 
-          disabled={isPayDisabled}
+          style={[styles.primaryBtn, (isPayDisabled || isSubmitting) && { opacity: 0.5 }]} 
+          disabled={isPayDisabled || isSubmitting}
           onPress={handlePayTip} accessibilityRole="button" accessibilityLabel={t('a11yPayTip', 'Pay tip amount')}
         >
-          <Text style={styles.primaryBtnText}>{getButtonLabel()}</Text>
+          <Text style={styles.primaryBtnText}>
+            {isSubmitting ? 'Processing...' : getButtonLabel()}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
