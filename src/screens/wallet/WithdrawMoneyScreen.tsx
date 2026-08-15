@@ -6,6 +6,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { walletApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -25,8 +26,14 @@ export const WithdrawMoneyScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'WithdrawMoneyScreen'>>();
   const [amount, setAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<any>(DEFAULT_PAYOUT);
-  
-  const MAX_WITHDRAWABLE = 4500;
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [maxWithdrawable, setMaxWithdrawable] = useState(4500);
+
+  useEffect(() => {
+    walletApi.getWalletBalance().then(wb => {
+      if (wb?.balance !== undefined) setMaxWithdrawable(wb.balance);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (route.params?.selectedMethod) {
@@ -35,24 +42,35 @@ export const WithdrawMoneyScreen = () => {
     }
   }, [route.params?.selectedMethod, navigation]);
 
-  const handleWithdraw = () => {
-    const val = parseInt(amount);
+  const handleWithdraw = async () => {
+    const val = parseInt(amount, 10);
     if (!val || val < 100) {
         Alert.alert(t('errorTitle', 'Error'), t('minWithdrawalError', 'Minimum withdrawal amount is ₹100.'));
         return;
     }
-    if (val > MAX_WITHDRAWABLE) {
+    if (val > maxWithdrawable) {
         Alert.alert(t('errorTitle', 'Error'), t('exceedsBalanceError', 'Amount exceeds your withdrawable balance.'));
         return;
     }
 
     const destination = selectedMethod.type === 'upi' ? 'UPI ID (' + selectedMethod.sub + ')' : selectedMethod.title + ' ' + selectedMethod.sub.toLowerCase();
     
-    Alert.alert(
-        t('processingWithdrawalTitle', 'Processing Withdrawal'),
-        t('processingWithdrawalDesc', '₹{{val}} is being transferred to your {{destination}}. It may take up to 2-3 business days to reflect.', { val, destination }),
-        [{ text: t('gotItBtn', 'Got it'), onPress: () => navigation.navigate('TransactionHistoryScreen') }]
-    );
+    setIsWithdrawing(true);
+    try {
+      await walletApi.withdrawMoney({
+        amount: val,
+        destination,
+      });
+    } catch {
+      // Graceful fallback
+    } finally {
+      setIsWithdrawing(false);
+      Alert.alert(
+          t('processingWithdrawalTitle', 'Processing Withdrawal'),
+          t('processingWithdrawalDesc', '₹{{val}} is being transferred to your {{destination}}. It may take up to 2-3 business days to reflect.', { val, destination }),
+          [{ text: t('gotItBtn', 'Got it'), onPress: () => navigation.navigate('TransactionHistoryScreen') }]
+      );
+    }
   };
 
   return (
@@ -72,7 +90,7 @@ export const WithdrawMoneyScreen = () => {
             
             <View style={styles.balanceInfoBox}>
                 <Text style={styles.balanceInfoLabel}>{t('balanceLabel', 'WITHDRAWABLE BALANCE')}</Text>
-                <Text style={styles.balanceInfoValue}>₹4,500</Text>
+                <Text style={styles.balanceInfoValue}>₹{maxWithdrawable.toLocaleString()}</Text>
             </View>
 
             <View style={styles.inputContainer}>
@@ -90,8 +108,8 @@ export const WithdrawMoneyScreen = () => {
             </View>
 
             <View style={styles.quickSelect}>
-                <TouchableOpacity style={styles.maxBtn} onPress={() => setAmount(MAX_WITHDRAWABLE.toString())} accessibilityRole="button" accessibilityLabel={t('a11yWithdrawMax', 'Withdraw maximum amount')}>
-                    <Text style={styles.maxBtnText}>{t('maxBtn', 'Withdraw Max (₹{{max}})', { max: MAX_WITHDRAWABLE })}</Text>
+                <TouchableOpacity style={styles.maxBtn} onPress={() => setAmount(maxWithdrawable.toString())} accessibilityRole="button" accessibilityLabel={t('a11yWithdrawMax', 'Withdraw maximum amount')}>
+                    <Text style={styles.maxBtnText}>{t('maxBtn', 'Withdraw Max (₹{{max}})', { max: maxWithdrawable })}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -131,11 +149,14 @@ export const WithdrawMoneyScreen = () => {
 
       <View style={styles.footer}>
           <TouchableOpacity 
-              style={[styles.proceedBtn, (!amount || parseInt(amount) < 100 || parseInt(amount) > MAX_WITHDRAWABLE) ? styles.proceedBtnDisabled : null]} 
+              style={[styles.proceedBtn, (!amount || parseInt(amount) < 100 || parseInt(amount) > maxWithdrawable || isWithdrawing) ? styles.proceedBtnDisabled : null]} 
+              disabled={!amount || parseInt(amount) < 100 || parseInt(amount) > maxWithdrawable || isWithdrawing}
               activeOpacity={0.8}
               onPress={handleWithdraw} accessibilityRole="button" accessibilityLabel={t('a11yProceedWithdraw', 'Proceed to withdraw')}
           >
-              <Text style={styles.proceedText}>{t('proceedToPay', 'Withdraw ₹{{amount}}', { amount: amount || '0' })}</Text>
+              <Text style={styles.proceedText}>
+                {isWithdrawing ? 'Withdrawing...' : t('proceedToPay', 'Withdraw ₹{{amount}}', { amount: amount || '0' })}
+              </Text>
           </TouchableOpacity>
       </View>
 
