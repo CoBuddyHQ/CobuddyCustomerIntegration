@@ -9,6 +9,7 @@ import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
 import { AppBottomSheet } from '../../components/ui/AppBottomSheet';
 import { DUMMY_PROFILE, DUMMY_COMPANIONS, DUMMY_FEATURED } from '../../services/mock';
+import { discoveryApi, accountApi, CompanionDetail as CompanionDetailType } from '../../services/api';
 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -29,20 +30,25 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
   const { companionId } = route?.params || {};
   const matchedCompanion = [...DUMMY_COMPANIONS, ...DUMMY_FEATURED].find(c => c.id === companionId);
 
-  const profile = matchedCompanion
+  const [apiProfile, setApiProfile] = useState<CompanionDetailType | null>(null);
+  const profile = apiProfile
+    ? {
+        ...DUMMY_PROFILE,
+        ...apiProfile,
+        name: apiProfile.name || matchedCompanion?.name || DUMMY_PROFILE.name,
+        trustScore: apiProfile.trustScore ?? matchedCompanion?.trustScore ?? DUMMY_PROFILE.trustScore,
+        distance: apiProfile.distance || matchedCompanion?.distance || DUMMY_PROFILE.distance,
+        bio: apiProfile.bio || DUMMY_PROFILE.bio,
+        photos: apiProfile.photos && apiProfile.photos.length > 0 ? apiProfile.photos : DUMMY_PROFILE.photos,
+      }
+    : matchedCompanion
     ? {
         ...DUMMY_PROFILE,
         name: matchedCompanion.name,
         trustScore: matchedCompanion.trustScore,
         distance: matchedCompanion.distance,
-        // rating/reviews count/rate/activities/gender only exist on the list item, not on
-        // DUMMY_PROFILE's shape today — map the ones DUMMY_PROFILE actually has slots for:
         reviews: { ...DUMMY_PROFILE.reviews, count: matchedCompanion.reviews },
         completedSessions: matchedCompanion.sessions,
-        // photos, bio, languages, personality, hobbies, pricing, travelPreference, schedule,
-        // rules, cancellationPolicy, memberSince, verifications, pronouns, lastActive, age:
-        // no per-companion mock data exists for these yet, so they stay as DUMMY_PROFILE's
-        // shared placeholder values until real companion profile data exists.
       }
     : DUMMY_PROFILE;
   const { t } = useTranslation(['companionProfile']);
@@ -57,11 +63,29 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
   const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+    let isMounted = true;
+    const fetchDetail = async () => {
+      if (!companionId) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const data = await discoveryApi.getCompanionDetail(companionId);
+        if (isMounted && data) {
+          setApiProfile(data);
+        }
+      } catch {
+        // Fallback to mock profile
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchDetail();
+    return () => {
+      isMounted = false;
+    };
+  }, [companionId]);
 
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -438,7 +462,14 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
                       { 
                         text: t('block', 'Block'), 
                         style: "destructive",
-                        onPress: () => {
+                        onPress: async () => {
+                          if (companionId) {
+                            try {
+                              await accountApi.blockUser(companionId);
+                            } catch {
+                              // Ignored
+                            }
+                          }
                           Alert.alert(t('blockedTitle', 'Blocked'), t('blockedMessage', '{{name}} has been blocked.', { name: profile.name }));
                           smartGoBack('DiscoverTab');
                         }

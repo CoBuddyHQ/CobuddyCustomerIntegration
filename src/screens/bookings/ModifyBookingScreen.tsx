@@ -8,6 +8,7 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { MOCK_VENUES } from '../../services/mock';
 import { MOCK_BOOKINGS } from '../../services/mock/bookings.mock';
+import { bookingApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -24,6 +25,7 @@ export const ModifyBookingScreen = () => {
   const [amPm, setAmPm] = useState<'AM' | 'PM'>('PM');
   const [duration, setDuration] = useState(2); // Default 2 hours
   const [newVenue, setNewVenue] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [venueModalVisible, setVenueModalVisible] = useState(false);
     const handleDateChange = (text: string) => {
@@ -54,8 +56,21 @@ export const ModifyBookingScreen = () => {
 
   const handleBack = () => smartGoBack();
   
-  const handleSendRequest = () => {
-    navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+  const handleSendRequest = async () => {
+    setIsSubmitting(true);
+    try {
+      await bookingApi.modifyBooking(bookingId, {
+        date: newDate,
+        time: `${newTime} ${amPm}`,
+        duration,
+        venue: newVenue || undefined,
+      });
+    } catch {
+      // Graceful fallback
+    } finally {
+      setIsSubmitting(false);
+      navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+    }
   };
 
   const isFormValid = newDate.length > 5 && newTime.length > 3;

@@ -15,6 +15,8 @@ import { selectInterests } from '../../store/selectors/userPreferencesSelectors'
 import { INTEREST_MAPPING } from '../../services/mock/interestMapping';
 import { useBookingStore } from '../../store/slices/bookingStore';
 import { selectActiveBooking } from '../../store/selectors/bookingSelectors';
+import { useAuthStore } from '../../store/slices/authStore';
+import { discoveryApi, bookingApi, CompanionCard as CompanionCardType } from '../../services/api';
 
 
 export const HomeDashboardScreen = () => {
@@ -29,6 +31,8 @@ export const HomeDashboardScreen = () => {
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [loading, setLoading] = useState(true);
+  const [featuredList, setFeaturedList] = useState<CompanionCardType[]>([]);
+  const user = useAuthStore(state => state.user);
   const selectedInterests = useUserPreferencesStore(selectInterests);
 
   const sortedExploreCategories = React.useMemo(() => {
@@ -56,9 +60,29 @@ export const HomeDashboardScreen = () => {
   const hasActiveBooking = !!activeBooking;
 
   useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => setLoading(false), 800);
-    return () => clearTimeout(timer);
+    let isMounted = true;
+    const loadHomeData = async () => {
+      setLoading(true);
+      try {
+        const featured = await discoveryApi.getFeaturedCompanions();
+        if (isMounted && featured && featured.length > 0) {
+          setFeaturedList(featured);
+        } else if (isMounted) {
+          setFeaturedList(DUMMY_FEATURED as unknown as CompanionCardType[]);
+        }
+      } catch {
+        if (isMounted) {
+          setFeaturedList(DUMMY_FEATURED as unknown as CompanionCardType[]);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadHomeData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
@@ -84,7 +108,7 @@ export const HomeDashboardScreen = () => {
         
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeText}>{t('greeting')} <Text style={styles.welcomeName}>{MOCK_PROFILE.name}</Text></Text>
+          <Text style={styles.welcomeText}>{t('greeting')} <Text style={styles.welcomeName}>{user?.name || MOCK_PROFILE.name}</Text></Text>
           <Text style={styles.subtitleText}>{t('subtitle')}</Text>
         </View>
 
@@ -254,7 +278,7 @@ export const HomeDashboardScreen = () => {
                 </View>
               </>
             ) : (
-              DUMMY_FEATURED.map((item) => (
+              (featuredList.length > 0 ? featuredList : DUMMY_FEATURED).map((item) => (
                 <View key={item.id} style={styles.featuredCardWrapper}>
                   <CompanionCard
                     {...item}

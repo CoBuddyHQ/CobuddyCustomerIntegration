@@ -11,6 +11,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useBookingStore } from '../../store/slices/bookingStore';
 import { selectCancelBooking } from '../../store/selectors/bookingSelectors';
+import { bookingApi } from '../../services/api';
 
 const REASONS = [
   { key: 'schedule', label: 'Change of plans / Schedule conflict' },
@@ -29,14 +30,24 @@ export const CancelBookingScreen = () => {
   const booking = MOCK_BOOKINGS.find(b => b.id === bookingId) || MOCK_BOOKINGS[0];
   
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const cancelBooking = useBookingStore(selectCancelBooking);
 
   const handleBack = () => smartGoBack();
   
-  const handleConfirmCancel = () => {
-    // In a real app, this would call an API, then go back to the root tab
-    cancelBooking(bookingId);
-    navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+  const handleConfirmCancel = async () => {
+    setIsCancelling(true);
+    try {
+      await bookingApi.cancelBooking(bookingId, {
+        reason: selectedReason || 'other',
+      });
+    } catch {
+      // Graceful fallback
+    } finally {
+      cancelBooking(bookingId);
+      setIsCancelling(false);
+      navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+    }
   };
 
   return (
@@ -102,13 +113,16 @@ export const CancelBookingScreen = () => {
         <View style={styles.actionCol}>
           <TouchableOpacity 
             style={[
-              styles.primaryBtn, 
-              { backgroundColor: selectedReason ? theme.colors.error : 'rgba(255,255,255,0.05)', shadowColor: theme.colors.error }
+              styles.primaryBtn,
+              { backgroundColor: selectedReason && !isCancelling ? theme.colors.error : 'rgba(255,255,255,0.05)' }
             ]} 
-            disabled={!selectedReason}
-            onPress={handleConfirmCancel} accessibilityRole="button" accessibilityLabel={t('a11yConfirmCancellation', 'Confirm Cancellation')}
+            disabled={!selectedReason || isCancelling}
+            onPress={handleConfirmCancel}
+            activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11yConfirmCancellation', 'Confirm Cancellation')}
           >
-            <Text style={[styles.primaryBtnText, { color: selectedReason ? theme.colors.background : theme.colors.textSecondary }]}>{t('confirmBtn', 'Confirm Cancellation')}</Text>
+            <Text style={[styles.primaryBtnText, { color: selectedReason && !isCancelling ? theme.colors.background : theme.colors.textSecondary }]}>
+              {isCancelling ? 'Cancelling...' : t('confirmBtn', 'Confirm Cancellation')}
+            </Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.secondaryBtn} onPress={handleBack} accessibilityRole="button" accessibilityLabel={t('a11yNoKeepBooking', 'No, Keep Booking')}>

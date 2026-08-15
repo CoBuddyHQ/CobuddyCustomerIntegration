@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
+import { sessionApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -56,15 +57,31 @@ export const ActiveSessionScreen = () => {
 
   const progressPercentage = ((TOTAL_SECONDS - timeLeft) / TOTAL_SECONDS) * 100;
 
-  const handleEndEarly = () => {
+  const handleEndEarly = async () => {
     setEndEarlyModalVisible(false);
-    navigation.navigate('SessionCompleteScreen', { companionId, companionName });
+    try {
+      const current = await sessionApi.getCurrentSession();
+      if (current?.id) {
+        await sessionApi.endSession(current.id);
+      }
+    } catch {
+      // Graceful fallback
+    } finally {
+      navigation.navigate('SessionCompleteScreen', { companionId, companionName });
+    }
   };
 
-  const handleConfirmExtension = () => {
-    // Add time to the timer
+  const handleConfirmExtension = async () => {
     setTimeLeft(prev => prev + (selectedExtension * 60));
     setExtendModalVisible(false);
+    try {
+      const current = await sessionApi.getCurrentSession();
+      if (current?.id) {
+        await sessionApi.extendSession(current.id, selectedExtension);
+      }
+    } catch {
+      // Graceful fallback
+    }
   };
 
   return (

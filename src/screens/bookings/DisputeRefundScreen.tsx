@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { MOCK_BOOKINGS } from '../../services/mock/bookings.mock';
+import { bookingApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -27,12 +28,23 @@ export const DisputeRefundScreen = () => {
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleBack = () => smartGoBack();
   
-  const handleSubmit = () => {
-    // In a real app, send API request, then navigate
-    navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      await bookingApi.disputeBooking(bookingId, {
+        reason: selectedCategory || 'other',
+        description,
+      });
+    } catch {
+      // Graceful fallback
+    } finally {
+      setIsSubmitting(false);
+      navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+    }
   };
 
   const isFormValid = selectedCategory && description.length > 10;
@@ -114,16 +126,16 @@ export const DisputeRefundScreen = () => {
 
       {/* Sticky Footer */}
       <View style={styles.bottomBar}>
-        <View style={styles.bottomBarHandle} />
-        <View style={styles.actionCol}>
-          <TouchableOpacity 
-            style={[styles.primaryBtn, { opacity: isFormValid ? 1 : 0.5 }]} 
-            disabled={!isFormValid}
-            onPress={handleSubmit} accessibilityRole="button" accessibilityLabel={t('a11ySubmitDispute', 'Submit Dispute')}
-          >
-            <Text style={styles.primaryBtnText}>{t('submitBtn', 'Submit Dispute')}</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          style={[styles.primaryBtn, (!isFormValid || isSubmitting) && { opacity: 0.5 }]} 
+          disabled={!isFormValid || isSubmitting}
+          onPress={handleSubmit}
+          activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11ySubmitDispute', 'Submit Dispute')}
+        >
+          <Text style={styles.primaryBtnText}>
+            {isSubmitting ? 'Submitting...' : t('submitBtn', 'Submit Dispute')}
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

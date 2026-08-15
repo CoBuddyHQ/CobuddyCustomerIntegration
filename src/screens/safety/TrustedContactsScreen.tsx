@@ -25,6 +25,7 @@ import { validatePhone, validateName } from '../../utils/validation';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { safetyApi } from '../../services/api';
 
 const RELATIONSHIPS = ['Family', 'Friend', 'Partner', 'Other'];
 
@@ -41,12 +42,41 @@ export const TrustedContactsScreen = () => {
   const [newPhone, setNewPhone] = useState('');
   const [newRel, setNewRel] = useState('Friend');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const removeContact = (id: string) => {
+  React.useEffect(() => {
+    const fetchContacts = async () => {
+      setIsLoading(true);
+      try {
+        const contacts = await safetyApi.getTrustedContacts();
+        if (contacts && Array.isArray(contacts)) {
+          // Sync with store
+          contacts.forEach(c => {
+            if (!trustedContacts.some(tc => tc.id === c.id)) {
+              addTrustedContact(c);
+            }
+          });
+        }
+      } catch (err) {
+        // Fallback gracefully to local store
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchContacts();
+  }, []);
+
+  const removeContact = async (id: string) => {
     removeTrustedContact(id);
+    try {
+      await safetyApi.deleteTrustedContact(id);
+    } catch {
+      // Ignored for graceful UI
+    }
   };
 
-  const handleAddSubmit = () => {
+  const handleAddSubmit = async () => {
     setErrorMsg('');
     if (!validateName(newName)) {
       setErrorMsg(t('contacts.error_name'));
@@ -57,16 +87,32 @@ export const TrustedContactsScreen = () => {
       return;
     }
 
-    addTrustedContact({
-      id: Date.now().toString(),
-      name: newName.trim(),
-      phone: newPhone.replace(/\D/g, ''),
-      relationship: newRel
-    });
-    setShowAddSheet(false);
-    setNewName('');
-    setNewPhone('');
-    setNewRel('Friend');
+    setIsSubmitting(true);
+    try {
+      const cleanPhone = newPhone.replace(/\D/g, '');
+      const created = await safetyApi.addTrustedContact({
+        name: newName.trim(),
+        phone: cleanPhone,
+        relationship: newRel,
+      });
+
+      addTrustedContact({
+        id: created.id || Date.now().toString(),
+        name: created.name || newName.trim(),
+        phone: created.phone || cleanPhone,
+        relationship: created.relationship || newRel,
+      });
+
+      setShowAddSheet(false);
+      setNewName('');
+      setNewPhone('');
+      setNewRel('Friend');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Failed to save contact.';
+      setErrorMsg(Array.isArray(msg) ? msg[0] : msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isValid = trustedContacts.length > 0;
@@ -200,7 +246,7 @@ export const TrustedContactsScreen = () => {
             </View>
             <View style={{ marginTop: 12 }}>
               {errorMsg ? <Text style={{ color: theme.colors.error, fontSize: 13, marginBottom: 12, textAlign: 'center' }}>{errorMsg}</Text> : null}
-              <Button title={t('contacts.btn_save')} onPress={handleAddSubmit} disabled={!newName || !newPhone} />
+              <Button title={t('contacts.btn_save')} onPress={handleAddSubmit} disabled={!newName || !newPhone || isSubmitting} loading={isSubmitting} />
             </View>
           </View>
         </AppBottomSheet>

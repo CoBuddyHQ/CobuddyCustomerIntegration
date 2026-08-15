@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { MOCK_BOOKINGS } from '../../services/mock';
+import { bookingApi, Booking as BookingApiType } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -15,8 +16,49 @@ export const BookingsListScreen = () => {
   const { t } = useTranslation('bookings.list');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
+  const [apiBookings, setApiBookings] = useState<BookingApiType[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const filteredBookings = MOCK_BOOKINGS.filter(b => b.type === activeTab);
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchBookings = async () => {
+      setIsLoading(true);
+      try {
+        const list = await bookingApi.listBookings(activeTab);
+        if (isMounted && list && list.length > 0) {
+          setApiBookings(list);
+        } else if (isMounted) {
+          setApiBookings([]);
+        }
+      } catch {
+        if (isMounted) setApiBookings([]);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    fetchBookings();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab]);
+
+  const mockFiltered = MOCK_BOOKINGS.filter(b => b.type === activeTab);
+  const displayList = apiBookings.length > 0
+    ? apiBookings.map(b => ({
+        id: b.id,
+        companionId: b.companionId,
+        companionName: b.companionName || 'Companion',
+        rating: '5.0',
+        activity: b.activity,
+        date: b.date || 'Today',
+        time: `${b.time || '18:00'} (${b.duration || 1} hrs)`,
+        venue: b.venue || 'Public Venue',
+        price: b.totalAmount ? `₹${b.totalAmount}` : '₹550',
+        displayStatus: b.status === 'accepted' ? 'Accepted' : b.status === 'countered' ? 'Counter-Proposed' : b.status === 'declined' ? 'Declined' : b.status === 'completed' ? 'Completed' : 'Awaiting Reply',
+        duration: `${b.duration || 1} hrs`,
+      }))
+    : mockFiltered;
 
   const handlePressCard = (booking: typeof MOCK_BOOKINGS[0]) => {
     if (booking.displayStatus === 'Counter-Proposed') {
@@ -105,7 +147,7 @@ export const BookingsListScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {filteredBookings.length === 0 ? (
+        {displayList.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconGlow}>
               <View style={styles.emptyIconCircle}>
@@ -119,7 +161,7 @@ export const BookingsListScreen = () => {
             </TouchableOpacity>
           </View>
         ) : (
-          filteredBookings.map((booking) => (
+          displayList.map((booking) => (
             <TouchableOpacity 
               key={booking.id} 
               style={styles.card} 

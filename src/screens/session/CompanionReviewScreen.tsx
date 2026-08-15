@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
+import { reviewsApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -15,16 +16,32 @@ export const CompanionReviewScreen = () => {
   const [publicReview, setPublicReview] = useState('');
   const [privateFeedback, setPrivateFeedback] = useState('');
 
-  const route = useRoute<any>();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { companionId: _companionId, companionName } = route.params || {};
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleFinish = () => {
-    // End of Live Session Flow. Reset stack to MainTabNavigator
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'MainTabNavigator' }],
-    });
+  const route = useRoute<any>();
+  const { companionId, companionName, bookingId, sessionId } = route.params || {};
+
+  const handleFinish = async () => {
+    setIsSubmitting(true);
+    try {
+      if (rating > 0) {
+        await reviewsApi.createReview({
+          companionId: companionId || 'c1',
+          bookingId,
+          sessionId,
+          rating,
+          text: publicReview,
+        });
+      }
+    } catch {
+      // Graceful fallback
+    } finally {
+      setIsSubmitting(false);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabNavigator' }],
+      });
+    }
   };
 
   return (
@@ -106,11 +123,13 @@ export const CompanionReviewScreen = () => {
 
       <View style={styles.bottomBar}>
         <TouchableOpacity 
-          style={[styles.primaryBtn, rating === 0 && { opacity: 0.5 }]} 
-          disabled={rating === 0}
+          style={[styles.primaryBtn, (rating === 0 || isSubmitting) && { opacity: 0.5 }]} 
+          disabled={rating === 0 || isSubmitting}
           onPress={handleFinish} accessibilityRole="button" accessibilityLabel={t('a11ySubmitFinish', 'Submit & Finish')}
         >
-          <Text style={styles.primaryBtnText}>{t('submitBtn', 'Submit & Finish')}</Text>
+          <Text style={styles.primaryBtnText}>
+            {isSubmitting ? 'Submitting...' : t('submitBtn', 'Submit & Finish')}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

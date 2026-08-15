@@ -13,6 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore';
 import { selectInterests } from '../../store/selectors/userPreferencesSelectors';
 import { INTEREST_MAPPING } from '../../services/mock/interestMapping';
+import { discoveryApi, CompanionCard as CompanionCardType } from '../../services/api';
 
 const FILTER_STATUS = ['All', 'Available Today', 'Top Rated', 'Nearby'];
 const FILTER_STATUS_KEYS: Record<string, string> = {
@@ -104,6 +105,7 @@ export const DiscoverScreen = () => {
   const [filterDistance, setFilterDistance] = useState(50);
   
   const [loading, setLoading] = useState(true);
+  const [apiCompanions, setApiCompanions] = useState<CompanionCardType[]>([]);
 
   // Sync navigation params to search bar whenever screen comes into focus
   useFocusEffect(
@@ -123,11 +125,32 @@ export const DiscoverScreen = () => {
   );
 
   useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
+    let isMounted = true;
+    const fetchCompanions = async () => {
+      setLoading(true);
+      try {
+        const params: any = {};
+        if (searchQuery.trim()) params.search = searchQuery.trim();
+        if (filterGender !== 'Any') params.gender = filterGender.toLowerCase();
+
+        const res = await discoveryApi.getCompanions(params);
+        if (isMounted && res?.data && res.data.length > 0) {
+          setApiCompanions(res.data);
+        } else if (isMounted) {
+          setApiCompanions([]);
+        }
+      } catch {
+        if (isMounted) setApiCompanions([]);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    const timer = setTimeout(fetchCompanions, 400);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, [activeStatus, searchQuery, filterGender, filterRating, filterMaxPrice, filterDistance]);
 
   const filteredCompanions = React.useMemo(() => {
@@ -142,33 +165,38 @@ export const DiscoverScreen = () => {
       });
     }
 
-    // 2. Filter companions
-    const filtered = DUMMY_COMPANIONS.filter(c => {
+    // 2. Filter companions (use apiCompanions if available, otherwise DUMMY_COMPANIONS)
+    const sourceList = apiCompanions.length > 0 ? apiCompanions : DUMMY_COMPANIONS;
+    const filtered = sourceList.filter(c => {
       // Search match
       const matchesSearch = searchQuery === '' || 
                             c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            c.activities.some(act => act.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                            (c.activities && c.activities.some(act => act.toLowerCase().includes(searchQuery.toLowerCase()))) ||
                             MODAL_CATEGORIES.find(m => m.label.toLowerCase() === searchQuery.toLowerCase())?.id === c.category;
       
       // Quick status filters
       let matchesStatus = true;
       if (activeStatus === 'Available Today') matchesStatus = c.isOnline === true;
-      if (activeStatus === 'Top Rated') matchesStatus = c.rating >= 4.95;
+      if (activeStatus === 'Top Rated') matchesStatus = (c.rating ?? 0) >= 4.95;
       
       // Advanced Filters
       let matchesGender = true;
-      if (filterGender !== 'Any') matchesGender = c.gender === filterGender;
+      if (filterGender !== 'Any') matchesGender = c.gender?.toLowerCase() === filterGender.toLowerCase();
       
       let matchesRating = true;
-      matchesRating = c.rating >= filterRating;
+      matchesRating = (c.rating ?? 0) >= filterRating;
 
       let matchesPrice = true;
-      const rateValue = parseInt(c.rate.replace(/\D/g, ''), 10);
-      matchesPrice = rateValue <= filterMaxPrice;
+      if (c.rate) {
+        const rateValue = parseInt(c.rate.replace(/\D/g, ''), 10);
+        if (!isNaN(rateValue)) matchesPrice = rateValue <= filterMaxPrice;
+      }
 
       let matchesDistance = true;
-      const distValue = parseFloat(c.distance);
-      matchesDistance = distValue <= filterDistance;
+      if (c.distance) {
+        const distValue = parseFloat(c.distance);
+        if (!isNaN(distValue)) matchesDistance = distValue <= filterDistance;
+      }
       
       return matchesSearch && matchesStatus && matchesGender && matchesRating && matchesPrice && matchesDistance;
     });
@@ -176,15 +204,15 @@ export const DiscoverScreen = () => {
     // 3. Sort companions to boost matches based on selected interests
     if (userActivityLabels.size > 0) {
       filtered.sort((a, b) => {
-        const aMatches = a.activities.some(act => userActivityLabels.has(act)) ? 1 : 0;
-        const bMatches = b.activities.some(act => userActivityLabels.has(act)) ? 1 : 0;
+        const aMatches = (a.activities && a.activities.some(act => userActivityLabels.has(act))) ? 1 : 0;
+        const bMatches = (b.activities && b.activities.some(act => userActivityLabels.has(act))) ? 1 : 0;
         return bMatches - aMatches;
       });
     }
 
     return filtered;
   }, [
-    searchQuery, activeStatus, filterGender, filterRating, 
+    apiCompanions, searchQuery, activeStatus, filterGender, filterRating, 
     filterMaxPrice, filterDistance, selectedInterests, MODAL_CATEGORIES
   ]);
 
