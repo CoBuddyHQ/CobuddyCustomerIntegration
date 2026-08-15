@@ -10,8 +10,8 @@
  */
 
 import { create } from 'zustand';
-import { authApi, TokenStorage, setLogoutListener } from '../services/api';
-import type { CustomerFromAuth } from '../services/api';
+import { authApi, TokenStorage, setLogoutListener } from '../../services/api';
+import type { CustomerFromAuth } from '../../services/api';
 
 export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 

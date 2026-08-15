@@ -43,9 +43,9 @@ export const TokenStorage = {
     return AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
   },
   async setTokens(access: string, refresh: string): Promise<void> {
-    await AsyncStorage.multiSet([
-      [STORAGE_KEYS.ACCESS_TOKEN, access],
-      [STORAGE_KEYS.REFRESH_TOKEN, refresh],
+    await Promise.all([
+      AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access),
+      AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh),
     ]);
   },
   async setUser(user: object): Promise<void> {
@@ -57,10 +57,10 @@ export const TokenStorage = {
     try { return JSON.parse(raw) as T; } catch { return null; }
   },
   async clearAll(): Promise<void> {
-    await AsyncStorage.multiRemove([
-      STORAGE_KEYS.ACCESS_TOKEN,
-      STORAGE_KEYS.REFRESH_TOKEN,
-      STORAGE_KEYS.USER,
+    await Promise.all([
+      AsyncStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN),
+      AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN),
+      AsyncStorage.removeItem(STORAGE_KEYS.USER),
     ]);
   },
 };

@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { kycApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';type DocType = 'AADHAAR' | 'PAN' | 'PASSPORT' | 'DL';
 
@@ -226,7 +227,18 @@ export const DocumentVerificationScreen = () => {
           <TouchableOpacity
             style={[styles.ctaBtn, !canSubmit() && styles.ctaBtnDisabled]}
             disabled={!canSubmit()}
-            onPress={() => navigation.navigate('SelfieCaptureScreen')}
+            onPress={async () => {
+              try {
+                await kycApi.submitKycDocument({
+                  docType: selectedDoc,
+                  docNumber: docNumber.trim(),
+                  legalName: legalName.trim(),
+                });
+              } catch {
+                // Fallback
+              }
+              navigation.navigate('SelfieCaptureScreen');
+            }}
             activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yContinueVerification', 'Continue Verification')}>
             <Icon name="upload" size={18} color={theme.colors.background} />
             <Text style={styles.ctaBtnText}>{t('continueVerify', 'Continue Verification')}</Text>

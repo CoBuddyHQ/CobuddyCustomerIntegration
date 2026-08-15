@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { kycApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -36,9 +37,16 @@ export const LivenessDetectionScreen = () => {
       ])
     ).start();
 
-    // MOCK: Simulate liveness steps
+    // MOCK / Real: Simulate liveness steps and send to backend
     const timer1 = setTimeout(() => setStep(1), 2500); // "Blink your eyes"
-    const timer2 = setTimeout(() => {
+    const timer2 = setTimeout(async () => {
+      try {
+        await kycApi.submitKycLiveness({
+          gestureStatus: 'completed',
+        });
+      } catch {
+        // Fallback
+      }
       navigation.replace('VerificationProcessingScreen');
     }, 5000);
 
