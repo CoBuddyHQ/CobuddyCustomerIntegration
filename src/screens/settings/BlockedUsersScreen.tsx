@@ -6,11 +6,26 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { MOCK_BLOCKED_USERS } from '../../services/mock';
+import { accountApi } from '../../services/api';
 
 export const BlockedUsersScreen = () => { 
   const { t } = useTranslation('settings.blockedUsers');
   const { smartGoBack } = useSmartNavigation();
   const [blockedUsers, setBlockedUsers] = useState(MOCK_BLOCKED_USERS);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    accountApi.getBlockedUsers().then(list => {
+      if (isMounted && list && list.length > 0) {
+        setBlockedUsers(list.map(u => ({
+          id: u.id,
+          name: u.name,
+          date: u.blockedAt ? new Date(u.blockedAt).toLocaleDateString() : 'Recently',
+        })));
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
 
   const handleUnblock = (user: typeof MOCK_BLOCKED_USERS[0]) => {
     Alert.alert(
@@ -21,8 +36,13 @@ export const BlockedUsersScreen = () => {
         { 
           text: t('unblockBtn', 'Unblock'), 
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
             setBlockedUsers(prev => prev.filter(u => u.id !== user.id));
+            try {
+              await accountApi.unblockUser(user.id);
+            } catch {
+              // Ignored
+            }
           }
         }
       ]

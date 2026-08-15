@@ -11,6 +11,7 @@ import { theme } from '../../theme';
 import { ChatInputBar } from '../../components/common/ChatInputBar';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { getMockChatMessages } from '../../services/mock/chat.mock';
+import { chatApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { isFeatureEnabled } from '../../config/featureFlags';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,7 +30,24 @@ export const CompanionChatScreen = () => {
 
   const [messages, setMessages] = useState(getMockChatMessages(companionName));
 
-  const handleSend = (text: string) => {
+  React.useEffect(() => {
+    let isMounted = true;
+    chatApi.getMessages(companionId).then(apiMsgs => {
+      if (isMounted && apiMsgs && apiMsgs.length > 0) {
+        setMessages(apiMsgs.map(m => ({
+          id: m.id,
+          type: 'text',
+          text: m.content || m.text,
+          sender: m.senderId === companionId ? 'them' : 'me',
+          time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now',
+        })));
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 200);
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [companionId]);
+
+  const handleSend = async (text: string) => {
     if (!text.trim()) return;
     
     const newMsg = {
@@ -41,21 +59,16 @@ export const CompanionChatScreen = () => {
     };
     
     setMessages(prev => [...prev, newMsg]);
-    
-    // Auto-scroll to bottom
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
 
-    // Mock bot reply
-    setTimeout(() => {
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        type: 'text',
-        text: t('botMsg.gotIt', 'Got it, see you shortly!'),
-        sender: 'them',
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-      }]);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    }, 1200);
+    try {
+      await chatApi.sendMessage({
+        conversationId: companionId,
+        content: text.trim(),
+      });
+    } catch {
+      // Optimistic update retained
+    }
   };
 
   const handleCall = () => {

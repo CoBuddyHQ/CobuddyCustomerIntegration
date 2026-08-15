@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { accountApi, ActiveSession as ActiveSessionType } from '../../services/api';
 
 interface Session {
     id: string;
@@ -55,6 +56,25 @@ export const ActiveSessionsScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const [sessions, setSessions] = useState<Session[]>(INITIAL_SESSIONS);
 
+  React.useEffect(() => {
+    let isMounted = true;
+    accountApi.getActiveSessions().then(list => {
+      if (isMounted && list && list.length > 0) {
+        setSessions(list.map(s => ({
+          id: s.id,
+          deviceName: s.deviceName || 'Mobile Device',
+          os: `${s.platform || 'Android'} • CoBuddy App`,
+          location: s.ipAddress ? `IP: ${s.ipAddress}` : 'India',
+          ipAddress: s.ipAddress || '192.168.1.1',
+          lastActive: s.lastActive ? new Date(s.lastActive).toLocaleTimeString() : 'Active Now',
+          isCurrentDevice: s.isCurrent ?? false,
+          deviceType: (s.platform === 'web' ? 'desktop' : 'mobile') as 'mobile' | 'desktop' | 'tablet',
+        })));
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
+
   const getDeviceIcon = (type: string) => {
       switch(type) {
           case 'desktop': return 'monitor';
@@ -72,8 +92,13 @@ export const ActiveSessionsScreen = () => {
               { 
                   text: t('logOutBtn', 'Log Out'), 
                   style: 'destructive',
-                  onPress: () => {
+                  onPress: async () => {
                       setSessions(prev => prev.filter(s => s.id !== id));
+                      try {
+                        await accountApi.revokeSession(id);
+                      } catch {
+                        // Ignored
+                      }
                   }
               }
           ]
