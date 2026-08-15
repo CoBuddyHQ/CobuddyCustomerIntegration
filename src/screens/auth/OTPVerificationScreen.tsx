@@ -46,9 +46,12 @@ export const OTPVerificationScreen = () => {
     ]).start();
   }, [shakeAnim]);
 
-  const handleVerify = useCallback(async () => {
-    if (!validateOTP(otp)) return;
+  const isVerifyingRef = useRef(false);
 
+  const handleVerify = useCallback(async () => {
+    if (!validateOTP(otp) || isVerifyingRef.current) return;
+
+    isVerifyingRef.current = true;
     setLocalError('');
     clearError();
 
@@ -61,12 +64,16 @@ export const OTPVerificationScreen = () => {
       // Error is set in authStore, show it and shake
       shake();
       setOtp('');
+    } finally {
+      isVerifyingRef.current = false;
     }
   }, [otp, phone, verifyOtp, clearError, shake]);
 
   // Auto-verify when all 6 digits entered
   useEffect(() => {
-    if (validateOTP(otp)) { handleVerify(); }
+    if (validateOTP(otp) && !isVerifyingRef.current) {
+      handleVerify();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otp]);
 

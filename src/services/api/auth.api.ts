@@ -34,13 +34,15 @@ export interface CustomerFromAuth {
   phone: string;
   name?: string | null;
   avatar?: string | null;
+  photoUrl?: string | null;
   bio?: string | null;
   age?: number | null;
   gender?: string | null;
   city?: string | null;
   countryCode?: string | null;
   accountStatus: string;
-  onboardingComplete: boolean;
+  isOnboardingComplete?: boolean;
+  onboardingComplete?: boolean;
   kycStatus: string;
   interests?: string[];
   spokenLanguages?: string[];

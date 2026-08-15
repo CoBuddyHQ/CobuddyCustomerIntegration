@@ -98,7 +98,7 @@ const mapCustomer = (c: CustomerFromAuth): AuthUser => ({
   id: c.id,
   phone: c.phone,
   name: c.name ?? null,
-  avatar: c.avatar ?? null,
+  avatar: c.avatar ?? c.photoUrl ?? null,
   bio: c.bio ?? null,
   age: c.age ?? null,
   gender: c.gender ?? null,
@@ -108,7 +108,7 @@ const mapCustomer = (c: CustomerFromAuth): AuthUser => ({
 });
 
 const toKycStatus = (raw?: string): KycStatus => {
-  if (raw === 'approved') return 'verified';
+  if (raw === 'approved' || raw === 'verified') return 'verified';
   if (raw === 'pending' || raw === 'processing') return 'pending';
   if (raw === 'rejected') return 'rejected';
   return 'unverified';
@@ -176,11 +176,15 @@ export const useAuthStore = create<AuthState>((set, get) => {
         await TokenStorage.setTokens(res.accessToken, res.refreshToken);
         await TokenStorage.setUser(user);
 
+        const isOnboardingComplete = Boolean(
+          res.customer.isOnboardingComplete ?? res.customer.onboardingComplete ?? false
+        );
+
         set({
           token: res.accessToken,
           user,
           isAuthenticated: true,
-          isOnboardingComplete: res.customer.onboardingComplete,
+          isOnboardingComplete,
           kycStatus: toKycStatus(res.customer.kycStatus),
         });
 
@@ -239,11 +243,15 @@ export const useAuthStore = create<AuthState>((set, get) => {
           const freshUser = mapCustomer(freshCustomer);
           await TokenStorage.setUser(freshUser);
 
+          const isOnboardingComplete = Boolean(
+            freshCustomer.isOnboardingComplete ?? freshCustomer.onboardingComplete ?? false
+          );
+
           set({
             token,
             user: freshUser,
             isAuthenticated: true,
-            isOnboardingComplete: freshCustomer.onboardingComplete,
+            isOnboardingComplete,
             kycStatus: toKycStatus(freshCustomer.kycStatus),
             isHydrated: true,
           });
