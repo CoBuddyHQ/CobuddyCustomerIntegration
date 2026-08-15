@@ -20,6 +20,7 @@ import { AppBottomSheet } from '../../components/ui/AppBottomSheet';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { validatePhone } from '../../utils/validation';
+import { useAuthStore } from '../../store/slices/authStore';
 
 import { useTranslation } from 'react-i18next';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
@@ -40,29 +41,42 @@ export const PhoneLoginScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const { t } = useTranslation(['auth']);
+  const { sendOtp, isLoading, error, clearError } = useAuthStore();
+
   const [countryCode, setCountryCode] = useState(COUNTRY_CODES[0]);
   const [phone, setPhone] = useState('');
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
   const [pickerVisible, setPickerVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  
+
   const fullPhone = `${countryCode.code}${phone}`;
   const isValid = validatePhone(fullPhone);
 
   const handleChangePhone = (text: string) => {
     const digits = text.replace(/\D/g, '');
     setPhone(digits);
-    if (error) { setError(''); }
+    if (localError) { setLocalError(''); }
+    if (error) { clearError(); }
   };
 
-  const handleSendOTP = () => {
+  const handleSendOTP = async () => {
     if (!isValid) {
-      setError(t('phone.error_invalid'));
+      setLocalError(t('phone.error_invalid'));
       return;
     }
-    setError('');
-    navigation.navigate('OTPVerificationScreen', { phone: fullPhone });
+    setLocalError('');
+    clearError();
+
+    try {
+      await sendOtp(fullPhone);
+      // Navigate to OTP screen — phone is passed as param
+      navigation.navigate('OTPVerificationScreen', { phone: fullPhone });
+    } catch {
+      // Error is already set in the store via sendOtp
+    }
   };
+
+  const displayError = localError || error || '';
 
   return (
     <KeyboardAvoidingView
@@ -92,9 +106,9 @@ export const PhoneLoginScreen = () => {
           {/* Phone field */}
           <TouchableOpacity
             activeOpacity={1}
-            style={[styles.fieldRow, error ? styles.fieldRowError : null]}
+            style={[styles.fieldRow, displayError ? styles.fieldRowError : null]}
             onPress={() => inputRef.current?.focus()} accessibilityRole="button" accessibilityLabel={t('phone.a11yFocusInput', 'Focus phone number input')}>
-            
+
             {/* Country code button */}
             <TouchableOpacity
               style={styles.codeBtn}
@@ -123,7 +137,7 @@ export const PhoneLoginScreen = () => {
             />
           </TouchableOpacity>
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {displayError ? <Text style={styles.errorText}>{displayError}</Text> : null}
 
           {/* Trust note */}
           <View style={styles.trustNote}>
@@ -138,7 +152,8 @@ export const PhoneLoginScreen = () => {
           <Button
             title={t('phone.btn_send')}
             onPress={handleSendOTP}
-            disabled={!isValid}
+            disabled={!isValid || isLoading}
+            loading={isLoading}
           />
         </BottomActionBar>
       </SafeAreaView>

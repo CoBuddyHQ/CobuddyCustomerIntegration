@@ -22,6 +22,8 @@ import { useTranslation } from 'react-i18next';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { profileApi } from '../../services/api';
+import { useAuthStore } from '../../store/slices/authStore';
 
 const GENDER_OPTIONS = ['Man', 'Woman', 'Non-binary', 'Prefer not to say'];
 const GENDER_OPTION_KEYS: Record<string, string> = {
@@ -41,6 +43,7 @@ const AVATAR_COLORS: Record<AvatarState, string> = {
 export const BasicProfileSetupScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
+  const { completeOnboarding, updateUser } = useAuthStore();
   const [name, setName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
@@ -53,14 +56,15 @@ export const BasicProfileSetupScreen = () => {
   const [bioError, setBioError] = useState('');
   const [avatarState, setAvatarState] = useState<AvatarState>('none');
   const [showAvatarSheet, setShowAvatarSheet] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const { t } = useTranslation(['onboarding']);
   
   const isValid = validateName(name) && validateDOB(dob) && gender !== '' && city.trim().length >= 3 && bio.trim().length >= 10;
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     let hasError = false;
-    
+
     if (!validateName(name)) {
       setNameError(t('profile.error_name', 'Invalid name'));
       hasError = true;
@@ -80,8 +84,30 @@ export const BasicProfileSetupScreen = () => {
 
     if (hasError) return;
 
-    // User profiling data could be saved here in a global store.
-    navigation.navigate('InterestSelectionScreen');
+    setIsSaving(true);
+    try {
+      // Parse age from DD/MM/YYYY dob
+      const parts = dob.split('/');
+      const birthYear = parseInt(parts[2], 10);
+      const age = new Date().getFullYear() - birthYear;
+
+      await profileApi.completeOnboarding({ name, city, gender, age });
+      // Also update bio via profile update
+      await profileApi.updateProfile({ bio });
+
+      // Update local store
+      updateUser({ name, city, gender, age, bio });
+      completeOnboarding();
+
+      // Navigate to next onboarding step
+      navigation.navigate('InterestSelectionScreen');
+    } catch {
+      // Non-fatal — still allow proceeding to next step
+      completeOnboarding();
+      navigation.navigate('InterestSelectionScreen');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDobChange = (text: string) => {
@@ -305,7 +331,7 @@ export const BasicProfileSetupScreen = () => {
         </ScrollView>
 
         <BottomActionBar>
-          <Button title={t('profile.btn_continue')} onPress={handleContinue} disabled={!isValid} />
+          <Button title={t('profile.btn_continue')} onPress={handleContinue} disabled={!isValid || isSaving} loading={isSaving} />
         </BottomActionBar>
 
         {/* Avatar picker bottom sheet */}

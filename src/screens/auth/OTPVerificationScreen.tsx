@@ -22,19 +22,19 @@ export const OTPVerificationScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'OTPVerificationScreen'>>();
   const { t } = useTranslation(['auth']);
   const phone = route.params?.phone || '+91 0000000000';
-  
+
+  const { verifyOtp, resendOtp, isLoading, error, clearError } = useAuthStore();
+
   const [otp, setOtp] = useState('');
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(OTP_EXPIRY);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  const { login } = useAuthStore();
-
   useEffect(() => {
     if (countdown <= 0) { return; }
-    const t = setInterval(() => setCountdown(c => c - 1), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setCountdown(c => c - 1), 1000);
+    return () => clearInterval(timer);
   }, [countdown]);
 
   const shake = useCallback(() => {
@@ -46,32 +46,43 @@ export const OTPVerificationScreen = () => {
     ]).start();
   }, [shakeAnim]);
 
-  const handleVerify = useCallback(() => {
+  const handleVerify = useCallback(async () => {
     if (!validateOTP(otp)) return;
-    
-    // Hardcoded logic for invalid OTP (testing)
-    if (otp !== '123456') {
-      setError(t('otp.error_invalid'));
+
+    setLocalError('');
+    clearError();
+
+    try {
+      // Real backend call — verifyOtp stores tokens on success
+      // Navigation is handled automatically by RootNavigator reacting to
+      // isAuthenticated / isOnboardingComplete changes in authStore
+      await verifyOtp(phone, otp);
+    } catch {
+      // Error is set in authStore, show it and shake
       shake();
       setOtp('');
-      return;
     }
+  }, [otp, phone, verifyOtp, clearError, shake]);
 
-    login('dummy-token', { id: 'user_123', phone });
-  }, [otp, t, login, phone, shake]);
-
+  // Auto-verify when all 6 digits entered
   useEffect(() => {
     if (validateOTP(otp)) { handleVerify(); }
-  }, [otp, handleVerify]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp]);
 
-  const handleResend = () => {
+  const handleResend = async () => {
     setResending(true);
     setOtp('');
-    setError('');
-    setTimeout(() => {
-      setResending(false);
+    setLocalError('');
+    clearError();
+    try {
+      await resendOtp(phone);
       setCountdown(OTP_EXPIRY);
-    }, 1200);
+    } catch {
+      // error displayed via store
+    } finally {
+      setResending(false);
+    }
   };
 
   const maskedPhone = phone.length > 5
@@ -79,6 +90,7 @@ export const OTPVerificationScreen = () => {
     : phone;
 
   const timerStr = `${Math.floor(countdown / 60)}:${(countdown % 60).toString().padStart(2, '0')}`;
+  const displayError = localError || error || '';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
@@ -98,13 +110,13 @@ export const OTPVerificationScreen = () => {
           <OTPInput
             length={6}
             value={otp}
-            onChange={v => { setOtp(v); if (error) { setError(''); } }}
-            error={!!error}
+            onChange={v => { setOtp(v); if (displayError) { setLocalError(''); clearError(); } }}
+            error={!!displayError}
             autoFocus
           />
         </Animated.View>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {displayError ? <Text style={styles.errorText}>{displayError}</Text> : null}
 
         <View style={styles.resendRow}>
           {countdown > 0 ? (
@@ -112,7 +124,7 @@ export const OTPVerificationScreen = () => {
               {t('otp.resend_in')}<Text style={styles.timerValue}>{timerStr}</Text>
             </Text>
           ) : (
-            <TouchableOpacity onPress={handleResend} disabled={resending} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityRole="button" accessibilityLabel={t('otp.a11yResendCode', 'Resend OTP code')}>
+            <TouchableOpacity onPress={handleResend} disabled={resending || isLoading} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityRole="button" accessibilityLabel={t('otp.a11yResendCode', 'Resend OTP code')}>
               <Icon name="refresh" size={16} color={theme.colors.primary} />
               <Text style={styles.resendBtn}>
                 {resending ? t('otp.resend_active') : t('otp.resend_btn')}
@@ -121,9 +133,12 @@ export const OTPVerificationScreen = () => {
           )}
         </View>
 
-        <View style={styles.devHint}>
-          <Text style={styles.devText}>{t('otp.dev_hint')}</Text>
-        </View>
+        {/* Dev hint — only in __DEV__ */}
+        {__DEV__ && (
+          <View style={styles.devHint}>
+            <Text style={styles.devText}>{t('otp.dev_hint')}</Text>
+          </View>
+        )}
 
         <View style={styles.trustNote}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
@@ -137,7 +152,8 @@ export const OTPVerificationScreen = () => {
         <Button
           title={t('otp.btn_verify')}
           onPress={handleVerify}
-          disabled={!validateOTP(otp)}
+          disabled={!validateOTP(otp) || isLoading}
+          loading={isLoading}
         />
         <TouchableOpacity onPress={() => smartGoBack()} style={styles.changeRow} accessibilityRole="button" accessibilityLabel={t('otp.a11yChangePhone', 'Change phone number')}>
           <Text style={styles.changeText}>{t('otp.btn_change')}</Text>
@@ -167,14 +183,14 @@ const styles = StyleSheet.create({
   },
   subtitle: { fontSize: 15, color: theme.colors.textSecondary, lineHeight: 22 },
   phoneHighlight: { color: theme.colors.primary, fontWeight: '600' },
-  
+
   errorText: { color: theme.colors.error, fontSize: 13, textAlign: 'center', marginTop: 12 },
-  
+
   resendRow: { alignItems: 'center', marginTop: 20, marginBottom: 28 },
   timerText: { fontSize: 13, color: theme.colors.textSecondary },
   timerValue: { color: theme.colors.primary, fontWeight: '600' },
   resendBtn: { fontSize: 14, color: theme.colors.primary, fontWeight: '500' },
-  
+
   devHint: {
     backgroundColor: 'rgba(212,175,55,0.08)',
     borderRadius: 10,
@@ -182,14 +198,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   devText: { fontSize: 11, color: theme.colors.primary, textAlign: 'center', fontStyle: 'italic' },
-  
+
   trustNote: {
     backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 14,
   },
   trustText: { fontSize: 12, color: theme.colors.textSecondary, lineHeight: 18 },
-  
+
   changeRow: { alignItems: 'center', paddingVertical: 12 },
   changeText: { fontSize: 13, color: theme.colors.textSecondary, textDecorationLine: 'underline' },
 });

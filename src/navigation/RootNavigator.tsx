@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SplashScreen } from '../screens/auth/SplashScreen';
 import { ForceUpdateScreen } from '../screens/system/ForceUpdateScreen';
@@ -19,20 +19,19 @@ import { useAuthStore } from '../store/slices/authStore';
 const Stack = createStackNavigator();
 
 export const RootNavigator = () => {
-  const { isAuthenticated, isOnboardingComplete } = useAuthStore();
-  const [isReady, setIsReady] = useState(false);
+  const { isAuthenticated, isOnboardingComplete, isHydrated, rehydrate } = useAuthStore();
 
   useEffect(() => {
-    // Artificial delay to show the Splash Screen for 1.5s as requested
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 1500);
-    return () => clearTimeout(timer);
+    // Restore session from AsyncStorage on boot.
+    // isHydrated becomes true once this completes (success or failure).
+    rehydrate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {!isReady ? (
+      {!isHydrated ? (
+        // Show splash until session is restored (or confirmed absent)
         <Stack.Screen name="SplashScreen" component={SplashScreen} />
       ) : !isAuthenticated ? (
         <Stack.Screen name="AuthStack" component={AuthStack} />
@@ -41,8 +40,8 @@ export const RootNavigator = () => {
       ) : (
         <Stack.Screen name="MainTabNavigator" component={MainTabNavigator} />
       )}
-      
-      {/* System state and modal screens can be pushed here or kept detached if needed */}
+
+      {/* System state and modal screens */}
       <Stack.Screen name="ForceUpdateScreen" component={ForceUpdateScreen} options={{ presentation: 'modal' }} />
       <Stack.Screen name="MaintenanceModeScreen" component={MaintenanceModeScreen} options={{ presentation: 'modal' }} />
       <Stack.Screen name="NetworkErrorScreen" component={NetworkErrorScreen} options={{ presentation: 'modal' }} />
