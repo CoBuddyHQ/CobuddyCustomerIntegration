@@ -19,7 +19,10 @@ import { useAuthStore } from '../store/slices/authStore';
 const Stack = createStackNavigator();
 
 export const RootNavigator = () => {
-  const { isAuthenticated, isOnboardingComplete, isHydrated, rehydrate } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isOnboardingComplete = useAuthStore((state) => state.isOnboardingComplete);
+  const isHydrated = useAuthStore((state) => state.isHydrated);
+  const rehydrate = useAuthStore((state) => state.rehydrate);
 
   useEffect(() => {
     // Restore session from AsyncStorage on boot.

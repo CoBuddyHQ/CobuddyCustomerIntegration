@@ -23,7 +23,11 @@ export const OTPVerificationScreen = () => {
   const { t } = useTranslation(['auth']);
   const phone = route.params?.phone || '+91 0000000000';
 
-  const { verifyOtp, resendOtp, isLoading, error, clearError } = useAuthStore();
+  const verifyOtp = useAuthStore((state) => state.verifyOtp);
+  const resendOtp = useAuthStore((state) => state.resendOtp);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const error = useAuthStore((state) => state.error);
+  const clearError = useAuthStore((state) => state.clearError);
 
   const [otp, setOtp] = useState('');
   const [localError, setLocalError] = useState('');
