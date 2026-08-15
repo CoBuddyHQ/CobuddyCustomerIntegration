@@ -13,6 +13,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore';
 import { selectInterests, selectSetInterests } from '../../store/selectors/userPreferencesSelectors';
+import { profileApi } from '../../services/api';
 
 const MIN_SELECT = 3;
 const MAX_SELECT = 10;
@@ -53,6 +54,7 @@ export const InterestSelectionScreen = () => {
   const initialInterests = route.params?.initialInterests || (globalInterests.length > 0 ? globalInterests : ['cafe', 'art', 'wellness']);
 
   const [selected, setSelected] = useState<Set<string>>(new Set(initialInterests));
+  const [isSaving, setIsSaving] = useState(false);
 
   const toggle = (id: string) => {
     setSelected(prev => {
@@ -67,19 +69,27 @@ export const InterestSelectionScreen = () => {
   const count = selected.size;
   const isValid = count >= MIN_SELECT;
 
-  const handleNext = () => {
-      const newInterests = Array.from(selected);
-      setGlobalInterests(newInterests);
-      if (isEditMode) {
-          // Pass data back to EditProfileScreen
-          navigation.navigate({
-              name: 'EditProfileScreen',
-              params: { updatedInterests: newInterests },
-              merge: true,
-          });
-      } else {
-          navigation.navigate('SafetyTutorialScreen' as never);
-      }
+  const handleNext = async () => {
+    const newInterests = Array.from(selected);
+    setGlobalInterests(newInterests);
+    setIsSaving(true);
+    try {
+      // Persist interests to backend: PATCH /profile/interests
+      await profileApi.updateInterests(newInterests);
+    } catch {
+      // Non-fatal — local store already updated, proceed
+    } finally {
+      setIsSaving(false);
+    }
+    if (isEditMode) {
+      navigation.navigate({
+        name: 'EditProfileScreen',
+        params: { updatedInterests: newInterests },
+        merge: true,
+      });
+    } else {
+      navigation.navigate('SafetyTutorialScreen' as never);
+    }
   };
 
   return (
@@ -124,7 +134,8 @@ export const InterestSelectionScreen = () => {
         <Button
           title={isEditMode ? t('interests.edit_btn_save', 'Save Interests') : t('interests.btn_continue')}
           onPress={handleNext}
-          disabled={!isValid}
+          disabled={!isValid || isSaving}
+          loading={isSaving}
         />
       </BottomActionBar>
     </SafeAreaView>
