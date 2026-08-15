@@ -31,8 +31,16 @@ export const RootNavigator = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const navKey = !isHydrated
+    ? 'splash'
+    : !isAuthenticated
+    ? 'auth'
+    : !isOnboardingComplete
+    ? 'onboarding'
+    : 'main';
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator key={navKey} screenOptions={{ headerShown: false }}>
       {!isHydrated ? (
         // Show splash until session is restored (or confirmed absent)
         <Stack.Screen name="SplashScreen" component={SplashScreen} />
