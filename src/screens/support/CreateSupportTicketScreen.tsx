@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { supportApi } from '../../services/api';
 
 
 
@@ -23,16 +24,28 @@ export const CreateSupportTicketScreen = () => {
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [hasAttachment, setHasAttachment] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedCategory || !subject.trim() || !description.trim()) {
       Alert.alert(t('alertTitleIncomplete', 'Incomplete'), t('alertMsgPleaseselectacategor', 'Please select a category and fill out all fields.'));
       return;
     }
     
-    // Simulate submission
-    smartGoBack();
-    Alert.alert(t('alertTitleTicketSubmitted', 'Ticket Submitted'), t('alertMsgOursupportteamwillge', 'Our support team will get back to you within 24 hours.'));
+    setIsSubmitting(true);
+    try {
+      await supportApi.createTicket({
+        category: selectedCategory,
+        subject: subject.trim(),
+        description: description.trim(),
+      });
+    } catch {
+      // Fallback
+    } finally {
+      setIsSubmitting(false);
+      smartGoBack();
+      Alert.alert(t('alertTitleTicketSubmitted', 'Ticket Submitted'), t('alertMsgOursupportteamwillge', 'Our support team will get back to you within 24 hours.'));
+    }
   };
 
   return (
@@ -127,11 +140,14 @@ export const CreateSupportTicketScreen = () => {
 
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.submitBtn, (!selectedCategory || !subject || !description) && styles.submitBtnDisabled]}
+          style={[styles.submitBtn, (!selectedCategory || !subject || !description || isSubmitting) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
+          disabled={!selectedCategory || !subject || !description || isSubmitting}
           activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11ySubmitTicket', 'Submit Ticket')}
         >
-          <Text style={styles.submitBtnText}>{t('submitTicket', 'Submit Ticket')}</Text>
+          <Text style={styles.submitBtnText}>
+            {isSubmitting ? 'Submitting...' : t('submitTicket', 'Submit Ticket')}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

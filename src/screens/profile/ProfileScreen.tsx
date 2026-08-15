@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
+import { profileApi, CustomerProfile, walletApi } from '../../services/api';
+import { useAuthStore } from '../../store/slices/authStore';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -18,24 +20,46 @@ export const ProfileScreen = () => {
   const { t } = useTranslation('profile.main');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
+  const authUser = useAuthStore(state => state.user);
+  const authKyc = useAuthStore(state => state.kycStatus);
 
-  // Mock User Data with Enhanced Fields
+  const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const [completionPercentage, setCompletionPercentage] = useState(85);
+  const [walletBal, setWalletBal] = useState('₹4,500');
+
+  React.useEffect(() => {
+    let isMounted = true;
+    profileApi.getProfile().then(p => {
+      if (isMounted && p) setProfile(p);
+    }).catch(() => {});
+
+    profileApi.getProfileCompletion().then(c => {
+      if (isMounted && c?.percentage) setCompletionPercentage(c.percentage);
+    }).catch(() => {});
+
+    walletApi.getWalletBalance().then(wb => {
+      if (isMounted && wb?.balance !== undefined) setWalletBal(`₹${wb.balance.toLocaleString()}`);
+    }).catch(() => {});
+
+    return () => { isMounted = false; };
+  }, []);
+
   const user = {
-    name: 'Shlok Sharma',
-    age: 28,
-    bio: 'Foodie & Explorer. Looking for great conversations and meeting new people across the city.',
-    location: 'New Delhi, India',
-    languages: 'English, Hindi',
-    memberSince: 'Oct 2026',
-    phone: '+91 98****1234',
-    email: 'shl***@gmail.com',
-    profileCompleteness: 85,
-    trustScore: 98,
-    kycStatus: 'unverified', // Unverified triggers the KYC checklist flow
-    walletBalance: '₹4,500',
+    name: profile?.name || authUser?.name || 'Shlok Sharma',
+    age: profile?.age ?? 28,
+    bio: profile?.bio || 'Foodie & Explorer. Looking for great conversations and meeting new people across the city.',
+    location: profile?.city ? `${profile.city}, India` : 'New Delhi, India',
+    languages: profile?.spokenLanguages?.join(', ') || 'English, Hindi',
+    memberSince: profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : 'Oct 2026',
+    phone: authUser?.phone || profile?.phone || '+91 98****1234',
+    email: 'user@cobuddy.app',
+    profileCompleteness: completionPercentage,
+    trustScore: profile?.trustScore ?? 98,
+    kycStatus: authKyc || profile?.kycStatus || 'unverified',
+    walletBalance: walletBal,
     reviewsCount: 12,
-    totalMeetups: 15,
-    hasActiveBooking: true,
+    totalMeetups: profile?.totalSessions ?? 15,
+    hasActiveBooking: false,
   };
 
   // State for inline safety toggles

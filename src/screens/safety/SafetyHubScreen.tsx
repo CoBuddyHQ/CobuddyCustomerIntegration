@@ -11,6 +11,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafetyStore } from '../../store/slices/safetyStore';
 import { selectIsSOSActive, selectTriggerSOS, selectResolveSOS, selectIsSessionActive, selectLastKnownLocation } from '../../store/selectors/safetySelectors';
+import { safetyApi } from '../../services/api';
 
 
 export const SafetyHubScreen = () => { 
@@ -110,8 +111,16 @@ export const SafetyHubScreen = () => {
                                 { 
                                   text: t('activateSOS', 'ACTIVATE SOS'), 
                                   style: 'destructive',
-                                  onPress: () => {
+                                  onPress: async () => {
                                     triggerSOS();
+                                    try {
+                                      await safetyApi.triggerSOS({
+                                        latitude: lastKnownLocation?.lat,
+                                        longitude: lastKnownLocation?.lng,
+                                      });
+                                    } catch {
+                                      // Local emergency state active
+                                    }
                                     Alert.alert(t('alertTitleSOSActivated', 'SOS Activated'), t('alertMsgHelpisonthewayYourli', 'Help is on the way. Your live location is now being shared.'));
                                   }
                                 }

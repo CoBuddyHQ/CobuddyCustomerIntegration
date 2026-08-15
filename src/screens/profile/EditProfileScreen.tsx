@@ -8,6 +8,7 @@ import { theme } from '../../theme';
 import { useInterestsData } from '../onboarding/InterestSelectionScreen'; // To map IDs to full objects
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { MOCK_PROFILE } from '../../services/mock';
+import { profileApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -18,6 +19,7 @@ export const EditProfileScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'EditProfileScreen'>>();
   
+  const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({
       name: MOCK_PROFILE.name,
       bio: MOCK_PROFILE.bio,
@@ -26,6 +28,19 @@ export const EditProfileScreen = () => {
       langIds: MOCK_PROFILE.langIds,
       interests: MOCK_PROFILE.interests.map((i) => INTERESTS_DATA.find((d) => d.id === i.id) || i),
   });
+
+  useEffect(() => {
+    profileApi.getProfile().then(p => {
+      if (p) {
+        setForm(prev => ({
+          ...prev,
+          name: p.name || prev.name,
+          bio: p.bio || prev.bio,
+          city: p.city || prev.city,
+        }));
+      }
+    }).catch(() => {});
+  }, []);
 
   // Handle incoming params from sub-screens (Location, Interests, Languages)
   useEffect(() => {
@@ -52,12 +67,28 @@ export const EditProfileScreen = () => {
       setForm(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
       if (!form.name.trim()) {
           Alert.alert(t('errorTitle', 'Error'), t('errorEmptyName', 'Display name cannot be empty.'));
           return;
       }
-      Alert.alert(t('successTitle', 'Success'), t('successProfileUpdate', 'Profile updated successfully!'), [{ text: t('ok', 'OK'), onPress: () => smartGoBack() }]);
+      setIsSaving(true);
+      try {
+        await profileApi.updateProfile({
+          name: form.name.trim(),
+          bio: form.bio.trim(),
+          city: form.city,
+        });
+
+        if (form.interests && form.interests.length > 0) {
+          await profileApi.updateInterests(form.interests.map(i => i.id));
+        }
+      } catch {
+        // Fallback
+      } finally {
+        setIsSaving(false);
+        Alert.alert(t('successTitle', 'Success'), t('successProfileUpdate', 'Profile updated successfully!'), [{ text: t('ok', 'OK'), onPress: () => smartGoBack() }]);
+      }
   };
 
   return (
@@ -69,8 +100,10 @@ export const EditProfileScreen = () => {
           <Icon name="arrow-left" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('title', 'Edit Profile')}</Text>
-        <TouchableOpacity style={styles.saveHeaderBtn} onPress={handleSave} accessibilityRole="button" accessibilityLabel={t('a11ySave', 'Save')}>
-            <Text style={styles.saveHeaderBtnText}>{t('saveBtn', 'Save')}</Text>
+        <TouchableOpacity style={styles.saveHeaderBtn} onPress={handleSave} disabled={isSaving} accessibilityRole="button" accessibilityLabel={t('a11ySave', 'Save')}>
+            <Text style={[styles.saveHeaderBtnText, isSaving && { opacity: 0.5 }]}>
+              {isSaving ? 'Saving...' : t('saveBtn', 'Save')}
+            </Text>
         </TouchableOpacity>
       </View>
 

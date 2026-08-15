@@ -6,6 +6,7 @@ import { useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { supportApi } from '../../services/api';
 import { MOCK_TICKETS, MOCK_THREADS } from '../../services/mock/support.mock';
 import { RootStackParamList } from '../../types/navigation';
 
@@ -18,18 +19,44 @@ export const SupportTicketDetailScreen = () => {
   
   const [replyText, setReplyText] = useState('');
   const [messages, setMessages] = useState(MOCK_THREADS[ticketId] || MOCK_THREADS['TKT-8921']);
+  const [isSending, setIsSending] = useState(false);
   const isClosed = matchedTicket?.status === 'Closed';
 
-  const handleSend = () => {
-    if (!replyText.trim()) return;
+  React.useEffect(() => {
+    let isMounted = true;
+    supportApi.getTicketDetail(ticketId).then(detail => {
+      if (isMounted && detail?.messages && detail.messages.length > 0) {
+        setMessages(detail.messages.map((m: any) => ({
+          id: m.id,
+          sender: m.senderType === 'agent' ? 'support' : 'user',
+          text: m.content || m.text,
+          time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
+        })));
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [ticketId]);
+
+  const handleSend = async () => {
+    if (!replyText.trim() || isSending) return;
+    const txt = replyText.trim();
     const newMsg = {
       id: Date.now().toString(),
       sender: 'user',
-      text: replyText.trim(),
+      text: txt,
       time: t('justNow', 'Just now')
     };
-    setMessages([...messages, newMsg]);
+    setMessages(prev => [...prev, newMsg]);
     setReplyText('');
+    
+    setIsSending(true);
+    try {
+      await supportApi.replyToTicket(ticketId, txt);
+    } catch {
+      // Optimistic update retained
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (

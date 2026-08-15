@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { supportApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -50,9 +51,29 @@ export const HelpCenterScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
+  const [apiFaqs, setApiFaqs] = useState<any[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    supportApi.getFaqs().then(faqs => {
+      if (isMounted && faqs && faqs.length > 0) {
+        setApiFaqs(faqs);
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
+
+  const activeFaqList = apiFaqs.length > 0
+    ? apiFaqs.map(f => ({
+        id: f.id,
+        categoryId: f.category || '1',
+        question: f.question,
+        answer: f.answer,
+      }))
+    : FAQS;
 
   // Dynamic filtering based on search text and selected category
-  const filteredFaqs = FAQS.filter(faq => {
+  const filteredFaqs = activeFaqList.filter(faq => {
     const matchesSearch = faq.question.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory ? faq.categoryId === selectedCategory : true;
