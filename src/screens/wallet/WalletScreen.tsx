@@ -9,6 +9,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
+import { walletApi, WalletBalance, WalletTransaction } from '../../services/api';
+import { useAuthStore } from '../../store/slices/authStore';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -24,16 +26,66 @@ const WALLET_DATA = {
 
 export const WalletScreen = () => { 
   const { t } = useTranslation('wallet.wallet');
-
-  const TRANSACTIONS = [
-  { id: '1', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via UPI ending in 45', amount: '+ ₹1,000', date: 'Today, 2:30 PM', positive: true },
-  { id: '2', type: 'deduct', title: t('txTypes.sessionPayment', 'Session Payment'), method: 'Booking #8294', amount: '- ₹450', date: 'Yesterday, 8:15 PM', positive: false },
-  { id: '3', type: 'refund', title: t('txTypes.refundProcessed', 'Refund Processed'), method: 'Canceled Session #8290', amount: '+ ₹200', date: 'Oct 18, 10:00 AM', positive: true, isRefund: true },
-  { id: '4', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via Card ending in 4242', amount: '+ ₹2,000', date: 'Oct 10, 1:15 PM', positive: true },
-];
-
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
+  const { kycStatus } = useAuthStore();
+
+  const [wallet, setWallet] = useState<WalletBalance>({
+    balance: 4500,
+    currency: 'INR',
+    pendingRefund: 500,
+    escrowHeld: 1200,
+  });
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchWalletData = async () => {
+      setIsLoading(true);
+      try {
+        const [wb, txs] = await Promise.allSettled([
+          walletApi.getWalletBalance(),
+          walletApi.getTransactions(),
+        ]);
+        if (isMounted && wb.status === 'fulfilled' && wb.value) {
+          setWallet(wb.value);
+        }
+        if (isMounted && txs.status === 'fulfilled' && txs.value?.data) {
+          setTransactions(txs.value.data);
+        }
+      } catch {
+        // Fallback to initial state
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    fetchWalletData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const MOCK_TRANSACTIONS = [
+    { id: '1', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via UPI ending in 45', amount: '+ ₹1,000', date: 'Today, 2:30 PM', positive: true },
+    { id: '2', type: 'deduct', title: t('txTypes.sessionPayment', 'Session Payment'), method: 'Booking #8294', amount: '- ₹450', date: 'Yesterday, 8:15 PM', positive: false },
+    { id: '3', type: 'refund', title: t('txTypes.refundProcessed', 'Refund Processed'), method: 'Canceled Session #8290', amount: '+ ₹200', date: 'Oct 18, 10:00 AM', positive: true, isRefund: true },
+    { id: '4', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via Card ending in 4242', amount: '+ ₹2,000', date: 'Oct 10, 1:15 PM', positive: true },
+  ];
+
+  const displayTransactions = transactions.length > 0
+    ? transactions.map(tx => ({
+        id: tx.id,
+        type: tx.type,
+        title: tx.type === 'deposit' || tx.type === 'topup' ? t('txTypes.moneyAdded', 'Money Added') : tx.type === 'refund' ? t('txTypes.refundProcessed', 'Refund Processed') : t('txTypes.sessionPayment', 'Session Payment'),
+        method: tx.description || 'Wallet Transaction',
+        amount: `${tx.amount >= 0 ? '+' : '-'} ₹${Math.abs(tx.amount).toLocaleString()}`,
+        date: tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : 'Recent',
+        positive: tx.amount >= 0,
+        isRefund: tx.type === 'refund',
+      }))
+    : MOCK_TRANSACTIONS;
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -60,21 +112,21 @@ export const WalletScreen = () => {
           <Text style={styles.heroSubtitle}>{t('availableBalance', 'Available Balance')}</Text>
           <View style={styles.balanceRow}>
             <Text style={styles.currencySymbol}>₹</Text>
-            <Text style={styles.balanceText}>{WALLET_DATA.balance.toLocaleString()}</Text>
+            <Text style={styles.balanceText}>{(wallet.balance ?? 4500).toLocaleString()}</Text>
           </View>
 
           <View style={styles.statsContainer}>
             <View style={styles.statBadgeWarning}>
               <Icon name="clock-outline" size={14} color={theme.colors.warning} />
-              <Text style={styles.statBadgeWarningText}>{t('wallet.pendingRefunds', 'Pending Refunds: ₹')}{WALLET_DATA.pendingRefund.toLocaleString()}</Text>
+              <Text style={styles.statBadgeWarningText}>{t('wallet.pendingRefunds', 'Pending Refunds: ₹')}{(wallet.pendingRefund ?? 500).toLocaleString()}</Text>
             </View>
             <View style={styles.statBadgeNeutral}>
               <Icon name="shield-lock-outline" size={14} color={theme.colors.textSecondary} />
-              <Text style={styles.statBadgeNeutralText}>{t('wallet.heldInEscrow', 'Held in Escrow: ₹')}{WALLET_DATA.escrowHeld.toLocaleString()}</Text>
+              <Text style={styles.statBadgeNeutralText}>{t('wallet.heldInEscrow', 'Held in Escrow: ₹')}{(wallet.escrowHeld ?? 1200).toLocaleString()}</Text>
             </View>
           </View>
 
-          {WALLET_DATA.kycStatus === 'unverified' && (
+          {kycStatus !== 'verified' && (
             <TouchableOpacity 
               style={styles.kycWarningBox}
               activeOpacity={0.8}
