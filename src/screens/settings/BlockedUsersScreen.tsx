@@ -19,7 +19,7 @@ export const BlockedUsersScreen = () => {
       if (isMounted && list && list.length > 0) {
         setBlockedUsers(list.map(u => ({
           id: u.id,
-          name: u.name,
+          name: u.name || 'CoBuddy User',
           date: u.blockedAt ? new Date(u.blockedAt).toLocaleDateString() : 'Recently',
         })));
       }

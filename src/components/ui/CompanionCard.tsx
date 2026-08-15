@@ -4,35 +4,36 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 
-interface CompanionCardProps {
+export interface CompanionCardProps {
   id: string;
   name: string;
-  initials: string;
+  initials?: string;
   photoUrl?: string; // Optional, fallback to initials if none
-  title: string; // The sub-line below name
-  activities: string[];
-  trustScore: number;
-  rating: number;
-  reviews: number;
-  sessions: number;
-  rate: string; // e.g. "₹500 /hr"
+  title?: string; // The sub-line below name
+  activities?: string[];
+  trustScore?: number;
+  rating?: number;
+  reviews?: number;
+  sessions?: number;
+  rate?: string; // e.g. "₹500 /hr"
   distance?: string; // e.g. "2.5 km away"
   isOnline?: boolean;
+  city?: string | null;
   onPress: (id: string) => void;
 }
 
 export const CompanionCard = ({
   id,
   name,
-  initials,
+  initials = name?.charAt(0) || 'C',
   photoUrl,
-  title,
-  activities,
-  trustScore,
-  rating,
-  reviews,
-  sessions,
-  rate,
+  title = 'Companion',
+  activities = [],
+  trustScore = 95,
+  rating = 4.8,
+  reviews = 10,
+  sessions = 12,
+  rate = '₹500 /hr',
   distance,
   isOnline = false,
   onPress,

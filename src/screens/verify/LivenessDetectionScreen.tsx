@@ -41,9 +41,7 @@ export const LivenessDetectionScreen = () => {
     const timer1 = setTimeout(() => setStep(1), 2500); // "Blink your eyes"
     const timer2 = setTimeout(async () => {
       try {
-        await kycApi.submitKycLiveness({
-          gestureStatus: 'completed',
-        });
+        await kycApi.submitKycLiveness('file:///local/liveness.mp4');
       } catch {
         // Fallback
       }

@@ -48,9 +48,10 @@ export const AddMoneyScreen = () => {
       // Simulate/Trigger payment gateway verification
       if (order?.orderId) {
         await paymentApi.verifyWalletTopup({
-          orderId: order.orderId,
-          paymentId: `pay_${Date.now()}`,
-          signature: `sig_${Date.now()}`,
+          razorpay_order_id: order.orderId,
+          razorpay_payment_id: `pay_${Date.now()}`,
+          razorpay_signature: `sig_${Date.now()}`,
+          amount: val,
         });
       }
     } catch {

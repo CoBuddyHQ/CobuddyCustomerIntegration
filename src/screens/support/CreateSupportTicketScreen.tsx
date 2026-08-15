@@ -37,7 +37,7 @@ export const CreateSupportTicketScreen = () => {
       await supportApi.createTicket({
         category: selectedCategory,
         subject: subject.trim(),
-        description: description.trim(),
+        message: description.trim(),
       });
     } catch {
       // Fallback

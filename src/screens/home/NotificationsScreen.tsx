@@ -7,7 +7,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { SmartHeader } from '../../components/ui/SmartHeader';
 import { MOCK_NOTIFICATIONS } from '../../services/mock';
-import { notificationsApi, NotificationItem as ApiNotificationItem } from '../../services/api';
+import { notificationsApi, Notification as ApiNotification } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -40,15 +40,15 @@ export const NotificationsScreen = () => {
     let isMounted = true;
     notificationsApi.listNotifications().then(list => {
       if (isMounted && list && list.length > 0) {
-        setNotifications(list.map((n: ApiNotificationItem) => ({
+        setNotifications(list.map((n: ApiNotification) => ({
           id: n.id,
-          category: (n.category || 'All') as NotificationCategory,
+          category: ((n.data?.category as string) || 'All') as NotificationCategory,
           title: n.title,
           description: n.body,
           time: n.createdAt ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now',
-          isRead: n.read ?? false,
-          icon: n.category === 'Security' ? 'shield-alert' : n.category === 'Wallet' ? 'wallet' : 'bell',
-          iconColor: n.category === 'Security' ? theme.colors.error : theme.colors.primary,
+          isRead: n.isRead ?? false,
+          icon: n.type === 'Security' ? 'shield-alert' : n.type === 'Wallet' ? 'wallet' : 'bell',
+          iconColor: n.type === 'Security' ? theme.colors.error : theme.colors.primary,
           route: 'HomeTab',
         })));
       }
@@ -61,7 +61,7 @@ export const NotificationsScreen = () => {
   const handleMarkAllRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     try {
-      await notificationsApi.markAllAsRead();
+      await notificationsApi.markAllNotificationsAsRead();
     } catch {
       // Ignored
     }

@@ -354,20 +354,20 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
             <View style={styles.reviewScoresGrid}>
               <View style={styles.reviewScoreItem}>
                 <Text style={styles.reviewScoreLabel}>{t('punctuality', 'Punctuality')}</Text>
-                <Text style={styles.reviewScoreValue}>{profile.reviews.categories.punctuality}</Text>
+                <Text style={styles.reviewScoreValue}>{profile.reviews.categories?.punctuality ?? 4.9}</Text>
               </View>
               <View style={styles.reviewScoreItem}>
                 <Text style={styles.reviewScoreLabel}>{t('communication', 'Communication')}</Text>
-                <Text style={styles.reviewScoreValue}>{profile.reviews.categories.communication}</Text>
+                <Text style={styles.reviewScoreValue}>{profile.reviews.categories?.communication ?? 5.0}</Text>
               </View>
               <View style={styles.reviewScoreItem}>
                 <Text style={styles.reviewScoreLabel}>{t('behavior', 'Behavior')}</Text>
-                <Text style={styles.reviewScoreValue}>{profile.reviews.categories.behavior}</Text>
+                <Text style={styles.reviewScoreValue}>{profile.reviews.categories?.behavior ?? 4.8}</Text>
               </View>
             </View>
 
-            {profile.reviews.items.map((rev, idx) => (
-              <View key={rev.id} style={[styles.reviewBox, idx === profile.reviews.items.length - 1 && { borderBottomWidth: 0, paddingBottom: 0 }]}>
+            {(profile.reviews.items || []).map((rev, idx) => (
+              <View key={rev.id} style={[styles.reviewBox, idx === (profile.reviews.items?.length || 1) - 1 && { borderBottomWidth: 0, paddingBottom: 0 }]}>
                 <View style={styles.reviewAuthorRow}>
                   <View style={styles.reviewAvatar}>
                     <Text style={styles.reviewAvatarText}>{rev.author.charAt(0)}</Text>

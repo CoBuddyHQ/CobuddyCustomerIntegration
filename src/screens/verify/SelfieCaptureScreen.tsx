@@ -37,9 +37,7 @@ export const SelfieCaptureScreen = () => {
 
   const handleNext = async () => {
     try {
-      await kycApi.submitKycSelfie({
-        selfieUrl: 'file:///local/selfie.jpg',
-      });
+      await kycApi.submitKycSelfie('file:///local/selfie.jpg');
     } catch {
       // Graceful fallback
     }

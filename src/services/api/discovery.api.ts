@@ -25,7 +25,7 @@ export interface CompanionCard {
   city?: string | null;
 }
 
-export interface CompanionDetail extends CompanionCard {
+export interface CompanionDetail extends Omit<CompanionCard, 'reviews'> {
   photos?: string[];
   location?: string;
   languages?: string[];

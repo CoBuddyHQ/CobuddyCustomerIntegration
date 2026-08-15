@@ -1,5 +1,5 @@
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
   StatusBar, Alert 
@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
-import { walletApi, WalletBalance, WalletTransaction } from '../../services/api';
+import { walletApi, WalletBalance, Transaction } from '../../services/api';
 import { useAuthStore } from '../../store/slices/authStore';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -34,9 +34,8 @@ export const WalletScreen = () => {
     balance: 4500,
     currency: 'INR',
     pendingRefund: 500,
-    escrowHeld: 1200,
   });
-  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   React.useEffect(() => {
@@ -68,21 +67,21 @@ export const WalletScreen = () => {
   }, []);
 
   const MOCK_TRANSACTIONS = [
-    { id: '1', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via UPI ending in 45', amount: '+ ₹1,000', date: 'Today, 2:30 PM', positive: true },
-    { id: '2', type: 'deduct', title: t('txTypes.sessionPayment', 'Session Payment'), method: 'Booking #8294', amount: '- ₹450', date: 'Yesterday, 8:15 PM', positive: false },
+    { id: '1', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via UPI ending in 45', amount: '+ ₹1,000', date: 'Today, 2:30 PM', positive: true, isRefund: false },
+    { id: '2', type: 'deduct', title: t('txTypes.sessionPayment', 'Session Payment'), method: 'Booking #8294', amount: '- ₹450', date: 'Yesterday, 8:15 PM', positive: false, isRefund: false },
     { id: '3', type: 'refund', title: t('txTypes.refundProcessed', 'Refund Processed'), method: 'Canceled Session #8290', amount: '+ ₹200', date: 'Oct 18, 10:00 AM', positive: true, isRefund: true },
-    { id: '4', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via Card ending in 4242', amount: '+ ₹2,000', date: 'Oct 10, 1:15 PM', positive: true },
+    { id: '4', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via Card ending in 4242', amount: '+ ₹2,000', date: 'Oct 10, 1:15 PM', positive: true, isRefund: false },
   ];
 
   const displayTransactions = transactions.length > 0
-    ? transactions.map(tx => ({
+    ? transactions.map((tx: Transaction) => ({
         id: tx.id,
         type: tx.type,
-        title: tx.type === 'deposit' || tx.type === 'topup' ? t('txTypes.moneyAdded', 'Money Added') : tx.type === 'refund' ? t('txTypes.refundProcessed', 'Refund Processed') : t('txTypes.sessionPayment', 'Session Payment'),
-        method: tx.description || 'Wallet Transaction',
-        amount: `${tx.amount >= 0 ? '+' : '-'} ₹${Math.abs(tx.amount).toLocaleString()}`,
-        date: tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : 'Recent',
-        positive: tx.amount >= 0,
+        title: tx.type === 'credit' ? t('txTypes.moneyAdded', 'Money Added') : tx.type === 'refund' ? t('txTypes.refundProcessed', 'Refund Processed') : t('txTypes.sessionPayment', 'Session Payment'),
+        method: tx.category || tx.paymentSource || 'Wallet Transaction',
+        amount: `${tx.positive ? '+' : '-'} ₹${Math.abs(tx.amount).toLocaleString()}`,
+        date: tx.date || (tx.time ? `${tx.date} ${tx.time}` : 'Recent'),
+        positive: tx.positive,
         isRefund: tx.type === 'refund',
       }))
     : MOCK_TRANSACTIONS;
@@ -191,8 +190,8 @@ export const WalletScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {TRANSACTIONS.map((tx, index) => (
-            <View key={tx.id} style={[styles.txItem, index !== TRANSACTIONS.length - 1 && styles.txBorder]}>
+          {displayTransactions.map((tx: any, index: number) => (
+            <View key={tx.id} style={[styles.txItem, index !== displayTransactions.length - 1 && styles.txBorder]}>
               <View style={[styles.txIconWrap, tx.positive ? styles.txIconWrapPos : styles.txIconWrapNeg, tx.isRefund && styles.txIconWrapRefund]}>
                 <Icon 
                   name={tx.isRefund ? "arrow-u-left-top" : tx.positive ? "arrow-bottom-left" : "arrow-top-right"} 

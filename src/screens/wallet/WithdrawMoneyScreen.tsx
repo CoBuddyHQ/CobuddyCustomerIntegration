@@ -57,10 +57,7 @@ export const WithdrawMoneyScreen = () => {
     
     setIsWithdrawing(true);
     try {
-      await walletApi.withdrawMoney({
-        amount: val,
-        destination,
-      });
+      await walletApi.withdrawMoney(val);
     } catch {
       // Graceful fallback
     } finally {

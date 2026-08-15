@@ -39,10 +39,8 @@ export const IncidentReportScreen = () => {
     setIsSubmitting(true);
     try {
       await safetyApi.createIncidentReport({
-        type: selectedType,
-        targetName: bookingRef || undefined,
-        description: description.trim(),
-        severity: 'high',
+        companionId: bookingRef || undefined,
+        description: `[${selectedType}] ${description.trim()}`,
       });
     } catch {
       // Fallback gracefully

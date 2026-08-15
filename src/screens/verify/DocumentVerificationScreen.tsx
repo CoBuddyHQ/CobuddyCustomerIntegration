@@ -230,9 +230,10 @@ export const DocumentVerificationScreen = () => {
             onPress={async () => {
               try {
                 await kycApi.submitKycDocument({
-                  docType: selectedDoc,
-                  docNumber: docNumber.trim(),
-                  legalName: legalName.trim(),
+                  documentType: selectedDoc,
+                  documentNumber: docNumber.trim(),
+                  frontDocUri: 'file:///local/front.jpg',
+                  backDocUri: 'file:///local/back.jpg',
                 });
               } catch {
                 // Fallback

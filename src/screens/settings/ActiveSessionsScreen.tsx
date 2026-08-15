@@ -62,13 +62,13 @@ export const ActiveSessionsScreen = () => {
       if (isMounted && list && list.length > 0) {
         setSessions(list.map(s => ({
           id: s.id,
-          deviceName: s.deviceName || 'Mobile Device',
-          os: `${s.platform || 'Android'} • CoBuddy App`,
+          deviceName: s.deviceInfo || 'Mobile Device',
+          os: 'CoBuddy App',
           location: s.ipAddress ? `IP: ${s.ipAddress}` : 'India',
           ipAddress: s.ipAddress || '192.168.1.1',
-          lastActive: s.lastActive ? new Date(s.lastActive).toLocaleTimeString() : 'Active Now',
+          lastActive: s.createdAt ? new Date(s.createdAt).toLocaleTimeString() : 'Active Now',
           isCurrentDevice: s.isCurrent ?? false,
-          deviceType: (s.platform === 'web' ? 'desktop' : 'mobile') as 'mobile' | 'desktop' | 'tablet',
+          deviceType: 'mobile' as const,
         })));
       }
     }).catch(() => {});

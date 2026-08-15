@@ -114,10 +114,11 @@ export const SafetyHubScreen = () => {
                                   onPress: async () => {
                                     triggerSOS();
                                     try {
-                                      await safetyApi.triggerSOS({
-                                        latitude: lastKnownLocation?.lat,
-                                        longitude: lastKnownLocation?.lng,
-                                      });
+                                      await safetyApi.triggerSOS(
+                                        undefined,
+                                        lastKnownLocation?.lat,
+                                        lastKnownLocation?.lng,
+                                      );
                                     } catch {
                                       // Local emergency state active
                                     }
