@@ -52,16 +52,20 @@ export interface CompanionDetail extends Omit<CompanionCard, 'reviews'> {
 }
 
 export interface CompanionsListResponse {
+  companions: CompanionCard[];
   data: CompanionCard[];
   total: number;
   page: number;
   limit: number;
+  totalPages?: number;
 }
 
 export interface CompanionFilterParams {
   category?: string;
   gender?: string;
   search?: string;
+  isOnline?: boolean;
+  maxPrice?: number;
   page?: number;
   limit?: number;
 }
@@ -83,8 +87,17 @@ export interface ActivityOption {
 
 // ─── Get companions list (with filters) ──────────────────────────────────────
 export const getCompanions = async (params?: CompanionFilterParams): Promise<CompanionsListResponse> => {
-  const res = await apiClient.get<CompanionsListResponse>('/discovery/companions', { params });
-  return res.data;
+  const res = await apiClient.get<any>('/discovery/companions', { params });
+  const data = res.data;
+  const list = Array.isArray(data) ? data : (data?.companions || data?.data || []);
+  return {
+    companions: list,
+    data: list,
+    total: data?.total ?? list.length,
+    page: data?.page ?? 1,
+    limit: data?.limit ?? 20,
+    totalPages: data?.totalPages ?? 1,
+  };
 };
 
 // ─── Get featured companions ──────────────────────────────────────────────────

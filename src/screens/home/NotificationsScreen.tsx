@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { SmartHeader } from '../../components/ui/SmartHeader';
-import { MOCK_NOTIFICATIONS } from '../../services/mock';
 import { notificationsApi, Notification as ApiNotification } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,32 +28,65 @@ interface NotificationItem {
 
 const CATEGORIES: NotificationCategory[] = ['All', 'Bookings', 'Wallet', 'Security', 'Support'];
 
+const formatRelativeTime = (dateString?: string): string => {
+  if (!dateString) return 'Now';
+  const diff = Date.now() - new Date(dateString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 export const NotificationsScreen = () => { 
   const { t } = useTranslation('home.notifications');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeCategory, setActiveCategory] = useState<NotificationCategory>('All');
-  const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS as unknown as NotificationItem[]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  React.useEffect(() => {
-    let isMounted = true;
-    notificationsApi.listNotifications().then(list => {
-      if (isMounted && list && list.length > 0) {
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const list = await notificationsApi.listNotifications();
+      if (list && Array.isArray(list)) {
         setNotifications(list.map((n: ApiNotification) => ({
           id: n.id,
-          category: ((n.data?.category as string) || 'All') as NotificationCategory,
+          category: (n.category || ((n.data?.category as string) || 'All')) as NotificationCategory,
           title: n.title,
-          description: n.body,
-          time: n.createdAt ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now',
+          description: n.description || n.body || '',
+          time: formatRelativeTime(n.createdAt),
           isRead: n.isRead ?? false,
-          icon: n.type === 'Security' ? 'shield-alert' : n.type === 'Wallet' ? 'wallet' : 'bell',
-          iconColor: n.type === 'Security' ? theme.colors.error : theme.colors.primary,
-          route: 'HomeTab',
+          icon: n.icon || (n.category === 'Security' ? 'shield-alert' : n.category === 'Wallet' ? 'wallet-plus' : 'calendar-check'),
+          iconColor: n.iconColor || (n.category === 'Security' ? theme.colors.error : theme.colors.primary),
+          route: n.route || 'HomeTab',
+          stack: n.stack,
         })));
       }
-    }).catch(() => {});
-    return () => { isMounted = false; };
+    } catch {
+      // Ignored
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications();
+    }, [fetchNotifications])
+  );
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchNotifications();
+  };
 
   const filteredNotifications = notifications.filter(n => activeCategory === 'All' || n.category === activeCategory);
 
@@ -139,6 +171,14 @@ export const NotificationsScreen = () => {
       <ScrollView 
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+          />
+        }
       >
         {filteredNotifications.length === 0 ? (
           <View style={styles.emptyState}>

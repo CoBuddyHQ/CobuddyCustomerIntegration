@@ -7,9 +7,15 @@ import apiClient from './apiClient';
 
 export interface Notification {
   id: string;
-  type: string;
+  type?: string;
   title: string;
-  body: string;
+  description?: string;
+  body?: string;
+  category?: string;
+  icon?: string;
+  iconColor?: string;
+  route?: string;
+  stack?: string;
   isRead: boolean;
   data?: Record<string, unknown>;
   createdAt: string;
@@ -17,8 +23,11 @@ export interface Notification {
 
 // ─── List notifications ───────────────────────────────────────────────────────
 export const listNotifications = async (): Promise<Notification[]> => {
-  const res = await apiClient.get<Notification[]>('/notifications');
-  return res.data;
+  const res = await apiClient.get<any>('/notifications');
+  const data = res.data;
+  if (Array.isArray(data)) return data;
+  if (data?.notifications && Array.isArray(data.notifications)) return data.notifications;
+  return [];
 };
 
 // ─── Mark single notification as read ────────────────────────────────────────

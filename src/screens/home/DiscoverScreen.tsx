@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -7,7 +7,6 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { CompanionCard } from '../../components/ui/CompanionCard';
 import { CompanionCardSkeleton } from '../../components/ui/CompanionCardSkeleton';
-import { DUMMY_COMPANIONS } from '../../services/mock';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore';
@@ -84,11 +83,11 @@ export const DiscoverScreen = () => {
   const { t } = useTranslation(['discover']);
 
   const MODAL_CATEGORIES = React.useMemo(() => [
-  { id: 'coffee', label: t('categories.coffeeMeetups', 'Coffee Meetups') },
-  { id: 'movie', label: t('categories.movieBuffs', 'Movie Buffs') },
-  { id: 'study', label: t('categories.studyBuddy', 'Study Buddy') },
-  { id: 'city', label: t('categories.cityWalk', 'City Walk') },
-], [t]);
+    { id: 'coffee', label: t('categories.coffeeMeetups', 'Coffee Meetups') },
+    { id: 'movie', label: t('categories.movieBuffs', 'Movie Buffs') },
+    { id: 'study', label: t('categories.studyBuddy', 'Study Buddy') },
+    { id: 'city', label: t('categories.cityWalk', 'City Walk') },
+  ], [t]);
 
   const selectedInterests = useUserPreferencesStore(selectInterests);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -105,6 +104,7 @@ export const DiscoverScreen = () => {
   const [filterDistance, setFilterDistance] = useState(50);
   
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [apiCompanions, setApiCompanions] = useState<CompanionCardType[]>([]);
 
   // Sync navigation params to search bar whenever screen comes into focus
@@ -124,34 +124,39 @@ export const DiscoverScreen = () => {
     }, [route.params?.category, MODAL_CATEGORIES, navigation])
   );
 
+  const fetchCompanions = useCallback(async () => {
+    try {
+      const params: any = {};
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+      if (filterGender !== 'Any') params.gender = filterGender.toLowerCase();
+
+      const res = await discoveryApi.getCompanions(params);
+      const list = res?.data || res?.companions || [];
+      setApiCompanions(list);
+    } catch {
+      setApiCompanions([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [searchQuery, filterGender]);
+
   useEffect(() => {
-    let isMounted = true;
-    const fetchCompanions = async () => {
-      setLoading(true);
-      try {
-        const params: any = {};
-        if (searchQuery.trim()) params.search = searchQuery.trim();
-        if (filterGender !== 'Any') params.gender = filterGender.toLowerCase();
+    setLoading(true);
+    const timer = setTimeout(fetchCompanions, 300);
+    return () => clearTimeout(timer);
+  }, [fetchCompanions]);
 
-        const res = await discoveryApi.getCompanions(params);
-        if (isMounted && res?.data && res.data.length > 0) {
-          setApiCompanions(res.data);
-        } else if (isMounted) {
-          setApiCompanions([]);
-        }
-      } catch {
-        if (isMounted) setApiCompanions([]);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
+  useFocusEffect(
+    useCallback(() => {
+      fetchCompanions();
+    }, [fetchCompanions])
+  );
 
-    const timer = setTimeout(fetchCompanions, 400);
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [activeStatus, searchQuery, filterGender, filterRating, filterMaxPrice, filterDistance]);
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchCompanions();
+  };
 
   const filteredCompanions = React.useMemo(() => {
     // 1. Gather all activity labels from user's selected interests
@@ -165,8 +170,8 @@ export const DiscoverScreen = () => {
       });
     }
 
-    // 2. Filter companions (use apiCompanions if available, otherwise DUMMY_COMPANIONS)
-    const sourceList = apiCompanions.length > 0 ? apiCompanions : DUMMY_COMPANIONS;
+    // 2. Filter companions using real backend list
+    const sourceList = apiCompanions;
     const filtered = sourceList.filter(c => {
       // Search match
       const matchesSearch = searchQuery === '' || 
@@ -188,13 +193,13 @@ export const DiscoverScreen = () => {
 
       let matchesPrice = true;
       if (c.rate) {
-        const rateValue = parseInt(c.rate.replace(/\D/g, ''), 10);
+        const rateValue = typeof c.rate === 'number' ? c.rate : parseInt(String(c.rate).replace(/\D/g, ''), 10);
         if (!isNaN(rateValue)) matchesPrice = rateValue <= filterMaxPrice;
       }
 
       let matchesDistance = true;
       if (c.distance) {
-        const distValue = parseFloat(c.distance);
+        const distValue = parseFloat(String(c.distance));
         if (!isNaN(distValue)) matchesDistance = distValue <= filterDistance;
       }
       
@@ -307,6 +312,14 @@ export const DiscoverScreen = () => {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+              colors={[theme.colors.primary]}
+            />
+          }
           renderItem={({ item }) => (
             <CompanionCard
               {...item}
