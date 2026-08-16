@@ -133,8 +133,16 @@ export const updateLocation = async (data: {
   longitude?: number;
   address?: string;
   city?: string;
-}): Promise<{ message: string }> => {
-  const res = await apiClient.patch<{ message: string }>('/profile/location', data);
+  permissionGranted?: boolean;
+  skipped?: boolean;
+}): Promise<{ success: boolean; message: string; city?: string; latitude?: number; longitude?: number; locationPermissionGranted?: boolean }> => {
+  const res = await apiClient.patch<{ success: boolean; message: string; city?: string; latitude?: number; longitude?: number; locationPermissionGranted?: boolean }>('/profile/location', data);
+  return res.data;
+};
+
+// ─── Skip location step ───────────────────────────────────────────────────────
+export const skipLocation = async (): Promise<{ success: boolean; message: string; locationPermissionGranted: boolean }> => {
+  const res = await apiClient.post<{ success: boolean; message: string; locationPermissionGranted: boolean }>('/profile/location/skip');
   return res.data;
 };
 
