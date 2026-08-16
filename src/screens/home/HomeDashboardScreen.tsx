@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { CompanionCard } from '../../components/ui/CompanionCard';
 import { CompanionCardSkeleton } from '../../components/ui/CompanionCardSkeleton';
-import { DUMMY_FEATURED, MOCK_PROFILE } from '../../services/mock';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore';
@@ -16,23 +15,24 @@ import { INTEREST_MAPPING } from '../../services/mock/interestMapping';
 import { useBookingStore } from '../../store/slices/bookingStore';
 import { selectActiveBooking } from '../../store/selectors/bookingSelectors';
 import { useAuthStore } from '../../store/slices/authStore';
-import { discoveryApi, bookingApi, CompanionCard as CompanionCardType } from '../../services/api';
-
+import { discoveryApi, bookingApi, profileApi, notificationsApi, CompanionCard as CompanionCardType } from '../../services/api';
 
 export const HomeDashboardScreen = () => {
   const { t } = useTranslation('home.dashboard');
 
   const EXPLORE_CATEGORIES = React.useMemo(() => [
-  { id: 'coffee', title: t('categories.coffeeMeetups', 'Coffee Meetups'), icon: 'coffee', color: '#D4AF37' },
-  { id: 'movie', title: t('categories.movieBuffs', 'Movie Buffs'), icon: 'movie', color: '#E11D48' },
-  { id: 'city', title: t('categories.cityWalk', 'City Walk'), icon: 'map-marker', color: '#10B981' },
-  { id: 'study', title: t('categories.studyBuddy', 'Study Buddy'), icon: 'book', color: '#3B82F6' },
-], [t]);
+    { id: 'coffee', title: t('categories.coffeeMeetups', 'Coffee Meetups'), icon: 'coffee', color: '#D4AF37' },
+    { id: 'movie', title: t('categories.movieBuffs', 'Movie Buffs'), icon: 'movie', color: '#E11D48' },
+    { id: 'city', title: t('categories.cityWalk', 'City Walk'), icon: 'map-marker', color: '#10B981' },
+    { id: 'study', title: t('categories.studyBuddy', 'Study Buddy'), icon: 'book', color: '#3B82F6' },
+  ], [t]);
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [featuredList, setFeaturedList] = useState<CompanionCardType[]>([]);
-  const user = useAuthStore(state => state.user);
+  const [hasUnreadNotifs, setHasUnreadNotifs] = useState(false);
+  const { user, updateUser } = useAuthStore();
   const selectedInterests = useUserPreferencesStore(selectInterests);
 
   const sortedExploreCategories = React.useMemo(() => {
@@ -59,31 +59,58 @@ export const HomeDashboardScreen = () => {
   const activeBooking = useBookingStore(selectActiveBooking);
   const hasActiveBooking = !!activeBooking;
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadHomeData = async () => {
-      setLoading(true);
-      try {
-        const featured = await discoveryApi.getFeaturedCompanions();
-        if (isMounted && featured && featured.length > 0) {
-          setFeaturedList(featured);
-        } else if (isMounted) {
-          setFeaturedList(DUMMY_FEATURED as unknown as CompanionCardType[]);
+  const loadHomeData = useCallback(async () => {
+    try {
+      // 1. Fetch fresh profile from PostgreSQL
+      const profilePromise = profileApi.getProfile().then(profile => {
+        if (profile?.name) {
+          updateUser({
+            name: profile.name,
+            avatar: profile.avatar || null,
+            city: profile.city || null,
+            gender: profile.gender || null,
+            bio: profile.bio || null,
+          });
         }
-      } catch {
-        if (isMounted) {
-          setFeaturedList(DUMMY_FEATURED as unknown as CompanionCardType[]);
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
+      }).catch(() => {});
 
+      // 2. Fetch notifications to check unread status
+      const notifsPromise = notificationsApi.listNotifications().then(notifsRes => {
+        const notifs = Array.isArray(notifsRes) ? notifsRes : (notifsRes as any)?.data || [];
+        const unread = notifs.some((n: any) => !n.isRead);
+        setHasUnreadNotifs(unread);
+      }).catch(() => {});
+
+      // 3. Fetch real featured companions
+      const featuredPromise = discoveryApi.getFeaturedCompanions().then(featured => {
+        if (featured && Array.isArray(featured)) {
+          setFeaturedList(featured);
+        }
+      }).catch(() => {});
+
+      await Promise.allSettled([profilePromise, notifsPromise, featuredPromise]);
+    } catch {
+      // Handle gracefully
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [updateUser]);
+
+  useEffect(() => {
     loadHomeData();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [loadHomeData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHomeData();
+    }, [loadHomeData])
+  );
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadHomeData();
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -98,17 +125,28 @@ export const HomeDashboardScreen = () => {
         </View>
         <View style={styles.topRightIcons}>
           <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={() => navigation.navigate('NotificationsScreen')} accessibilityRole="button" accessibilityLabel={t('a11yNotifications', 'Notifications')}>
-            <View style={styles.notifDot} />
+            {hasUnreadNotifs && <View style={styles.notifDot} />}
             <Icon name="bell-outline" size={24} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+          />
+        }
+      >
         
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeText}>{t('greeting')} <Text style={styles.welcomeName}>{user?.name || MOCK_PROFILE.name}</Text></Text>
+          <Text style={styles.welcomeText}>{t('greeting')} <Text style={styles.welcomeName}>{user?.name || 'Member'}</Text></Text>
           <Text style={styles.subtitleText}>{t('subtitle')}</Text>
         </View>
 
@@ -278,7 +316,7 @@ export const HomeDashboardScreen = () => {
                 </View>
               </>
             ) : (
-              (featuredList.length > 0 ? featuredList : DUMMY_FEATURED).map((item) => (
+              featuredList.map((item) => (
                 <View key={item.id} style={styles.featuredCardWrapper}>
                   <CompanionCard
                     {...item}
