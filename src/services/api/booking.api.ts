@@ -58,7 +58,9 @@ export interface ModifyBookingRequest {
   date?: string;
   time?: string;
   venue?: string;
+  venueName?: string;
   duration?: number;
+  durationHours?: number;
   notes?: string;
 }
 
@@ -111,7 +113,13 @@ export const cancelBooking = async (id: string, data: CancelBookingRequest): Pro
 
 // ─── Modify booking ───────────────────────────────────────────────────────────
 export const modifyBooking = async (id: string, data: ModifyBookingRequest): Promise<Booking> => {
-  const res = await apiClient.patch<Booking>(`/bookings/${id}/modify`, data);
+  const payload: Record<string, any> = {};
+  if (data.date) payload.date = data.date;
+  if (data.time) payload.time = data.time;
+  if (data.venueName) payload.venueName = data.venueName;
+  if (data.durationHours ?? data.duration) payload.durationHours = data.durationHours ?? data.duration;
+  if (data.notes) payload.specialInstructions = data.notes;
+  const res = await apiClient.patch<Booking>(`/bookings/${id}/modify`, payload);
   return res.data;
 };
 

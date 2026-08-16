@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -26,12 +26,19 @@ export const CancelBookingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'CancelBookingScreen'>>();
-  const bookingId = route.params?.bookingId || 'CB-REQ-8829';
-  const booking = MOCK_BOOKINGS.find(b => b.id === bookingId) || MOCK_BOOKINGS[0];
+  const bookingId = route.params?.bookingId;
+  const booking = MOCK_BOOKINGS.find(b => b.id === bookingId);
   
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const cancelBooking = useBookingStore(selectCancelBooking);
+
+  // Guard: should never arrive here without a real bookingId
+  useEffect(() => {
+    if (!bookingId) {
+      smartGoBack();
+    }
+  }, [bookingId]);
 
   const handleBack = () => smartGoBack();
   

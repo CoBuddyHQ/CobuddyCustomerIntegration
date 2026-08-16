@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, TextInput, Modal, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -17,9 +17,16 @@ export const ModifyBookingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'ModifyBookingScreen'>>();
-  const bookingId = route.params?.bookingId || 'CB-REQ-8829';
-  const booking = MOCK_BOOKINGS.find(b => b.id === bookingId) || MOCK_BOOKINGS[0];
+  const bookingId = route.params?.bookingId;
+  const booking = MOCK_BOOKINGS.find(b => b.id === bookingId);
   
+  // Guard: should never arrive here without a real bookingId
+  useEffect(() => {
+    if (!bookingId) {
+      smartGoBack();
+    }
+  }, [bookingId]);
+
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
   const [amPm, setAmPm] = useState<'AM' | 'PM'>('PM');
@@ -55,15 +62,23 @@ export const ModifyBookingScreen = () => {
   };
 
   const handleBack = () => smartGoBack();
+
+  /** Converts DD/MM/YYYY → ISO 8601 string required by the backend */
+  const parseDateToISO = (ddmmyyyy: string): string => {
+    const parts = ddmmyyyy.split('/');
+    if (parts.length !== 3) return ddmmyyyy;
+    const [dd, mm, yyyy] = parts;
+    return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T00:00:00.000Z`;
+  };
   
   const handleSendRequest = async () => {
     setIsSubmitting(true);
     try {
       await bookingApi.modifyBooking(bookingId, {
-        date: newDate,
+        date: parseDateToISO(newDate),
         time: `${newTime} ${amPm}`,
         duration,
-        venue: newVenue || undefined,
+        venueName: newVenue || undefined,
       });
     } catch {
       // Graceful fallback
