@@ -34,6 +34,7 @@ import { useTranslation } from 'react-i18next';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { profileApi } from '../../services/api';
 
 export const LegalConsentScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -87,8 +88,29 @@ export const LegalConsentScreen = () => {
     { id: 'safety', label: t('consent.checkbox.safety', 'I agree to follow community safety and respectful behavior guidelines') },
   ];
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const allChecked = CONSENTS.every(c => checked[c.id]);
   const toggle = (id: string) => setChecked(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const handleAgree = async () => {
+    setIsSubmitting(true);
+    try {
+      await profileApi.submitLegalConsent({
+        tosAccepted: !!checked['tos'],
+        privacyAccepted: true,
+        communityGuidelinesAccepted: !!checked['safety'],
+        safetyAgreementAccepted: true,
+        allAccepted: true,
+      });
+      navigation.navigate('LocationPermissionScreen');
+    } catch {
+      // Fallback gracefully
+      navigation.navigate('LocationPermissionScreen');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
@@ -158,8 +180,9 @@ export const LegalConsentScreen = () => {
       <BottomActionBar>
         <Button
           title={t('consent.btn_agree')}
-          onPress={() => navigation.navigate('LocationPermissionScreen')}
-          disabled={!allChecked}
+          onPress={handleAgree}
+          disabled={!allChecked || isSubmitting}
+          loading={isSubmitting}
         />
       </BottomActionBar>
 

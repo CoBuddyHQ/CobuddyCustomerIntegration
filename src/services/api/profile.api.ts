@@ -59,6 +59,33 @@ export interface ProfileCompletion {
   completed: string[];
 }
 
+export interface LegalConsentRequest {
+  tosAccepted?: boolean;
+  privacyAccepted?: boolean;
+  communityGuidelinesAccepted?: boolean;
+  safetyAgreementAccepted?: boolean;
+  allAccepted?: boolean;
+}
+
+export interface OnboardingProgressResponse {
+  isOnboardingComplete: boolean;
+  currentStep: string;
+  completedSteps: string[];
+  customer?: CustomerProfile;
+}
+
+// ─── Submit legal consent ─────────────────────────────────────────────────────
+export const submitLegalConsent = async (data: LegalConsentRequest): Promise<{ success: boolean; message: string; onboardingStep: string }> => {
+  const res = await apiClient.post<{ success: boolean; message: string; onboardingStep: string }>('/profile/legal-consent', data);
+  return res.data;
+};
+
+// ─── Get onboarding progress ──────────────────────────────────────────────────
+export const getOnboardingProgress = async (): Promise<OnboardingProgressResponse> => {
+  const res = await apiClient.get<OnboardingProgressResponse>('/profile/onboarding-progress');
+  return res.data;
+};
+
 // ─── Get profile ──────────────────────────────────────────────────────────────
 export const getProfile = async (): Promise<CustomerProfile> => {
   const res = await apiClient.get<CustomerProfile>('/profile');
