@@ -12,7 +12,10 @@ export interface WalletBalance {
   totalAdded?: number;
   pendingAmount?: number;
   pendingRefund?: number;
+  pendingRefunds?: number;
   escrowHeld?: number;
+  kycStatus?: string;
+  kycLimit?: number | null;
 }
 
 export interface Transaction {
@@ -35,6 +38,7 @@ export interface Transaction {
 
 export interface TransactionsResponse {
   data: Transaction[];
+  transactions?: Transaction[];
   total: number;
   page: number;
   limit: number;
@@ -70,13 +74,34 @@ export interface WithdrawalMethod {
 // ─── Get wallet balance ───────────────────────────────────────────────────────
 export const getWalletBalance = async (): Promise<WalletBalance> => {
   const res = await apiClient.get<WalletBalance>('/wallet/balance');
-  return res.data;
+  const data = res.data;
+  if (data && typeof data === 'object') {
+    return {
+      ...data,
+      pendingRefund: data.pendingRefund ?? data.pendingRefunds ?? 0,
+    };
+  }
+  return data;
 };
 
 // ─── Get transactions ─────────────────────────────────────────────────────────
 export const getTransactions = async (page = 1, limit = 20): Promise<TransactionsResponse> => {
-  const res = await apiClient.get<TransactionsResponse>('/wallet/transactions', { params: { page, limit } });
-  return res.data;
+  const res = await apiClient.get<any>('/wallet/transactions', { params: { page, limit } });
+  const raw = res.data;
+  const list: Transaction[] = Array.isArray(raw)
+    ? raw
+    : (raw?.transactions || raw?.data || []);
+  const total = raw?.pagination?.total ?? raw?.total ?? list.length;
+  const currPage = raw?.pagination?.page ?? raw?.page ?? page;
+  const currLimit = raw?.pagination?.limit ?? raw?.limit ?? limit;
+
+  return {
+    data: list,
+    transactions: list,
+    total,
+    page: currPage,
+    limit: currLimit,
+  };
 };
 
 // ─── Get single transaction ────────────────────────────────────────────────────

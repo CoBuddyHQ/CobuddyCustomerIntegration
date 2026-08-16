@@ -62,11 +62,20 @@ export const getMessages = async (
   page = 1,
   limit = 50,
 ): Promise<MessagesResponse> => {
-  const res = await apiClient.get<MessagesResponse>(
+  const res = await apiClient.get<any>(
     `/chat/conversations/${conversationId}/messages`,
     { params: { page, limit } },
   );
-  return res.data;
+  const raw = res.data;
+  const list: ChatMessage[] = Array.isArray(raw)
+    ? raw
+    : (raw?.data || raw?.messages || []);
+  return {
+    data: list,
+    total: raw?.total ?? list.length,
+    page,
+    limit,
+  };
 };
 
 // ─── Send message ─────────────────────────────────────────────────────────────

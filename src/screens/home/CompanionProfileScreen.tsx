@@ -62,6 +62,21 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
+  const handleToggleFavorite = async () => {
+    if (!companionId) return;
+    const nextState = !isFavorite;
+    setIsFavorite(nextState);
+    try {
+      if (nextState) {
+        await discoveryApi.addFavorite(companionId);
+      } else {
+        await discoveryApi.removeFavorite(companionId);
+      }
+    } catch {
+      setIsFavorite(!nextState);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
     const fetchDetail = async () => {
@@ -70,9 +85,15 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
         return;
       }
       try {
-        const data = await discoveryApi.getCompanionDetail(companionId);
-        if (isMounted && data) {
-          setApiProfile(data);
+        const [dataRes, favsRes] = await Promise.allSettled([
+          discoveryApi.getCompanionDetail(companionId),
+          discoveryApi.getFavorites(),
+        ]);
+        if (isMounted && dataRes.status === 'fulfilled' && dataRes.value) {
+          setApiProfile(dataRes.value);
+        }
+        if (isMounted && favsRes.status === 'fulfilled' && Array.isArray(favsRes.value)) {
+          setIsFavorite(favsRes.value.some((f: any) => f.id === companionId));
         }
       } catch {
         // Fallback to mock profile
@@ -398,7 +419,7 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
         </TouchableOpacity>
         
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <TouchableOpacity style={styles.iconCircle} onPress={() => setIsFavorite(!isFavorite)} accessibilityRole="button" accessibilityLabel={t('a11yLike', 'Like')}>
+          <TouchableOpacity style={styles.iconCircle} onPress={handleToggleFavorite} accessibilityRole="button" accessibilityLabel={t('a11yLike', 'Like')}>
             <Icon name={isFavorite ? "heart" : "heart-outline"} size={22} color={isFavorite ? theme.colors.error : theme.colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconCircle} onPress={() => setShowMenuSheet(true)} accessibilityRole="button" accessibilityLabel={t('a11yMoreOptions', 'More options')}>
