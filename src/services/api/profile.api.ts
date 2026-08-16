@@ -41,8 +41,10 @@ export interface UpdateProfileRequest {
   name?: string;
   bio?: string;
   age?: number;
+  dob?: string;
   gender?: string;
   city?: string;
+  photoUrl?: string;
   countryCode?: string;
 }
 

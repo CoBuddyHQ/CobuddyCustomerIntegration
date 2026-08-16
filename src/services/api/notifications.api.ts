@@ -44,3 +44,24 @@ export const registerDeviceToken = async (fcmToken: string): Promise<{ message: 
   const res = await apiClient.post<{ message: string }>('/notifications/device-token', { fcmToken });
   return res.data;
 };
+
+// ─── Update notification permission ───────────────────────────────────────────
+export const updateNotificationPermission = async (data: {
+  enabled?: boolean;
+  fcmToken?: string;
+  skipped?: boolean;
+}): Promise<{ success: boolean; message: string; notificationsEnabled: boolean; onboardingStep: string }> => {
+  const res = await apiClient.post<{ success: boolean; message: string; notificationsEnabled: boolean; onboardingStep: string }>(
+    '/notifications/permission',
+    data,
+  );
+  return res.data;
+};
+
+// ─── Skip notification step ───────────────────────────────────────────────────
+export const skipNotificationPermission = async (): Promise<{ success: boolean; message: string; notificationsEnabled: boolean; onboardingStep: string }> => {
+  const res = await apiClient.post<{ success: boolean; message: string; notificationsEnabled: boolean; onboardingStep: string }>(
+    '/notifications/skip',
+  );
+  return res.data;
+};

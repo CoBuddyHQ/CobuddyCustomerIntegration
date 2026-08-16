@@ -43,22 +43,40 @@ const AVATAR_COLORS: Record<AvatarState, string> = {
 export const BasicProfileSetupScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
-  const { completeOnboarding, updateUser } = useAuthStore();
-  const [name, setName] = useState('');
+  const { user, updateUser } = useAuthStore();
+  const [name, setName] = useState(user?.name || '');
   const [dob, setDob] = useState('');
-  const [gender, setGender] = useState('');
-  const [city, setCity] = useState('');
-  const [bio, setBio] = useState('');
+  const [gender, setGender] = useState(user?.gender || '');
+  const [city, setCity] = useState(user?.city || '');
+  const [bio, setBio] = useState(user?.bio || '');
   const [showGender, setShowGender] = useState(false);
   const [nameError, setNameError] = useState('');
   const [dobError, setDobError] = useState('');
   const [cityError, setCityError] = useState('');
   const [bioError, setBioError] = useState('');
-  const [avatarState, setAvatarState] = useState<AvatarState>('none');
+  const [avatarState, setAvatarState] = useState<AvatarState>(user?.avatar ? 'photo' : 'none');
   const [showAvatarSheet, setShowAvatarSheet] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const { t } = useTranslation(['onboarding']);
+
+  React.useEffect(() => {
+    const fetchExistingProfile = async () => {
+      try {
+        const profile = await profileApi.getProfile();
+        if (profile) {
+          if (profile.name && !name) setName(profile.name);
+          if (profile.city && !city) setCity(profile.city);
+          if (profile.gender && !gender) setGender(profile.gender);
+          if (profile.bio && !bio) setBio(profile.bio);
+          if (profile.avatar) setAvatarState('photo');
+        }
+      } catch {
+        // Fallback to local store
+      }
+    };
+    fetchExistingProfile();
+  }, []);
   
   const isValid = validateName(name) && validateDOB(dob) && gender !== '' && city.trim().length >= 3 && bio.trim().length >= 10;
 
@@ -91,9 +109,7 @@ export const BasicProfileSetupScreen = () => {
       const birthYear = parseInt(parts[2], 10);
       const age = new Date().getFullYear() - birthYear;
 
-      await profileApi.completeOnboarding({ name, city, gender, age });
-      // Also update bio via profile update
-      await profileApi.updateProfile({ bio });
+      await profileApi.updateProfile({ name, city, gender, age, bio, dob });
 
       // Update local store
       updateUser({ name, city, gender, age, bio });

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -16,17 +16,44 @@ import { useTranslation } from 'react-i18next';
 import { NOTIFICATION_BENEFITS } from '../../services/mock';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { notificationsApi } from '../../services/api';
 
 export const NotificationPermissionScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { t } = useTranslation(['onboarding']);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-    return (
+  const handleEnableNotifications = async () => {
+    setIsSubmitting(true);
+    try {
+      await notificationsApi.updateNotificationPermission({
+        enabled: true,
+        skipped: false,
+      });
+    } catch {
+      // Continue gracefully
+    } finally {
+      setIsSubmitting(false);
+      navigation.navigate('BasicProfileSetupScreen');
+    }
+  };
+
+  const handleSkipNotifications = async () => {
+    try {
+      await notificationsApi.skipNotificationPermission();
+    } catch {
+      // Continue gracefully
+    } finally {
+      navigation.navigate('BasicProfileSetupScreen');
+    }
+  };
+
+  return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       {/* Skip */}
       <TouchableOpacity
         style={styles.skipBtn}
-        onPress={() => navigation.navigate('BasicProfileSetupScreen')}
+        onPress={handleSkipNotifications}
         activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('notification.a11ySkip', 'Skip notification permission')}>
         <Text style={styles.skipText}>{t('notification.btn_skip')}</Text>
       </TouchableOpacity>
@@ -83,24 +110,19 @@ export const NotificationPermissionScreen = () => {
       {/* CTAs */}
       <View style={styles.ctaBlock}>
         <TouchableOpacity
-          style={styles.ctaPrimary}
-          onPress={() =>
-            Alert.alert(
-              t('notification.alertTitleEnableNotificat', 'Enable Notifications'),
-              t('notification.alertMsgNotificationpermissi', 'Notification permission will be requested on your device.'),
-              [
-                { text: t('notification.cancelBtn', 'Cancel'), style: 'cancel' },
-                { text: t('notification.continueBtn', 'Continue'), onPress: () => navigation.navigate('BasicProfileSetupScreen') },
-              ]
-            )
-          }
+          style={[styles.ctaPrimary, isSubmitting && { opacity: 0.8 }]}
+          onPress={handleEnableNotifications}
+          disabled={isSubmitting}
           activeOpacity={0.88} accessibilityRole="button" accessibilityLabel={t('notification.a11yEnable', 'Enable notifications')}>
           <Icon name="bell-ring-outline" size={20} color={theme.colors.background} />
-          <Text style={styles.ctaPrimaryText}>{t('notification.btn_allow')}</Text>
+          <Text style={styles.ctaPrimaryText}>
+            {isSubmitting ? 'Configuring Notifications...' : t('notification.btn_allow')}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.ctaSecondary}
-          onPress={() => navigation.navigate('BasicProfileSetupScreen')}
+          onPress={handleSkipNotifications}
+          disabled={isSubmitting}
           activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('notification.a11yNotNow', 'Not now')}>
           <Text style={styles.ctaSecondaryText}>{t('notification.btn_skip')}</Text>
         </TouchableOpacity>

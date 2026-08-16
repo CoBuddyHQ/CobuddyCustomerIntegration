@@ -10,7 +10,7 @@
  */
 
 import { create } from 'zustand';
-import { authApi, TokenStorage, setLogoutListener } from '../../services/api';
+import { authApi, profileApi, TokenStorage, setLogoutListener } from '../../services/api';
 import type { CustomerFromAuth } from '../../services/api';
 
 export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
@@ -268,7 +268,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     // ─── completeOnboarding ───────────────────────────────────────────────────
-    completeOnboarding: () => set({ isOnboardingComplete: true }),
+    completeOnboarding: () => {
+      set({ isOnboardingComplete: true });
+      profileApi.completeOnboarding({}).catch(() => {});
+    },
 
     // ─── setKycStatus ─────────────────────────────────────────────────────────
     setKycStatus: (status) => set({ kycStatus: status }),
