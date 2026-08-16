@@ -96,29 +96,93 @@ export const DiscoverScreen = () => {
   const [activeStatus, setActiveStatus] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Advanced Filters State
+  // Applied Filters State
+  const [appliedActivity, setAppliedActivity] = useState('');
+  const [appliedGender, setAppliedGender] = useState('Any');
+  const [appliedRating, setAppliedRating] = useState(1.0);
+  const [appliedMaxPrice, setAppliedMaxPrice] = useState(2000);
+  const [appliedDistance, setAppliedDistance] = useState(50);
+
+  // Modal Draft Filters State
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-  const [filterGender, setFilterGender] = useState('Any');
-  const [filterRating, setFilterRating] = useState(4.0);
-  const [filterMaxPrice, setFilterMaxPrice] = useState(2000);
-  const [filterDistance, setFilterDistance] = useState(50);
+  const [draftActivity, setDraftActivity] = useState('');
+  const [draftGender, setDraftGender] = useState('Any');
+  const [draftRating, setDraftRating] = useState(1.0);
+  const [draftMaxPrice, setDraftMaxPrice] = useState(2000);
+  const [draftDistance, setDraftDistance] = useState(50);
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [apiCompanions, setApiCompanions] = useState<CompanionCardType[]>([]);
 
-  // Sync navigation params to search bar whenever screen comes into focus
+  // Count active advanced filters
+  const activeFilterCount = React.useMemo(() => {
+    let count = 0;
+    if (appliedActivity) count++;
+    if (appliedGender !== 'Any') count++;
+    if (appliedRating > 1.0) count++;
+    if (appliedMaxPrice < 2000) count++;
+    if (appliedDistance < 50) count++;
+    return count;
+  }, [appliedActivity, appliedGender, appliedRating, appliedMaxPrice, appliedDistance]);
+
+  // Open Filter Modal with current applied values
+  const handleOpenFilterModal = () => {
+    setDraftActivity(appliedActivity);
+    setDraftGender(appliedGender);
+    setDraftRating(appliedRating);
+    setDraftMaxPrice(appliedMaxPrice);
+    setDraftDistance(appliedDistance);
+    setIsFilterVisible(true);
+  };
+
+  // Apply draft filters from modal
+  const handleApplyFilters = () => {
+    setAppliedActivity(draftActivity);
+    setAppliedGender(draftGender);
+    setAppliedRating(draftRating);
+    setAppliedMaxPrice(draftMaxPrice);
+    setAppliedDistance(draftDistance);
+    setIsFilterVisible(false);
+  };
+
+  // Clear modal draft state
+  const handleModalClearAll = () => {
+    setDraftActivity('');
+    setDraftGender('Any');
+    setDraftRating(1.0);
+    setDraftMaxPrice(2000);
+    setDraftDistance(50);
+  };
+
+  // Clear all filters completely
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setActiveStatus('All');
+    setAppliedActivity('');
+    setAppliedGender('Any');
+    setAppliedRating(1.0);
+    setAppliedMaxPrice(2000);
+    setAppliedDistance(50);
+    setDraftActivity('');
+    setDraftGender('Any');
+    setDraftRating(1.0);
+    setDraftMaxPrice(2000);
+    setDraftDistance(50);
+    setIsFilterVisible(false);
+  };
+
+  // Sync navigation params to activity filter whenever screen comes into focus
   useFocusEffect(
     useCallback(() => {
       const initialCategory = route.params?.category;
       if (initialCategory) {
         const cat = MODAL_CATEGORIES.find(c => c.id === initialCategory);
         if (cat) {
-          setSearchQuery(cat.label);
+          setAppliedActivity(cat.label);
         } else {
-          setSearchQuery(initialCategory);
+          setAppliedActivity(initialCategory);
         }
-        // Clear params so it doesn't get stuck if user clears search and re-focuses
         navigation.setParams({ category: undefined });
       }
     }, [route.params?.category, MODAL_CATEGORIES, navigation])
@@ -128,7 +192,12 @@ export const DiscoverScreen = () => {
     try {
       const params: any = {};
       if (searchQuery.trim()) params.search = searchQuery.trim();
-      if (filterGender !== 'Any') params.gender = filterGender.toLowerCase();
+      if (appliedActivity) params.category = appliedActivity;
+      if (appliedGender !== 'Any') params.gender = appliedGender.toLowerCase();
+      if (appliedMaxPrice < 2000) params.maxPrice = appliedMaxPrice;
+      if (appliedRating > 1.0) params.minRating = appliedRating;
+      if (appliedDistance < 50) params.maxDistance = appliedDistance;
+      if (activeStatus === 'Available Today') params.isOnline = true;
 
       const res = await discoveryApi.getCompanions(params);
       const list = res?.data || res?.companions || [];
@@ -139,11 +208,11 @@ export const DiscoverScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [searchQuery, filterGender]);
+  }, [searchQuery, appliedActivity, appliedGender, appliedMaxPrice, appliedRating, appliedDistance, activeStatus]);
 
   useEffect(() => {
     setLoading(true);
-    const timer = setTimeout(fetchCompanions, 300);
+    const timer = setTimeout(fetchCompanions, 250);
     return () => clearTimeout(timer);
   }, [fetchCompanions]);
 
@@ -173,37 +242,61 @@ export const DiscoverScreen = () => {
     // 2. Filter companions using real backend list
     const sourceList = apiCompanions;
     const filtered = sourceList.filter(c => {
-      // Search match
-      const matchesSearch = searchQuery === '' || 
-                            c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            (c.activities && c.activities.some(act => act.toLowerCase().includes(searchQuery.toLowerCase()))) ||
-                            MODAL_CATEGORIES.find(m => m.label.toLowerCase() === searchQuery.toLowerCase())?.id === c.category;
+      // Free-form Search match
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = c.name?.toLowerCase().includes(q);
+        const matchTitle = c.title?.toLowerCase().includes(q);
+        const matchCity = c.city?.toLowerCase().includes(q);
+        const matchActivities = c.activities && c.activities.some(act => act.toLowerCase().includes(q));
+        if (!matchName && !matchTitle && !matchCity && !matchActivities) {
+          return false;
+        }
+      }
+
+      // Applied Activity / Category Filter
+      if (appliedActivity) {
+        const actQ = appliedActivity.toLowerCase();
+        const matchCategory = c.category?.toLowerCase().includes(actQ) ||
+          (actQ.includes('coffee') && c.category === 'coffee') ||
+          (actQ.includes('movie') && c.category === 'movie') ||
+          (actQ.includes('study') && c.category === 'study') ||
+          (actQ.includes('city') && (c.category === 'city' || c.category === 'coffee'));
+        const matchAct = c.activities && c.activities.some(act => act.toLowerCase().includes(actQ) || actQ.includes(act.toLowerCase()));
+        if (!matchCategory && !matchAct) return false;
+      }
       
       // Quick status filters
-      let matchesStatus = true;
-      if (activeStatus === 'Available Today') matchesStatus = c.isOnline === true;
-      if (activeStatus === 'Top Rated') matchesStatus = (c.rating ?? 0) >= 4.95;
+      if (activeStatus === 'Available Today' && !c.isOnline) return false;
+      if (activeStatus === 'Top Rated' && (c.rating ?? 0) < 4.9) return false;
+      if (activeStatus === 'Nearby') {
+        const distNum = parseFloat(String(c.distance || '999'));
+        if (!isNaN(distNum) && distNum > 3.0) return false;
+      }
       
-      // Advanced Filters
-      let matchesGender = true;
-      if (filterGender !== 'Any') matchesGender = c.gender?.toLowerCase() === filterGender.toLowerCase();
+      // Gender Filter
+      if (appliedGender !== 'Any') {
+        if (c.gender?.toLowerCase() !== appliedGender.toLowerCase()) return false;
+      }
       
-      let matchesRating = true;
-      matchesRating = (c.rating ?? 0) >= filterRating;
+      // Rating Filter
+      if (appliedRating > 1.0) {
+        if ((c.rating ?? 0) < appliedRating) return false;
+      }
 
-      let matchesPrice = true;
-      if (c.rate) {
+      // Max Price Filter
+      if (appliedMaxPrice < 2000 && c.rate) {
         const rateValue = typeof c.rate === 'number' ? c.rate : parseInt(String(c.rate).replace(/\D/g, ''), 10);
-        if (!isNaN(rateValue)) matchesPrice = rateValue <= filterMaxPrice;
+        if (!isNaN(rateValue) && rateValue > appliedMaxPrice) return false;
       }
 
-      let matchesDistance = true;
-      if (c.distance) {
+      // Max Distance Filter
+      if (appliedDistance < 50 && c.distance) {
         const distValue = parseFloat(String(c.distance));
-        if (!isNaN(distValue)) matchesDistance = distValue <= filterDistance;
+        if (!isNaN(distValue) && distValue > appliedDistance) return false;
       }
       
-      return matchesSearch && matchesStatus && matchesGender && matchesRating && matchesPrice && matchesDistance;
+      return true;
     });
 
     // 3. Sort companions to boost matches based on selected interests
@@ -217,19 +310,9 @@ export const DiscoverScreen = () => {
 
     return filtered;
   }, [
-    apiCompanions, searchQuery, activeStatus, filterGender, filterRating, 
-    filterMaxPrice, filterDistance, selectedInterests, MODAL_CATEGORIES
+    apiCompanions, searchQuery, appliedActivity, activeStatus, appliedGender, appliedRating, 
+    appliedMaxPrice, appliedDistance, selectedInterests
   ]);
-
-  const clearAllFilters = () => {
-    setSearchQuery('');
-    setFilterGender('Any');
-    setFilterRating(3.0);
-    setFilterMaxPrice(2000);
-    setFilterDistance(50);
-    setActiveStatus('All');
-    setIsFilterVisible(false);
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -238,11 +321,21 @@ export const DiscoverScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.headerTitle}>{t('title', 'Discover')}</Text>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setIsFilterVisible(true)} accessibilityRole="button" accessibilityLabel={t('a11yFilter', 'Filter')}>
-            <Icon name="tune-variant" size={24} color={theme.colors.textSecondary} />
-            {/* Show badge if advanced filters are active */}
-            {(filterGender !== 'Any' || filterRating > 4.0 || filterMaxPrice < 2000 || filterDistance < 50) && (
-              <View style={styles.filterBadge} />
+          <TouchableOpacity 
+            style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]} 
+            onPress={handleOpenFilterModal} 
+            accessibilityRole="button" 
+            accessibilityLabel={t('a11yFilter', 'Filter')}
+          >
+            <Icon 
+              name="tune-variant" 
+              size={22} 
+              color={activeFilterCount > 0 ? theme.colors.background : theme.colors.textSecondary} 
+            />
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -252,7 +345,7 @@ export const DiscoverScreen = () => {
           <Icon name="magnify" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder={t('search_placeholder')}
+            placeholder={t('search_placeholder', 'Search by name or specialty...')}
             placeholderTextColor={theme.colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -292,6 +385,53 @@ export const DiscoverScreen = () => {
             )}
           />
         </View>
+
+        {/* Active Filter Chips Bar */}
+        {activeFilterCount > 0 && (
+          <View style={styles.activeChipsContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activeChipsScroll}>
+              {appliedActivity ? (
+                <TouchableOpacity style={styles.activeChip} onPress={() => setAppliedActivity('')}>
+                  <Text style={styles.activeChipText}>{appliedActivity}</Text>
+                  <Icon name="close" size={14} color={theme.colors.primary} style={styles.activeChipIcon} />
+                </TouchableOpacity>
+              ) : null}
+
+              {appliedGender !== 'Any' ? (
+                <TouchableOpacity style={styles.activeChip} onPress={() => setAppliedGender('Any')}>
+                  <Text style={styles.activeChipText}>{appliedGender}</Text>
+                  <Icon name="close" size={14} color={theme.colors.primary} style={styles.activeChipIcon} />
+                </TouchableOpacity>
+              ) : null}
+
+              {appliedMaxPrice < 2000 ? (
+                <TouchableOpacity style={styles.activeChip} onPress={() => setAppliedMaxPrice(2000)}>
+                  <Text style={styles.activeChipText}>≤ ₹{appliedMaxPrice}/hr</Text>
+                  <Icon name="close" size={14} color={theme.colors.primary} style={styles.activeChipIcon} />
+                </TouchableOpacity>
+              ) : null}
+
+              {appliedRating > 1.0 ? (
+                <TouchableOpacity style={styles.activeChip} onPress={() => setAppliedRating(1.0)}>
+                  <Text style={styles.activeChipText}>≥ {appliedRating} ⭐</Text>
+                  <Icon name="close" size={14} color={theme.colors.primary} style={styles.activeChipIcon} />
+                </TouchableOpacity>
+              ) : null}
+
+              {appliedDistance < 50 ? (
+                <TouchableOpacity style={styles.activeChip} onPress={() => setAppliedDistance(50)}>
+                  <Text style={styles.activeChipText}>≤ {appliedDistance} km</Text>
+                  <Icon name="close" size={14} color={theme.colors.primary} style={styles.activeChipIcon} />
+                </TouchableOpacity>
+              ) : null}
+
+              <TouchableOpacity style={styles.activeChipClearAll} onPress={clearAllFilters}>
+                <Text style={styles.activeChipClearAllText}>{t('clearAll', 'Clear All')}</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        )}
+
         <View style={styles.infoBar}>
           <Text style={styles.infoBarText}>
             {t('showing', 'Showing ')}{filteredCompanions.length} {t('companions', 'companions')}
@@ -366,13 +506,15 @@ export const DiscoverScreen = () => {
                     key={cat.id} 
                     style={[
                       styles.modalOptionBtn,
-                      searchQuery === cat.label && styles.modalOptionBtnActive
+                      draftActivity === cat.label && styles.modalOptionBtnActive
                     ]}
-                    onPress={() => setSearchQuery(searchQuery === cat.label ? '' : cat.label)} accessibilityRole="button" accessibilityLabel={cat.label}
+                    onPress={() => setDraftActivity(draftActivity === cat.label ? '' : cat.label)} 
+                    accessibilityRole="button" 
+                    accessibilityLabel={cat.label}
                   >
                     <Text style={[
                       styles.modalOptionText,
-                      searchQuery === cat.label && styles.modalOptionTextActive
+                      draftActivity === cat.label && styles.modalOptionTextActive
                     ]}>{cat.label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -386,16 +528,18 @@ export const DiscoverScreen = () => {
                     key={g} 
                     style={[
                       styles.modalOptionBtn,
-                      filterGender === g && styles.modalOptionBtnActive
+                      draftGender === g && styles.modalOptionBtnActive
                     ]}
-                    onPress={() => setFilterGender(g)} accessibilityRole="button" accessibilityLabel={t('a11yG', 'g')}
+                    onPress={() => setDraftGender(g)} 
+                    accessibilityRole="button" 
+                    accessibilityLabel={t('a11yG', 'g')}
                   >
                     <Text style={[
                       styles.modalOptionText,
-                      filterGender === g && styles.modalOptionTextActive
+                      draftGender === g && styles.modalOptionTextActive
                     ]}>
-                        {g === 'Any' ? t('filter.any', 'Any') : g === 'Male' ? t('filter.male', 'Male') : t('filter.female', 'Female')}
-                      </Text>
+                      {g === 'Any' ? t('filter.any', 'Any') : g === 'Male' ? t('filter.male', 'Male') : t('filter.female', 'Female')}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -403,8 +547,8 @@ export const DiscoverScreen = () => {
               {/* Price Range Slider */}
               <Text style={styles.modalSectionTitle}>{t('filterMaxHourlyRate', 'Maximum Hourly Rate')}</Text>
               <CustomSlider 
-                value={filterMaxPrice} 
-                onValueChange={setFilterMaxPrice} 
+                value={draftMaxPrice} 
+                onValueChange={setDraftMaxPrice} 
                 min={200} 
                 max={2000} 
                 step={50} 
@@ -415,10 +559,12 @@ export const DiscoverScreen = () => {
                 {PRICE_PILLS.map((p) => (
                   <TouchableOpacity 
                     key={p} 
-                    style={[styles.modalOptionBtn, filterMaxPrice === p && styles.modalOptionBtnActive]}
-                    onPress={() => setFilterMaxPrice(p)} accessibilityRole="button" accessibilityLabel={t('a11yP', '₹ p')}
+                    style={[styles.modalOptionBtn, draftMaxPrice === p && styles.modalOptionBtnActive]}
+                    onPress={() => setDraftMaxPrice(p)} 
+                    accessibilityRole="button" 
+                    accessibilityLabel={t('a11yP', '₹ p')}
                   >
-                    <Text style={[styles.modalOptionText, filterMaxPrice === p && styles.modalOptionTextActive]}>
+                    <Text style={[styles.modalOptionText, draftMaxPrice === p && styles.modalOptionTextActive]}>
                       ₹{p}
                     </Text>
                   </TouchableOpacity>
@@ -428,8 +574,8 @@ export const DiscoverScreen = () => {
               {/* Rating Slider */}
               <Text style={styles.modalSectionTitle}>{t('filterMinRating', 'Minimum Rating')}</Text>
               <CustomSlider 
-                value={filterRating} 
-                onValueChange={setFilterRating} 
+                value={draftRating} 
+                onValueChange={setDraftRating} 
                 min={1.0} 
                 max={5.0} 
                 step={0.1}
@@ -439,10 +585,12 @@ export const DiscoverScreen = () => {
                 {RATING_PILLS.map((r) => (
                   <TouchableOpacity 
                     key={r} 
-                    style={[styles.modalOptionBtn, filterRating === r && styles.modalOptionBtnActive]}
-                    onPress={() => setFilterRating(r)} accessibilityRole="button" accessibilityLabel={t('a11yR', 'r + ⭐')}
+                    style={[styles.modalOptionBtn, draftRating === r && styles.modalOptionBtnActive]}
+                    onPress={() => setDraftRating(r)} 
+                    accessibilityRole="button" 
+                    accessibilityLabel={t('a11yR', 'r + ⭐')}
                   >
-                    <Text style={[styles.modalOptionText, filterRating === r && styles.modalOptionTextActive]}>
+                    <Text style={[styles.modalOptionText, draftRating === r && styles.modalOptionTextActive]}>
                       {r}+ ⭐
                     </Text>
                   </TouchableOpacity>
@@ -452,8 +600,8 @@ export const DiscoverScreen = () => {
               {/* Distance Slider */}
               <Text style={styles.modalSectionTitle}>{t('filterMaxDistance', 'Maximum Distance')}</Text>
               <CustomSlider 
-                value={filterDistance} 
-                onValueChange={setFilterDistance} 
+                value={draftDistance} 
+                onValueChange={setDraftDistance} 
                 min={1} 
                 max={50} 
                 step={1} 
@@ -463,10 +611,12 @@ export const DiscoverScreen = () => {
                 {DISTANCE_PILLS.map((d) => (
                   <TouchableOpacity 
                     key={d} 
-                    style={[styles.modalOptionBtn, filterDistance === d && styles.modalOptionBtnActive]}
-                    onPress={() => setFilterDistance(d)} accessibilityRole="button" accessibilityLabel={t('a11yDKm', 'd km')}
+                    style={[styles.modalOptionBtn, draftDistance === d && styles.modalOptionBtnActive]}
+                    onPress={() => setDraftDistance(d)} 
+                    accessibilityRole="button" 
+                    accessibilityLabel={t('a11yDKm', 'd km')}
                   >
-                    <Text style={[styles.modalOptionText, filterDistance === d && styles.modalOptionTextActive]}>
+                    <Text style={[styles.modalOptionText, draftDistance === d && styles.modalOptionTextActive]}>
                       {d} {t('units.km', 'km')}
                     </Text>
                   </TouchableOpacity>
@@ -476,10 +626,10 @@ export const DiscoverScreen = () => {
 
             {/* Bottom Actions */}
             <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.modalClearBtn} onPress={clearAllFilters} accessibilityRole="button" accessibilityLabel={t('a11yClearAll', 'Clear All')}>
+              <TouchableOpacity style={styles.modalClearBtn} onPress={handleModalClearAll} accessibilityRole="button" accessibilityLabel={t('a11yClearAll', 'Clear All')}>
                 <Text style={styles.modalClearBtnText}>{t('clearAll', 'Clear All')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalApplyBtn} onPress={() => setIsFilterVisible(false)} accessibilityRole="button" accessibilityLabel={t('a11yApplyFilters', 'Apply Filters')}>
+              <TouchableOpacity style={styles.modalApplyBtn} onPress={handleApplyFilters} accessibilityRole="button" accessibilityLabel={t('a11yApplyFilters', 'Apply Filters')}>
                 <Text style={styles.modalApplyBtnText}>{t('applyFilters', 'Apply Filters')}</Text>
               </TouchableOpacity>
             </View>
@@ -525,14 +675,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
+  filterBtnActive: {
+    backgroundColor: theme.colors.primary,
+  },
   filterBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.primary,
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: theme.colors.background,
+  },
+  filterBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  activeChipsContainer: {
+    marginBottom: 10,
+  },
+  activeChipsScroll: {
+    gap: 8,
+    paddingRight: 16,
+  },
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    gap: 4,
+  },
+  activeChipText: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  activeChipIcon: {
+    marginLeft: 2,
+  },
+  activeChipClearAll: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    justifyContent: 'center',
+  },
+  activeChipClearAllText: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    fontWeight: '600',
   },
   searchContainer: {
     flexDirection: 'row',

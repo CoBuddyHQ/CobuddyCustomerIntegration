@@ -64,6 +64,9 @@ export interface CompanionFilterParams {
   category?: string;
   gender?: string;
   search?: string;
+  city?: string;
+  minRating?: number;
+  maxDistance?: number;
   isOnline?: boolean;
   maxPrice?: number;
   page?: number;
