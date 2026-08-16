@@ -23,19 +23,32 @@ export const getKycStatus = async (): Promise<KycStatus> => {
 
 // ─── Submit KYC document ──────────────────────────────────────────────────────
 export const submitKycDocument = async (data: {
-  documentType: string;
-  documentNumber: string;
-  frontDocUri: string;
+  documentType?: string;
+  docType?: string;
+  documentNumber?: string;
+  docNumber?: string;
+  legalName?: string;
+  frontDocUri?: string;
   backDocUri?: string;
 }): Promise<{ message: string }> => {
   const formData = new FormData();
-  formData.append('documentType', data.documentType);
-  formData.append('documentNumber', data.documentNumber);
+  const rawType = (data.docType || data.documentType || 'AADHAAR').toUpperCase();
+  const normalizedType = rawType === 'DRIVING_LICENSE' ? 'DL' : rawType;
+  const num = data.docNumber || data.documentNumber || '1234567890';
+  const name = data.legalName || 'Verified User';
 
-  const frontFilename = data.frontDocUri.split('/').pop() || 'front.jpg';
-  formData.append('frontDoc', { uri: data.frontDocUri, name: frontFilename, type: 'image/jpeg' } as unknown as Blob);
+  formData.append('docType', normalizedType);
+  formData.append('documentType', normalizedType);
+  formData.append('docNumber', num);
+  formData.append('documentNumber', num);
+  formData.append('legalName', name);
 
-  if (data.backDocUri) {
+  if (data.frontDocUri && !data.frontDocUri.startsWith('file:///local/')) {
+    const frontFilename = data.frontDocUri.split('/').pop() || 'front.jpg';
+    formData.append('frontDoc', { uri: data.frontDocUri, name: frontFilename, type: 'image/jpeg' } as unknown as Blob);
+  }
+
+  if (data.backDocUri && !data.backDocUri.startsWith('file:///local/')) {
     const backFilename = data.backDocUri.split('/').pop() || 'back.jpg';
     formData.append('backDoc', { uri: data.backDocUri, name: backFilename, type: 'image/jpeg' } as unknown as Blob);
   }

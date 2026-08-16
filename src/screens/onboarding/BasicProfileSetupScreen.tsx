@@ -97,13 +97,12 @@ export const BasicProfileSetupScreen = () => {
 
       // Update local store
       updateUser({ name, city, gender, age, bio });
-      completeOnboarding();
 
       // Navigate to next onboarding step
       navigation.navigate('InterestSelectionScreen');
     } catch {
       // Non-fatal — still allow proceeding to next step
-      completeOnboarding();
+      updateUser({ name, city, gender });
       navigation.navigate('InterestSelectionScreen');
     } finally {
       setIsSaving(false);

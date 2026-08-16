@@ -33,12 +33,21 @@ export interface Booking {
 
 export interface CreateBookingRequest {
   companionId: string;
-  activity: string;
+  companionName?: string;
+  activity?: string;
+  activityName?: string;
+  activityId?: string;
+  activityIcon?: string;
   venue?: string;
+  venueName?: string;
+  venueAddress?: string;
   date?: string;
   time?: string;
   duration?: number;
+  durationHours?: number;
   notes?: string;
+  specialInstructions?: string;
+  baseRate?: number;
 }
 
 export interface CancelBookingRequest {
@@ -64,7 +73,21 @@ export interface CounterOfferResponseRequest {
 
 // ─── Create booking ───────────────────────────────────────────────────────────
 export const createBooking = async (data: CreateBookingRequest): Promise<Booking> => {
-  const res = await apiClient.post<Booking>('/bookings', data);
+  const payload = {
+    companionId: data.companionId,
+    companionName: data.companionName,
+    activityName: data.activityName || data.activity || 'Coffee Meetup',
+    activityId: data.activityId,
+    activityIcon: data.activityIcon,
+    venueName: data.venueName || data.venue || 'Public Cafe',
+    venueAddress: data.venueAddress,
+    date: (data.date && data.date.includes('T')) ? data.date : `${data.date || new Date().toISOString().split('T')[0]}T00:00:00.000Z`,
+    time: data.time || '18:00',
+    durationHours: Number(data.durationHours || data.duration || 2),
+    specialInstructions: data.specialInstructions || data.notes,
+    baseRate: Number(data.baseRate || 500),
+  };
+  const res = await apiClient.post<Booking>('/bookings', payload);
   return res.data;
 };
 

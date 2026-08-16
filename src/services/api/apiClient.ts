@@ -113,6 +113,15 @@ apiClient.interceptors.response.use(
     if (__DEV__) {
       console.log(`[API] ✅ ${response.config.url}`, response.data);
     }
+    // Automatically unwrap NestJS ResponseInterceptor payload { success: true, data: T }
+    if (
+      response.data &&
+      typeof response.data === 'object' &&
+      'success' in response.data &&
+      'data' in response.data
+    ) {
+      response.data = response.data.data;
+    }
     return response;
   },
   async (error: AxiosError) => {
@@ -139,7 +148,8 @@ apiClient.interceptors.response.use(
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken });
-        const { accessToken, refreshToken: newRefresh } = data;
+        const payload = (data && typeof data === 'object' && 'data' in data) ? data.data : data;
+        const { accessToken, refreshToken: newRefresh } = payload;
 
         await TokenStorage.setTokens(accessToken, newRefresh);
         processRefreshQueue(accessToken);

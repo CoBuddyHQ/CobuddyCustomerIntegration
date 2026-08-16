@@ -28,7 +28,11 @@ export interface CreateReviewRequest {
   sessionId?: string;
   rating: number;
   text?: string;
+  comment?: string;
   tags?: string[];
+  punctuality?: number;
+  communication?: number;
+  behavior?: number;
   categoryRatings?: {
     punctuality?: number;
     communication?: number;
@@ -38,7 +42,17 @@ export interface CreateReviewRequest {
 
 // ─── Submit review ────────────────────────────────────────────────────────────
 export const createReview = async (data: CreateReviewRequest): Promise<Review> => {
-  const res = await apiClient.post<Review>('/reviews', data);
+  const payload = {
+    companionId: data.companionId,
+    bookingId: data.bookingId || data.sessionId,
+    rating: Number(data.rating || 5),
+    comment: data.comment || data.text || '',
+    text: data.text || data.comment || '',
+    punctuality: data.punctuality ?? data.categoryRatings?.punctuality,
+    communication: data.communication ?? data.categoryRatings?.communication,
+    behavior: data.behavior ?? data.categoryRatings?.behavior,
+  };
+  const res = await apiClient.post<Review>('/reviews', payload);
   return res.data;
 };
 

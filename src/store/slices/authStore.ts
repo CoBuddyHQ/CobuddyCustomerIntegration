@@ -170,25 +170,26 @@ export const useAuthStore = create<AuthState>((set, get) => {
       set({ isLoading: true, error: null });
       try {
         const res = await authApi.verifyOtp({ phone, otp });
-        const user = mapCustomer(res.customer);
+        const payload = (res && typeof res === 'object' && 'data' in res && (res as any).data?.accessToken) ? (res as any).data : res;
+        const user = mapCustomer(payload.customer || {});
 
         // Persist tokens
-        await TokenStorage.setTokens(res.accessToken, res.refreshToken);
+        await TokenStorage.setTokens(payload.accessToken, payload.refreshToken);
         await TokenStorage.setUser(user);
 
         const isOnboardingComplete = Boolean(
-          res.customer.isOnboardingComplete ?? res.customer.onboardingComplete ?? false
+          payload.customer?.isOnboardingComplete ?? payload.customer?.onboardingComplete ?? false
         );
 
         set({
-          token: res.accessToken,
+          token: payload.accessToken,
           user,
           isAuthenticated: true,
           isOnboardingComplete,
-          kycStatus: toKycStatus(res.customer.kycStatus),
+          kycStatus: toKycStatus(payload.customer?.kycStatus),
         });
 
-        return { isNewCustomer: res.isNewCustomer };
+        return { isNewCustomer: payload.isNewCustomer };
       } catch (e: any) {
         const data = e?.response?.data;
         let msg = 'Invalid OTP. Please try again.';
@@ -239,12 +240,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
         if (token && user) {
           // Try to validate session via /auth/me
-          const freshCustomer = await authApi.getMe();
-          const freshUser = mapCustomer(freshCustomer);
+          const freshRes = await authApi.getMe();
+          const freshCustomer = (freshRes && typeof freshRes === 'object' && 'data' in freshRes && (freshRes as any).data?.id) ? (freshRes as any).data : freshRes;
+          const freshUser = mapCustomer(freshCustomer || {});
           await TokenStorage.setUser(freshUser);
 
           const isOnboardingComplete = Boolean(
-            freshCustomer.isOnboardingComplete ?? freshCustomer.onboardingComplete ?? false
+            freshCustomer?.isOnboardingComplete ?? freshCustomer?.onboardingComplete ?? false
           );
 
           set({
@@ -252,7 +254,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
             user: freshUser,
             isAuthenticated: true,
             isOnboardingComplete,
-            kycStatus: toKycStatus(freshCustomer.kycStatus),
+            kycStatus: toKycStatus(freshCustomer?.kycStatus),
             isHydrated: true,
           });
         } else {
