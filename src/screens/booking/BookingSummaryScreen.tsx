@@ -85,18 +85,8 @@ export const BookingSummaryScreen = () => {
 
       navigation.navigate('BookingRequestSentScreen');
     } catch (err: any) {
-      // If error occurs, still allow proceeding in dev or show error
-      const msg = err?.response?.data?.message || 'Failed to submit booking request.';
+      const msg = err?.response?.data?.message || 'Failed to submit booking request. Please try again.';
       setSubmitError(Array.isArray(msg) ? msg[0] : msg);
-      
-      // Local fallback for smooth experience
-      requestBooking({
-        companionId: companionId || 'c1',
-        activity: draftBooking?.activity || activity?.defaultTitle || 'Coffee Meetup',
-        venue: draftBooking?.venue || venue?.name || 'Public Cafe',
-        time: draftBooking?.time || time || '18:00',
-      });
-      navigation.navigate('BookingRequestSentScreen');
     } finally {
       setIsSubmitting(false);
     }

@@ -28,12 +28,12 @@ export const CompanionChatScreen = () => {
   const [isOptionsMenuVisible, setOptionsMenuVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
-  const [messages, setMessages] = useState(getMockChatMessages(companionName));
+  const [messages, setMessages] = useState<any[]>([]);
 
   React.useEffect(() => {
     let isMounted = true;
     chatApi.getMessages(companionId).then(apiMsgs => {
-      if (isMounted && apiMsgs?.data && apiMsgs.data.length > 0) {
+      if (isMounted && apiMsgs?.data) {
         setMessages(apiMsgs.data.map(m => ({
           id: m.id,
           type: 'text',

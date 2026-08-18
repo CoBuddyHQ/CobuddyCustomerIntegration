@@ -7,7 +7,6 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { supportApi } from '../../services/api';
-import { MOCK_TICKETS, MOCK_THREADS } from '../../services/mock/support.mock';
 import { RootStackParamList } from '../../types/navigation';
 
 export const SupportTicketDetailScreen = () => { 
@@ -15,23 +14,26 @@ export const SupportTicketDetailScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'SupportTicketDetailScreen'>>();
   const ticketId = route.params?.ticketId || 'TKT-8921';
-  const matchedTicket = MOCK_TICKETS.find((tk: any) => tk.id === ticketId);
   
+  const [ticketInfo, setTicketInfo] = useState<any>(null);
   const [replyText, setReplyText] = useState('');
-  const [messages, setMessages] = useState(MOCK_THREADS[ticketId] || MOCK_THREADS['TKT-8921']);
+  const [messages, setMessages] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const isClosed = matchedTicket?.status === 'Closed';
+  const isClosed = ticketInfo?.status === 'closed';
 
   React.useEffect(() => {
     let isMounted = true;
     supportApi.getTicketDetail(ticketId).then(detail => {
-      if (isMounted && detail?.messages && detail.messages.length > 0) {
-        setMessages(detail.messages.map((m: any) => ({
-          id: m.id,
-          sender: m.senderType === 'agent' ? 'support' : 'user',
-          text: m.content || m.text,
-          time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
-        })));
+      if (isMounted && detail) {
+        setTicketInfo(detail);
+        if (detail.messages && detail.messages.length > 0) {
+          setMessages(detail.messages.map((m: any) => ({
+            id: m.id,
+            sender: m.senderType === 'agent' ? 'support' : 'user',
+            text: m.content || m.text,
+            time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
+          })));
+        }
       }
     }).catch(() => {});
     return () => { isMounted = false; };
@@ -71,7 +73,7 @@ export const SupportTicketDetailScreen = () => {
           <Text style={styles.headerTitle}>{ticketId}</Text>
           <View style={styles.statusBadge}>
             <View style={styles.statusDot} />
-            {matchedTicket?.status === 'Open' ? <Text style={styles.statusText}>{t('statusOpen', 'Open')}</Text> : matchedTicket?.status === 'Closed' ? <Text style={[styles.statusText, { color: theme.colors.textSecondary }]}>{t('statusClosed', 'Closed')}</Text> : <Text style={[styles.statusText, { color: theme.colors.primary }]}>{t('statusInProgress', 'In Progress')}</Text>}
+            {ticketInfo?.status === 'open' || !ticketInfo ? <Text style={styles.statusText}>{t('statusOpen', 'Open')}</Text> : ticketInfo?.status === 'closed' ? <Text style={[styles.statusText, { color: theme.colors.textSecondary }]}>{t('statusClosed', 'Closed')}</Text> : <Text style={[styles.statusText, { color: theme.colors.primary }]}>{t('statusInProgress', 'In Progress')}</Text>}
           </View>
         </View>
         <View style={styles.backBtn} />
@@ -81,8 +83,8 @@ export const SupportTicketDetailScreen = () => {
         
         {/* Ticket Original Context */}
         <View style={styles.contextCard}>
-          <Text style={styles.contextLabel}>{matchedTicket?.subject || t('contextLabel', 'Refund Request for Booking #4412')}</Text>
-          <Text style={styles.contextMeta}>{t('ticketMeta', 'Category: {{category}} • Created {{date}}', { category: t(`category.${matchedTicket?.category || 'Payment'}`, matchedTicket?.category || 'Payment'), date: matchedTicket?.date || '2 hours ago' })}</Text>
+          <Text style={styles.contextLabel}>{ticketInfo?.subject || t('contextLabel', 'Support Request')}</Text>
+          <Text style={styles.contextMeta}>{t('ticketMeta', 'Category: {{category}} • Created {{date}}', { category: t(`category.${ticketInfo?.category || 'General'}`, ticketInfo?.category || 'General'), date: ticketInfo?.createdAt ? new Date(ticketInfo.createdAt).toLocaleDateString() : 'Recent' })}</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.chatScroll} showsVerticalScrollIndicator={false}>

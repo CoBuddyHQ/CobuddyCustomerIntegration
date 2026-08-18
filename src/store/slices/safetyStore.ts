@@ -9,11 +9,12 @@ export interface TrustedContact {
 
 export interface SafetyState {
   isSOSActive: boolean;
+  activeSosId: string | null;
   isSessionActive: boolean;
   trustedContacts: TrustedContact[];
   // GPS location strictly for backend/safety-team visibility. Customer/Companion cannot see each other's live location.
   lastKnownLocation: { lat: number; lng: number } | null; 
-  triggerSOS: () => void;
+  triggerSOS: (sosId?: string) => void;
   resolveSOS: () => void;
   setSessionActive: (active: boolean) => void;
   addTrustedContact: (contact: TrustedContact) => void;
@@ -23,11 +24,12 @@ export interface SafetyState {
 
 export const useSafetyStore = create<SafetyState>((set) => ({
   isSOSActive: false,
+  activeSosId: null,
   isSessionActive: false,
   trustedContacts: [],
   lastKnownLocation: null,
-  triggerSOS: () => set({ isSOSActive: true }),
-  resolveSOS: () => set({ isSOSActive: false }),
+  triggerSOS: (sosId) => set({ isSOSActive: true, activeSosId: sosId || null }),
+  resolveSOS: () => set({ isSOSActive: false, activeSosId: null }),
   setSessionActive: (active) => set({ isSessionActive: active }),
   addTrustedContact: (contact) => set((state) => ({ trustedContacts: [...state.trustedContacts, contact] })),
   removeTrustedContact: (id) => set((state) => ({ trustedContacts: state.trustedContacts.filter(c => c.id !== id) })),

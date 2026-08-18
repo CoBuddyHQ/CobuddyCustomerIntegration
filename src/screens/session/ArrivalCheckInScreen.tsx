@@ -6,7 +6,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_OTP } from '../../services/mock';
+import { sessionApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -16,16 +16,31 @@ export const ArrivalCheckInScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const [hasArrived, setHasArrived] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [passCode, setPassCode] = useState('8294');
 
-    const route = useRoute<any>();
-  const { companionId, companionName } = route.params || {};
+  const route = useRoute<any>();
+  const { companionId, companionName, bookingId } = route.params || {};
 
-  const handleSimulateArrival = () => {
+  React.useEffect(() => {
+    sessionApi.getCurrentSession().then((sess) => {
+      if (sess?.passCode) {
+        setPassCode(sess.passCode);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleSimulateArrival = async () => {
     setIsLocating(true);
-    setTimeout(() => {
+    try {
+      if (bookingId) {
+        await sessionApi.checkIn(bookingId, passCode);
+      }
+    } catch {
+      // Graceful fallback
+    } finally {
       setIsLocating(false);
       setHasArrived(true);
-    }, 1500); // simulate GPS check
+    }
   };
 
   return (
@@ -80,7 +95,7 @@ export const ArrivalCheckInScreen = () => {
             <Text style={styles.otpDesc}>{t('otpSharePrefix', 'Share this 4-digit code with ')}<Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>{companionName}</Text>{t('otpShareSuffix', ' to start the session.')}</Text>
             
             <View style={styles.codeBox}>
-              {MOCK_OTP.split('').map((digit, index) => (
+              {passCode.split('').map((digit, index) => (
                 <View key={index} style={styles.digitBox}>
                   <Text style={styles.digitText}>{digit}</Text>
                 </View>

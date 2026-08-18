@@ -43,6 +43,7 @@ export const CancelBookingScreen = () => {
   const handleBack = () => smartGoBack();
   
   const handleConfirmCancel = async () => {
+    if (!bookingId) return;
     setIsCancelling(true);
     try {
       await bookingApi.cancelBooking(bookingId, {

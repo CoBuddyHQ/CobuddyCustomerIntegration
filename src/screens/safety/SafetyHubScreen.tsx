@@ -40,6 +40,7 @@ export const SafetyHubScreen = () => {
   const ring2Opacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0] });
 
   const isSOSActive = useSafetyStore(selectIsSOSActive);
+  const activeSosId = useSafetyStore((s) => s.activeSosId);
   const triggerSOS = useSafetyStore(selectTriggerSOS);
   const resolveSOS = useSafetyStore(selectResolveSOS);
   const isSessionActive = useSafetyStore(selectIsSessionActive);
@@ -102,7 +103,18 @@ export const SafetyHubScreen = () => {
                         if (isSOSActive) {
                             Alert.alert(t('alertTitleCancelSOS', 'Cancel SOS'), t('alertMsgAreYouSureYouWantToCancel', 'Are you sure you want to cancel the SOS?'), [
                                 { text: t('no', 'No'), style: 'cancel' },
-                                { text: t('yesSafe', 'Yes, I am safe'), onPress: () => resolveSOS() }
+                                { 
+                                  text: t('yesSafe', 'Yes, I am safe'), 
+                                  onPress: async () => {
+                                    const sosId = activeSosId;
+                                    resolveSOS();
+                                    try {
+                                      if (sosId) {
+                                        await safetyApi.resolveSOS(sosId);
+                                      }
+                                    } catch {}
+                                  } 
+                                }
                             ]);
                         } else {
                             Alert.alert(t('alertTitleEMERGENCYSOS', '🚨 EMERGENCY SOS'), t('alertMsgAreyouindangerThiswi', 'Are you in danger? This will instantly share your live location with your trusted contacts and alert the CoBuddy Safety Team.'),
@@ -112,15 +124,15 @@ export const SafetyHubScreen = () => {
                                   text: t('activateSOS', 'ACTIVATE SOS'), 
                                   style: 'destructive',
                                   onPress: async () => {
-                                    triggerSOS();
                                     try {
-                                      await safetyApi.triggerSOS(
+                                      const res = await safetyApi.triggerSOS(
                                         undefined,
                                         lastKnownLocation?.lat,
                                         lastKnownLocation?.lng,
                                       );
+                                      triggerSOS((res as any)?.sosId || (res as any)?.id);
                                     } catch {
-                                      // Local emergency state active
+                                      triggerSOS();
                                     }
                                     Alert.alert(t('alertTitleSOSActivated', 'SOS Activated'), t('alertMsgHelpisonthewayYourli', 'Help is on the way. Your live location is now being shared.'));
                                   }

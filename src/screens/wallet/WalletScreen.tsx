@@ -31,9 +31,10 @@ export const WalletScreen = () => {
   const { kycStatus } = useAuthStore();
 
   const [wallet, setWallet] = useState<WalletBalance>({
-    balance: 4500,
+    balance: 0,
     currency: 'INR',
-    pendingRefund: 500,
+    pendingRefund: 0,
+    escrowHeld: 0,
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,25 +67,16 @@ export const WalletScreen = () => {
     };
   }, []);
 
-  const MOCK_TRANSACTIONS = [
-    { id: '1', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via UPI ending in 45', amount: '+ ₹1,000', date: 'Today, 2:30 PM', positive: true, isRefund: false },
-    { id: '2', type: 'deduct', title: t('txTypes.sessionPayment', 'Session Payment'), method: 'Booking #8294', amount: '- ₹450', date: 'Yesterday, 8:15 PM', positive: false, isRefund: false },
-    { id: '3', type: 'refund', title: t('txTypes.refundProcessed', 'Refund Processed'), method: 'Canceled Session #8290', amount: '+ ₹200', date: 'Oct 18, 10:00 AM', positive: true, isRefund: true },
-    { id: '4', type: 'add', title: t('txTypes.moneyAdded', 'Money Added'), method: 'via Card ending in 4242', amount: '+ ₹2,000', date: 'Oct 10, 1:15 PM', positive: true, isRefund: false },
-  ];
-
-  const displayTransactions = transactions.length > 0
-    ? transactions.map((tx: Transaction) => ({
-        id: tx.id,
-        type: tx.type,
-        title: tx.type === 'credit' ? t('txTypes.moneyAdded', 'Money Added') : tx.type === 'refund' ? t('txTypes.refundProcessed', 'Refund Processed') : t('txTypes.sessionPayment', 'Session Payment'),
-        method: tx.category || tx.paymentSource || 'Wallet Transaction',
-        amount: `${tx.positive ? '+' : '-'} ₹${Math.abs(tx.amount).toLocaleString()}`,
-        date: tx.date || (tx.time ? `${tx.date} ${tx.time}` : 'Recent'),
-        positive: tx.positive,
-        isRefund: tx.type === 'refund',
-      }))
-    : MOCK_TRANSACTIONS;
+  const displayTransactions = transactions.map((tx: Transaction) => ({
+    id: tx.id,
+    type: tx.type,
+    title: tx.type === 'credit' ? t('txTypes.moneyAdded', 'Money Added') : tx.type === 'refund' ? t('txTypes.refundProcessed', 'Refund Processed') : t('txTypes.sessionPayment', 'Session Payment'),
+    method: tx.category || tx.paymentSource || 'Wallet Transaction',
+    amount: `${tx.positive ? '+' : '-'} ₹${Math.abs(tx.amount).toLocaleString()}`,
+    date: tx.date || (tx.time ? `${tx.date} ${tx.time}` : 'Recent'),
+    positive: tx.positive,
+    isRefund: tx.type === 'refund',
+  }));
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>

@@ -72,6 +72,7 @@ export const ModifyBookingScreen = () => {
   };
   
   const handleSendRequest = async () => {
+    if (!bookingId) return;
     setIsSubmitting(true);
     try {
       await bookingApi.modifyBooking(bookingId, {

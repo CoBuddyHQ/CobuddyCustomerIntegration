@@ -10,6 +10,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 
 
+import { kycApi } from '../../services/api';
+import { useAuthStore } from '../../store/slices/authStore';
+
 export const VerificationProcessingScreen = () => { 
   const { t } = useTranslation('verify.processing');
 
@@ -21,6 +24,7 @@ export const VerificationProcessingScreen = () => {
 ];
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const setKycStatus = useAuthStore((s) => s.setKycStatus);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [activeStep, setActiveStep] = useState(2); // 0=none, 1=doc, 2=selfie, 3=profile, 4=done
 
@@ -32,35 +36,27 @@ export const VerificationProcessingScreen = () => {
       ]),
     ).start();
 
-    const t1 = setTimeout(() => setActiveStep(3), 2000); 
-    const t2 = setTimeout(() => setActiveStep(4), 4000); 
+    const t1 = setTimeout(() => setActiveStep(3), 1500); 
+    const t2 = setTimeout(() => setActiveStep(4), 3000); 
     const t3 = setTimeout(async () => {
       try {
-        // [BACKEND INTEGRATION POINT]
-        // 1. Call your API here: const response = await api.verifyKYC(data);
-        // 2. Based on response, navigate to the correct screen:
-        
-        // Example logic for your backend integration:
-        /*
-        if (response.data.status === 'APPROVED') {
+        const res = await kycApi.getKycStatus();
+        const status = res?.status || 'pending';
+        if (status === 'approved') {
+          setKycStatus('verified');
           navigation.replace('VerificationSuccessScreen');
-        } else if (response.data.status === t('status.pending', 'PENDING')) {
-          navigation.replace('VerificationPendingScreen');
-        } else {
+        } else if (status === 'rejected') {
+          setKycStatus('rejected');
           navigation.replace('VerificationRejectedScreen');
+        } else {
+          setKycStatus('pending');
+          navigation.replace('VerificationPendingScreen');
         }
-        */
-
-        // For now, randomly showing all 3 screens for your frontend testing
-        const outcomes: Array<'VerificationSuccessScreen' | 'VerificationPendingScreen' | 'VerificationRejectedScreen'> = ['VerificationSuccessScreen', 'VerificationPendingScreen', 'VerificationRejectedScreen'];
-        const randomOutcome = outcomes[Math.floor(Math.random() * outcomes.length)];
-        navigation.replace(randomOutcome);
-        
       } catch {
-        // If API fails (e.g. no internet), show rejected or error screen
-        navigation.replace('VerificationRejectedScreen');
+        setKycStatus('pending');
+        navigation.replace('VerificationPendingScreen');
       }
-    }, 5500);
+    }, 4500);
 
     return () => {
       clearTimeout(t1);

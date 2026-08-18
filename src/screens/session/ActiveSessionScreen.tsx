@@ -13,12 +13,14 @@ export const ActiveSessionScreen = () => {
   const { t } = useTranslation('session.active');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<any>();
-  const { companionId, companionName } = route.params || {};
+  const [sessionData, setSessionData] = useState<any>(null);
+  const companionId = route.params?.companionId || sessionData?.companionId;
+  const companionName = route.params?.companionName || sessionData?.companionName || 'Companion';
   const [etiquetteVisible, setEtiquetteVisible] = useState(true);
   
-  // Timer State (e.g. 2 hours = 7200 seconds)
-  const TOTAL_SECONDS = 7200;
-  const [timeLeft, setTimeLeft] = useState(TOTAL_SECONDS);
+  // Timer State (e.g. 2 hours = 7200 seconds default)
+  const [totalSeconds, setTotalSeconds] = useState(7200);
+  const [timeLeft, setTimeLeft] = useState(7200);
 
   // Modals
   const [extendModalVisible, setExtendModalVisible] = useState(false);
@@ -29,7 +31,21 @@ export const ActiveSessionScreen = () => {
   // Pulse Animation for LIVE badge
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-    useEffect(() => {
+  useEffect(() => {
+    // Fetch live session from backend
+    sessionApi.getCurrentSession().then((sess) => {
+      if (sess) {
+        setSessionData(sess);
+        const durationSec = (sess.durationMinutes || 120) * 60;
+        setTotalSeconds(durationSec);
+        if (sess.startedAt) {
+          const elapsedSec = Math.floor((Date.now() - new Date(sess.startedAt).getTime()) / 1000);
+          const remaining = Math.max(0, durationSec - elapsedSec);
+          setTimeLeft(remaining);
+        }
+      }
+    }).catch(() => {});
+
     // Pulse animation
     Animated.loop(
       Animated.sequence([
@@ -44,8 +60,7 @@ export const ActiveSessionScreen = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pulseAnim]);
 
   // Format Time
   const formatTime = (seconds: number) => {
@@ -55,7 +70,7 @@ export const ActiveSessionScreen = () => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const progressPercentage = ((TOTAL_SECONDS - timeLeft) / TOTAL_SECONDS) * 100;
+  const progressPercentage = totalSeconds > 0 ? ((totalSeconds - timeLeft) / totalSeconds) * 100 : 0;
 
   const handleEndEarly = async () => {
     setEndEarlyModalVisible(false);
