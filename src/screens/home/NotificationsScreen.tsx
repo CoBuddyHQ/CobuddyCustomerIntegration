@@ -10,11 +10,11 @@ import { notificationsApi, Notification as ApiNotification } from '../../service
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-type NotificationCategory = 'All' | 'Bookings' | 'Wallet' | 'Security' | 'Support';
+export type NotificationCategory = 'All' | 'request' | 'session' | 'safety' | 'payout' | 'support' | 'policy' | 'training' | 'system' | 'wallet' | 'promotion' | 'reminder';
 
 interface NotificationItem {
   id: string;
-  category: NotificationCategory;
+  category: string;
   title: string;
   description: string;
   time: string;
@@ -26,7 +26,7 @@ interface NotificationItem {
   routeParams?: Record<string, unknown>;
 }
 
-const CATEGORIES: NotificationCategory[] = ['All', 'Bookings', 'Wallet', 'Security', 'Support'];
+const CATEGORIES: string[] = ['All', 'request', 'session', 'safety', 'payout', 'support', 'policy', 'training', 'system', 'wallet', 'promotion', 'reminder'];
 
 const formatRelativeTime = (dateString?: string): string => {
   if (!dateString) return 'Now';
@@ -43,7 +43,7 @@ const formatRelativeTime = (dateString?: string): string => {
 export const NotificationsScreen = () => { 
   const { t } = useTranslation('home.notifications');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [activeCategory, setActiveCategory] = useState<NotificationCategory>('All');
+  const [activeCategory, setActiveCategory] = useState<string>('All');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

@@ -36,6 +36,7 @@ import { SettingsHubScreen } from '../screens/settings/SettingsHubScreen';
 import { NotificationPreferencesScreen } from '../screens/settings/NotificationPreferencesScreen';
 import { LanguageSelectionScreen } from '../screens/settings/LanguageSelectionScreen';
 import { AccountSettingsScreen } from '../screens/settings/AccountSettingsScreen';
+import { ChangeMobileNumberScreen } from '../screens/settings/ChangeMobileNumberScreen';
 import { DeleteAccountScreen } from '../screens/settings/DeleteAccountScreen';
 import { LegalAgreementsScreen } from '../screens/settings/LegalAgreementsScreen';
 import { InterestSelectionScreen } from '../screens/onboarding/InterestSelectionScreen';
@@ -127,6 +128,7 @@ const ProfileTabStack = () => (
       <Stack.Screen name="NotificationPreferencesScreen" component={NotificationPreferencesScreen} />
       <Stack.Screen name="LanguageSelectionScreen" component={LanguageSelectionScreen} />
       <Stack.Screen name="AccountSettingsScreen" component={AccountSettingsScreen} />
+      <Stack.Screen name="ChangeMobileNumberScreen" component={ChangeMobileNumberScreen} />
       <Stack.Screen name="DeleteAccountScreen" component={DeleteAccountScreen} />
       <Stack.Screen name="LegalAgreementsScreen" component={LegalAgreementsScreen} />
       

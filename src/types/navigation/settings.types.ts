@@ -1,5 +1,6 @@
 export interface SettingsStackParamList {
   ActiveSessionsScreen: undefined;
+  ChangeMobileNumberScreen: undefined;
   AppLockScreen: undefined;
   AppPermissionsScreen: undefined;
   BlockedUsersScreen: undefined;

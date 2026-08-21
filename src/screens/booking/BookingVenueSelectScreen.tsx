@@ -14,50 +14,71 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { useBookingStore } from '../../store/slices/bookingStore';
+import { adminValues } from '../../config/adminValues';
 import { selectSetDraftBooking } from '../../store/selectors/bookingSelectors';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 // MOCK: Replace with API response from Safe Venues database
 const SAFE_VENUES = [
-  { id: 'v1', name: 'Starbucks Reserve', address: '123 Fort, Downtown', icon: 'coffee' },
-  { id: 'v2', name: 'Third Wave Coffee', address: 'Bandra West', icon: 'coffee' },
-  { id: 'v3', name: 'Phoenix Palladium', address: 'Lower Parel', icon: 'shopping' },
-  { id: 'v4', name: 'PVR Cinemas', address: 'Juhu', icon: 'popcorn' },
+  { id: 'v1', name: 'Starbucks Reserve', address: '123 Fort, Downtown', icon: 'coffee', type: 'cafe' },
+  { id: 'v2', name: 'Third Wave Coffee', address: 'Bandra West', icon: 'coffee', type: 'cafe' },
+  { id: 'v3', name: 'Phoenix Palladium', address: 'Lower Parel', icon: 'shopping', type: 'shopping_mall' },
+  { id: 'v4', name: 'PVR Cinemas', address: 'Juhu', icon: 'popcorn', type: 'movie_theater' },
 ];
 
 export const BookingVenueSelectScreen = () => { 
   const { t } = useTranslation('booking.venueSelect');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
-    const clearDraftBooking = useBookingStore(state => state.clearDraftBooking);
+  const clearDraftBooking = useBookingStore(state => state.clearDraftBooking);
   const route = useRoute<RouteProp<RootStackParamList, 'BookingVenueSelectScreen'>>();
   const setDraftBooking = useBookingStore(selectSetDraftBooking);
 
-  
   const { activity, companionId, companionName } = route.params || {};
 
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPlaceType, setSelectedPlaceType] = useState<string | null>(null);
 
   const handleBack = () => {
-      clearDraftBooking();
-      smartGoBack();
-    };
+    clearDraftBooking();
+    smartGoBack();
+  };
 
-    const handleNext = () => {
+  const handleNext = () => {
     if (!selectedVenueId) return;
     
-    const selectedVenue = SAFE_VENUES.find(v => v.id === selectedVenueId) || { name: t('customVenue', 'Custom Venue'), address: searchQuery };
-    setDraftBooking({ venue: selectedVenue.name });
+    const venue = SAFE_VENUES.find(v => v.id === selectedVenueId);
+    if (!venue) return;
+
+    setDraftBooking({
+      venue: {
+        venueId: venue.id,
+        name: venue.name,
+        area: (venue as any).area || 'Central',
+        city: (venue as any).city || 'Mumbai',
+        isApproved: true,
+        venueType: venue.type,
+        meetingPoint: venue.name,
+        landmark: venue.address,
+      }
+    });
     
     navigation.navigate('BookingTimeSelectScreen', {
       activity,
-      venue: selectedVenue,
+      venue: venue,
       companionId,
       companionName,
     });
   };
+
+  const filteredVenues = SAFE_VENUES.filter(venue => {
+    const matchesSearch = venue.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          venue.address.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = selectedPlaceType ? venue.type === selectedPlaceType : true;
+    return matchesSearch && matchesType;
+  });
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
@@ -88,60 +109,82 @@ export const BookingVenueSelectScreen = () => {
           />
         </View>
 
+        {/* Place Type Filter Horizontal List */}
+        <View style={styles.filterSection}>
+          <Text style={styles.filterSectionTitle}>{t('filterByPlaceType', 'Filter by Place Type')}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContainer}>
+            <TouchableOpacity
+              style={[styles.filterChip, selectedPlaceType === null && styles.filterChipActive]}
+              onPress={() => setSelectedPlaceType(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Show all place types"
+            >
+              <Text style={[styles.filterChipText, selectedPlaceType === null && styles.filterChipTextActive]}>
+                {t('all', 'All')}
+              </Text>
+            </TouchableOpacity>
+            {adminValues.venue.allowedPlaceTypes.map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[styles.filterChip, selectedPlaceType === type && styles.filterChipActive]}
+                onPress={() => setSelectedPlaceType(selectedPlaceType === type ? null : type)}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter by ${type.replace(/_/g, ' ')}`}
+              >
+                <Text style={[styles.filterChipText, selectedPlaceType === type && styles.filterChipTextActive]}>
+                  {type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         <Text style={styles.sectionTitle}>{t('sectionTitle', 'Curated Safe Venues')}</Text>
 
         <View style={styles.listContainer}>
-          {SAFE_VENUES.map((venue) => {
+          {filteredVenues.map((venue) => {
             const isSelected = selectedVenueId === venue.id;
             return (
               <TouchableOpacity
                 key={venue.id}
                 style={[styles.card, isSelected && styles.cardSelected]}
                 onPress={() => setSelectedVenueId(venue.id)}
-                activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11ySelectVenue', 'Select {{venue}}', { venue: venue.name })}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={venue.name}
               >
-                <View style={[styles.iconWrap, isSelected && styles.iconWrapSelected]}>
-                  <Icon 
-                    name={venue.icon} 
-                    size={24} 
-                    color={isSelected ? theme.colors.background : theme.colors.primary} 
-                  />
+                <View style={styles.iconWrap}>
+                  <Icon name={venue.icon} size={28} color={isSelected ? theme.colors.primary : theme.colors.textSecondary} />
                 </View>
-                
                 <View style={styles.cardContent}>
-                  <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>
-                    {venue.name}
-                  </Text>
-                  <Text style={[styles.cardDesc, isSelected && styles.cardDescSelected]}>
-                    {venue.address}
-                  </Text>
+                  <Text style={styles.venueName}>{venue.name}</Text>
+                  <Text style={styles.venueAddress}>{venue.address}</Text>
+                  <View style={styles.badge}>
+                    <Icon name="shield-check" size={14} color={theme.colors.success} />
+                    <Text style={styles.badgeText}>{t('safePublicLocation', 'Safe Public Location')}</Text>
+                  </View>
                 </View>
-
-                {isSelected && (
-                  <Icon name="check-circle" size={24} color={theme.colors.primary} />
-                )}
+                <View style={[styles.radio, isSelected && styles.radioSelected]}>
+                  {isSelected && <View style={styles.radioInner} />}
+                </View>
               </TouchableOpacity>
             );
           })}
         </View>
       </ScrollView>
 
-      {/* Bottom Action Bar */}
-      <View style={styles.bottomBar}>
+      {/* Footer / CTA */}
+      <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.nextBtn, !selectedVenueId && styles.nextBtnDisabled]}
           disabled={!selectedVenueId}
           onPress={handleNext}
-          activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11yContinue', 'Continue')}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11ySelectDate', 'Select date')}
         >
-          <Text style={[styles.nextBtnText, !selectedVenueId && styles.nextBtnTextDisabled]}>
-            {t('continueBtn', 'Continue')}
-          </Text>
-          <Icon 
-            name="arrow-right" 
-            size={20} 
-            color={selectedVenueId ? theme.colors.background : 'rgba(255,255,255,0.4)'} 
-          />
+          <Text style={styles.nextBtnText}>{t('btn.selectDate', 'Select Date & Time')}</Text>
+          <Icon name="arrow-right" size={20} color={theme.colors.background} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -157,22 +200,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 12,
   },
   backBtn: {
-    padding: 8,
+    padding: 4,
   },
   headerTitle: {
-    color: theme.colors.textSecondary,
     fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
   },
   progressContainer: {
-    height: 3,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    height: 4,
+    backgroundColor: theme.colors.surface,
     width: '100%',
   },
   progressBar: {
@@ -184,13 +225,13 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 14,
     color: theme.colors.textSecondary,
     marginBottom: 24,
   },
@@ -200,21 +241,56 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: 16,
     paddingHorizontal: 16,
-    height: 56,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    marginBottom: 32,
+    borderColor: theme.colors.border,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     color: theme.colors.textPrimary,
-    fontSize: 16,
+    fontSize: 15,
+  },
+  filterSection: {
+    marginBottom: 24,
+  },
+  filterSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  filterContainer: {
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: 'rgba(217, 119, 6, 0.15)',
+    borderColor: theme.colors.primary,
+  },
+  filterChipText: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: theme.colors.primary,
+    fontWeight: 'bold',
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: theme.colors.textSecondary,
+    color: theme.colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 16,
@@ -229,69 +305,85 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: theme.colors.border,
   },
   cardSelected: {
-    backgroundColor: 'rgba(212, 175, 55, 0.1)',
     borderColor: theme.colors.primary,
+    backgroundColor: 'rgba(217, 119, 6, 0.05)',
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(212, 175, 55, 0.1)',
-    alignItems: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
-  },
-  iconWrapSelected: {
-    backgroundColor: theme.colors.primary,
   },
   cardContent: {
     flex: 1,
-    marginRight: 12,
   },
-  cardTitle: {
+  venueName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: theme.colors.textPrimary,
     marginBottom: 4,
   },
-  cardTitleSelected: {
-    color: theme.colors.primary,
-  },
-  cardDesc: {
+  venueAddress: {
     fontSize: 13,
     color: theme.colors.textSecondary,
+    marginBottom: 8,
   },
-  cardDescSelected: {
-    color: 'rgba(212, 175, 55, 0.8)',
-  },
-  bottomBar: {
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-    backgroundColor: theme.colors.surface,
-  },
-  nextBtn: {
-    backgroundColor: theme.colors.primary,
+  badge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+  },
+  badgeText: {
+    fontSize: 12,
+    color: theme.colors.success,
+    fontWeight: '500',
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  radioSelected: {
+    borderColor: theme.colors.primary,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.primary,
+  },
+  footer: {
+    padding: 24,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  nextBtn: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.primary,
+    borderRadius: 30,
     height: 56,
-    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: 8,
   },
   nextBtnDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    opacity: 0.5,
   },
   nextBtnText: {
-    color: theme.colors.background,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  nextBtnTextDisabled: {
-    color: 'rgba(255,255,255,0.4)',
+    color: theme.colors.background,
   },
 });

@@ -17,6 +17,7 @@ import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { useBookingStore } from '../../store/slices/bookingStore';
 import { useAuthStore } from '../../store/slices/authStore';
 import { bookingApi } from '../../services/api';
+import { adminValues } from '../../config/adminValues';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -45,10 +46,11 @@ export const BookingSummaryScreen = () => {
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [agreedToSafety, setAgreedToSafety] = useState(false);
 
-  // Pricing calculations (MOCK parsing)
-  const baseRate = parseInt(activity?.price?.replace(/[^0-9]/g, '') || '500', 10);
+  // Pricing calculations
+  const hourlyRate = 500;
+  const baseRate = Math.round(hourlyRate * ((activity as any)?.multiplier || 1.0));
   const baseTotal = baseRate * duration;
-  const serviceFee = 50;
+  const serviceFee = adminValues.commission.serviceFee;
   const totalAmount = baseTotal + serviceFee;
 
   const handleSendRequest = async () => {
@@ -63,15 +65,25 @@ export const BookingSummaryScreen = () => {
     setIsSubmitting(true);
     try {
       const actTitle = draftBooking?.activity || activity?.defaultTitle || 'Coffee Meetup';
-      const venueName = draftBooking?.venue || venue?.name || 'Public Cafe';
-      const slotTime = draftBooking?.time || time || '18:00';
+      const venueObj = draftBooking?.venue || {
+        venueId: (venue as any)?.id || 'v-1',
+        name: (venue as any)?.name || 'Public Cafe',
+        area: (venue as any)?.area || 'Central',
+        city: (venue as any)?.city || 'Mumbai',
+        isApproved: true,
+        venueType: (venue as any)?.type || 'cafe',
+        meetingPoint: (venue as any)?.name || 'Main Entrance',
+        landmark: (venue as any)?.address || 'Public Area',
+      };
+      const slotStart = draftBooking?.scheduledStart || time || new Date().toISOString();
+      const slotEnd = draftBooking?.scheduledEnd || time || new Date(Date.now() + duration * 3600000).toISOString();
 
-      const created = await bookingApi.createBooking({
+      await bookingApi.createBooking({
         companionId: companionId || 'c1',
         activity: actTitle,
-        venue: venueName,
+        venue: venueObj.name,
         date: date || new Date().toISOString().split('T')[0],
-        time: slotTime,
+        time: typeof slotStart === 'string' ? slotStart : '18:00',
         duration,
         notes: specialInstructions,
       });
@@ -79,8 +91,10 @@ export const BookingSummaryScreen = () => {
       requestBooking({
         companionId: companionId || 'c1',
         activity: actTitle,
-        venue: venueName,
-        time: slotTime,
+        venue: venueObj,
+        scheduledStart: slotStart,
+        scheduledEnd: slotEnd,
+        sessionPassCode: '1234',
       });
 
       navigation.navigate('BookingRequestSentScreen');

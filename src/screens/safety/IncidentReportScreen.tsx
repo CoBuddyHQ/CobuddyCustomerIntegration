@@ -1,34 +1,35 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, StatusBar, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, StatusBar, KeyboardAvoidingView, Platform, Alert, Image, ScrollView as RNScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { adminValues } from '../../config/adminValues';
 import { safetyApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 
-
-
 export const IncidentReportScreen = () => { 
   const { t } = useTranslation('safety.report');
-
-  const INCIDENT_TYPES = [
-  { id: 'harassment', label: t('incident.inappropriateBehavior', 'Inappropriate Behavior or Harassment') },
-  { id: 'identity', label: t('incident.identityMismatch', 'Identity Mismatch (Fake Profile)') },
-  { id: 'noshow', label: t('incident.companionNoShow', 'Companion No-Show / Scam') },
-  { id: 'other', label: t('incident.otherSafetyConcern', 'Other Safety Concern') }
-];
-
+  const INCIDENT_TYPES = adminValues.incidentTypes;
   const route = useRoute<RouteProp<RootStackParamList, 'IncidentReportScreen'>>();
   const { smartGoBack } = useSmartNavigation();
   
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [bookingRef, setBookingRef] = useState(route.params?.companionName || '');
   const [description, setDescription] = useState('');
-  const [hasEvidence, setHasEvidence] = useState(false);
+  const [evidenceUris, setEvidenceUris] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleAddEvidence = () => {
+    // Select/capture evidence
+    setEvidenceUris([...evidenceUris, `https://picsum.photos/200?random=${Date.now()}`]);
+  };
+
+  const handleRemoveEvidence = (index: number) => {
+    setEvidenceUris(evidenceUris.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async () => {
     if (!selectedType || !description.trim()) {
@@ -41,9 +42,10 @@ export const IncidentReportScreen = () => {
       await safetyApi.createIncidentReport({
         companionId: bookingRef || undefined,
         description: `[${selectedType}] ${description.trim()}`,
+        evidenceUrls: evidenceUris,
       });
     } catch {
-      // Fallback gracefully
+      // Fallback
     } finally {
       setIsSubmitting(false);
       Alert.alert(t('alertTitleReportSubmitted', 'Report Submitted'), t('alertMsgYoursafetyreporthasb', 'Your safety report has been escalated to our Trust & Safety team. We will review this immediately and contact you.'),
@@ -76,21 +78,24 @@ export const IncidentReportScreen = () => {
 
           <Text style={styles.sectionTitle}>{t('whatHappened', 'WHAT HAPPENED?')}</Text>
           <View style={styles.typeContainer}>
-            {INCIDENT_TYPES.map(type => (
-              <TouchableOpacity 
-                key={type.id} 
-                style={[styles.typeItem, selectedType === type.id && styles.typeItemActive]}
-                onPress={() => setSelectedType(type.id)}
-                activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11ySelectIncidentType', 'Select {{type}}', { type: type.label })}
-              >
-                <View style={[styles.radioBox, selectedType === type.id && styles.radioBoxActive]}>
-                  {selectedType === type.id && <View style={styles.radioDot} />}
-                </View>
-                <Text style={[styles.typeLabel, selectedType === type.id && styles.typeLabelActive]}>
-                  {t(type.id, type.label)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {INCIDENT_TYPES.map(type => {
+              const label = type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+              return (
+                <TouchableOpacity 
+                  key={type} 
+                  style={[styles.typeItem, selectedType === type && styles.typeItemActive]}
+                  onPress={() => setSelectedType(type)}
+                  activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11ySelectIncidentType', 'Select {{type}}', { type: label })}
+                >
+                  <View style={[styles.radioBox, selectedType === type && styles.radioBoxActive]}>
+                    {selectedType === type && <View style={styles.radioDot} />}
+                  </View>
+                  <Text style={[styles.typeLabel, selectedType === type && styles.typeLabelActive]}>
+                    {t(`incident.${type}`, label)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           <View style={styles.formGroup}>
@@ -123,18 +128,37 @@ export const IncidentReportScreen = () => {
 
           <View style={styles.formGroup}>
             <Text style={styles.inputLabel}>{t('evidenceLabel', 'EVIDENCE (OPTIONAL)')}</Text>
+            
+            {evidenceUris.length > 0 && (
+              <RNScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {evidenceUris.map((uri, index) => (
+                  <View key={index} style={styles.thumbnailContainer}>
+                    <Image source={{ uri }} style={styles.thumbnail} />
+                    <TouchableOpacity 
+                      style={styles.removeThumbnailBtn} 
+                      onPress={() => handleRemoveEvidence(index)}
+                      accessibilityRole="button" 
+                      accessibilityLabel={t('a11yRemoveEvidence', 'Remove evidence')}
+                    >
+                      <Icon name="close" size={12} color={theme.colors.background} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </RNScrollView>
+            )}
+
             <TouchableOpacity 
-              style={[styles.attachmentBtn, hasEvidence && styles.attachmentBtnActive]}
-              onPress={() => setHasEvidence(!hasEvidence)}
-              activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11yHasevidenceEvidenceAttache', 'hasEvidence ? Evidence Attache...')}
+              style={styles.attachmentBtn}
+              onPress={handleAddEvidence}
+              activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11yUploadEvidence', 'Upload Evidence')}
             >
               <Icon 
-                name={hasEvidence ? "check-circle" : "camera-plus"} 
+                name="camera-plus" 
                 size={24} 
-                color={hasEvidence ? theme.colors.primary : theme.colors.textSecondary} 
+                color={theme.colors.textSecondary} 
               />
-              <Text style={[styles.attachmentText, hasEvidence && { color: theme.colors.primary }]}>
-                {hasEvidence ? t('evidenceAttached', 'Evidence Attached (Tap to remove)') : t('uploadScreenshots', 'Upload Screenshots or Audio')}
+              <Text style={styles.attachmentText}>
+                {t('uploadScreenshots', 'Upload Screenshots or Audio')}
               </Text>
             </TouchableOpacity>
             <Text style={styles.helperText}>{t('maxFile', 'Max file size: 10MB')}</Text>
@@ -145,8 +169,9 @@ export const IncidentReportScreen = () => {
 
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.submitBtn, (!selectedType || !description) && styles.submitBtnDisabled]}
+          style={[styles.submitBtn, (!selectedType || !description || isSubmitting) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
+          disabled={isSubmitting}
           activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11ySubmitConfidentialReport', 'Submit Confidential Report')}
         >
           <Icon name="alert-octagon" size={20} color={theme.colors.background} />
@@ -162,38 +187,32 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 60, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary },
-  
-  scrollContent: { padding: 16, paddingBottom: 40 },
-  
-  alertBanner: { flexDirection: 'row', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)', marginBottom: 24, gap: 12 },
-  alertText: { flex: 1, fontSize: 13, color: theme.colors.textPrimary, lineHeight: 20 },
-
-  sectionTitle: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 1.5, marginBottom: 16 },
-  
-  typeContainer: { backgroundColor: theme.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 24, overflow: 'hidden' },
-  typeItem: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  typeItemActive: { backgroundColor: 'rgba(212, 175, 55, 0.05)' },
+  scrollContent: { padding: 20 },
+  alertBanner: { flexDirection: 'row', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.2)', marginBottom: 24 },
+  alertText: { flex: 1, fontSize: 13, color: theme.colors.error, marginLeft: 12, lineHeight: 18 },
+  sectionTitle: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 1, marginBottom: 16 },
+  typeContainer: { gap: 12, marginBottom: 24 },
+  typeItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border },
+  typeItemActive: { borderColor: theme.colors.primary, backgroundColor: 'rgba(217, 119, 6, 0.05)' },
   radioBox: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: theme.colors.textSecondary, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   radioBoxActive: { borderColor: theme.colors.primary },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.primary },
-  typeLabel: { fontSize: 15, color: theme.colors.textPrimary },
-  typeLabelActive: { fontWeight: '600', color: theme.colors.primary },
-
+  typeLabel: { fontSize: 15, color: theme.colors.textSecondary, fontWeight: '500' },
+  typeLabelActive: { color: theme.colors.textPrimary, fontWeight: 'bold' },
   formGroup: { marginBottom: 24 },
-  inputLabel: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 1.5, marginBottom: 8 },
-  inputContainer: { backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border },
-  input: { height: 50, paddingHorizontal: 16, color: theme.colors.textPrimary, fontSize: 15 },
-  
-  textAreaContainer: { height: 120 },
-  textArea: { flex: 1, padding: 16, color: theme.colors.textPrimary, fontSize: 15 },
-
-  attachmentBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: theme.colors.border, borderStyle: 'dashed', gap: 12 },
-  attachmentBtnActive: { borderColor: theme.colors.primary, backgroundColor: 'rgba(212, 175, 55, 0.05)', borderStyle: 'solid' },
-  attachmentText: { fontSize: 14, fontWeight: '500', color: theme.colors.textSecondary },
-  helperText: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 8, marginLeft: 4 },
-
-  footer: { padding: 20, paddingBottom: 32, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background },
-  submitBtn: { flexDirection: 'row', backgroundColor: theme.colors.error, paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  submitBtnDisabled: { opacity: 0.5, backgroundColor: theme.colors.textSecondary },
-  submitBtnText: { fontSize: 16, fontWeight: 'bold', color: theme.colors.background }
+  inputLabel: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 0.5, marginBottom: 8 },
+  inputContainer: { backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: 16 },
+  textAreaContainer: { paddingVertical: 12, minHeight: 120 },
+  input: { height: 48, color: theme.colors.textPrimary, fontSize: 15 },
+  textArea: { color: theme.colors.textPrimary, fontSize: 15, height: 100 },
+  thumbnailContainer: { position: 'relative', marginRight: 12 },
+  thumbnail: { width: 80, height: 80, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border },
+  removeThumbnailBtn: { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.textPrimary, justifyContent: 'center', alignItems: 'center' },
+  attachmentBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderStyle: 'dashed', padding: 16, borderRadius: 12, gap: 8 },
+  attachmentText: { fontSize: 14, color: theme.colors.textSecondary, fontWeight: '500' },
+  helperText: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 6 },
+  footer: { padding: 20, paddingBottom: 32, backgroundColor: theme.colors.background, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  submitBtn: { flexDirection: 'row', backgroundColor: theme.colors.error, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', gap: 8 },
+  submitBtnDisabled: { opacity: 0.5 },
+  submitBtnText: { color: theme.colors.background, fontSize: 16, fontWeight: 'bold' }
 });

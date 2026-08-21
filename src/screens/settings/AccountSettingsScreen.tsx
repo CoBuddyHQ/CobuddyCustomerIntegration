@@ -36,7 +36,7 @@ export const AccountSettingsScreen = () => {
   };
 
   const handlePhoneUpdate = () => {
-      navigation.navigate('OTPVerificationScreen', { isUpdate: true });
+      navigation.navigate('ChangeMobileNumberScreen' as never);
   };
 
   const toggleAppleConnect = () => {

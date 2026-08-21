@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -36,7 +37,7 @@ export const TrustedContactsScreen = () => {
   const { t } = useTranslation(['onboarding']);
   const completeOnboarding = useAuthStore(selectCompleteOnboarding);
   const isFromSettings = route.params?.fromSettings;
-  const { trustedContacts, addTrustedContact, removeTrustedContact } = useSafetyStore();
+  const { trustedContacts, addTrustedContact, removeTrustedContact, updateTrustedContact } = useSafetyStore();
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
@@ -182,7 +183,16 @@ export const TrustedContactsScreen = () => {
               </View>
               <View style={styles.cardBody}>
                 <Icon name="phone-outline" size={16} color={theme.colors.textSecondary} />
-                <Text style={styles.cardPhone}>{contact.phone}</Text>
+                <Text style={styles.cardPhone}>{contact.maskedPhone || (contact.phone ? '******' + contact.phone.slice(-4) : '')}</Text>
+              </View>
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleText}>{t('contacts.toggleLocation', 'Let this contact see my live-location during SOS.')}</Text>
+                <Switch 
+                  value={contact.shareLocation ?? false}
+                  onValueChange={(val) => updateTrustedContact(contact.id, { shareLocation: val })}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={theme.colors.surface}
+                />
               </View>
             </View>
           ))}
@@ -307,8 +317,10 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, color: theme.colors.textPrimary, fontWeight: '600', marginBottom: 2 },
   cardRel: { fontSize: 12, color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
   removeBtn: { padding: 4 },
-  cardBody: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 56 },
+  cardBody: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 56, marginBottom: 12 },
   cardPhone: { fontSize: 14, color: theme.colors.textSecondary },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 12, paddingLeft: 56 },
+  toggleText: { fontSize: 12, color: theme.colors.textSecondary, flex: 1, marginRight: 12 },
 
   addButton: {
     flexDirection: 'row',

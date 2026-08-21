@@ -8,7 +8,9 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { kycApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';type DocType = 'AADHAAR' | 'PAN' | 'PASSPORT' | 'DL';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+type DocType = 'AADHAAR' | 'PAN' | 'PASSPORT' | 'DRIVING_LICENSE' | 'VOTER_ID';
 
 type UploadState = 'idle' | 'selected' | 'uploaded';
 
@@ -16,10 +18,11 @@ export const DocumentVerificationScreen = () => {
   const { t } = useTranslation('verify.document');
 
   const DOC_TYPES = [
-    {id: 'AADHAAR',  icon: 'card-account-details-outline', label: t('docType.aadhaar', 'Aadhaar')},
-    {id: 'PAN',      icon: 'card-account-details',         label: t('docType.pan', 'PAN Card')},
-    {id: 'PASSPORT', icon: 'book-open-page-variant',       label: t('docType.passport', 'Passport')},
-    {id: 'DL',       icon: 'car',                          label: t('docType.dl', 'Driving License')},
+    {id: 'AADHAAR',         icon: 'card-account-details-outline', label: t('docType.aadhaar', 'Aadhaar')},
+    {id: 'PAN',             icon: 'card-account-details',         label: t('docType.pan', 'PAN Card')},
+    {id: 'PASSPORT',        icon: 'book-open-page-variant',       label: t('docType.passport', 'Passport')},
+    {id: 'DRIVING_LICENSE', icon: 'car',                          label: t('docType.dl', 'Driving License')},
+    {id: 'VOTER_ID',        icon: 'card-bulleted-outline',        label: t('docType.voterId', 'Voter ID')},
   ] as const;
 
   const UPLOAD_TIPS = [
@@ -59,8 +62,9 @@ export const DocumentVerificationScreen = () => {
     switch (selectedDoc) {
       case 'AADHAAR': return '0000 0000 0000';
       case 'PAN': return 'ABCDE1234F';
-      case 'DL': return 'DL-1420110012345';
+      case 'DRIVING_LICENSE': return 'DL-1420110012345';
       case 'PASSPORT': return 'A1234567';
+      case 'VOTER_ID': return 'ABC1234567';
     }
   };
 
@@ -183,7 +187,7 @@ export const DocumentVerificationScreen = () => {
               )}
             </TouchableOpacity>
 
-            {(selectedDoc === 'AADHAAR' || selectedDoc === 'DL') && (
+            {(selectedDoc === 'AADHAAR' || selectedDoc === 'DRIVING_LICENSE' || selectedDoc === 'VOTER_ID') && (
               <>
                 <View style={styles.uploadDivider} />
                 <TouchableOpacity

@@ -66,7 +66,7 @@ export const BookingTimeSelectScreen = () => {
     if (!selectedTime) return;
     
     const selectedDate = DATES.find(d => d.id === selectedDateId);
-    setDraftBooking({ time: `${selectedDate?.dayName}, ${selectedTime}` });
+    setDraftBooking({ scheduledStart: `${selectedDate?.dateStr || ''}T${selectedTime || '18:00'}:00` });
     
     navigation.navigate('BookingSummaryScreen', {
       activity,

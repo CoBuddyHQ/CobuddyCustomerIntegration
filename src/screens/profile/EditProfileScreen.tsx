@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
-import { useInterestsData } from '../onboarding/InterestSelectionScreen'; // To map IDs to full objects
+import { adminValues } from '../../config/adminValues';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { MOCK_PROFILE } from '../../services/mock';
 import { profileApi } from '../../services/api';
@@ -13,7 +13,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 export const EditProfileScreen = () => {
-  const INTERESTS_DATA = useInterestsData(); 
+  const INTERESTS_DATA = adminValues.activityCategories; 
   const { t } = useTranslation('profile.edit');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();

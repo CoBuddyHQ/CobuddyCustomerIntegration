@@ -21,6 +21,8 @@ const SPOKEN_LANGUAGES = [
     { id: 'ml', label: 'Malayalam', native: 'മലയാളം' },
     { id: 'pa', label: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
     { id: 'ur', label: 'Urdu', native: 'اردو' },
+    { id: 'or', label: 'Odia', native: 'ଓଡ଼ିଆ' },
+    { id: 'hinglish', label: 'Hinglish', native: 'Hinglish' },
     { id: 'fr', label: 'French', native: 'Français' },
     { id: 'es', label: 'Spanish', native: 'Español' },
 ];
@@ -56,76 +58,159 @@ export const SpokenLanguagesScreen = () => {
           name: 'EditProfileScreen',
           params: { updatedLanguages: selectedLabels, updatedLangIds: Array.from(selected) },
           merge: true,
-      });
+      } as any);
   };
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
-
+      
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => smartGoBack()} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11yGoBack', 'Go back')}>
+        <TouchableOpacity onPress={() => smartGoBack()} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t('a11yGoBack', 'Go back')}>
           <Icon name="arrow-left" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('headerTitle', 'Spoken Languages')}</Text>
-        <TouchableOpacity style={styles.saveHeaderBtn} onPress={handleSave} accessibilityRole="button" accessibilityLabel={t('a11yDone', 'Done')}>
-            <Text style={styles.saveHeaderBtnText}>{t('doneBtn', 'Done')}</Text>
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        <View style={styles.infoBanner}>
-            <Icon name="earth" size={24} color={theme.colors.primary} style={{marginBottom: 8}} />
-            <Text style={styles.infoText}>{t('infoText', 'Select up to 5 languages you can fluently converse in during a meetup.')}</Text>
-            <Text style={styles.countText}>{t('countSelected', '{{count}}/5 selected', { count: selected.size })}</Text>
-        </View>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Text style={styles.subtitle}>{t('subtitle', 'Select up to 5 languages you are comfortable speaking.')}</Text>
 
-        <View style={styles.grid}>
+        <View style={styles.listContainer}>
             {SPOKEN_LANGUAGES.map(lang => {
-                const active = selected.has(lang.id);
+                const isSelected = selected.has(lang.id);
                 return (
                     <TouchableOpacity 
                         key={lang.id} 
-                        style={[styles.tile, active && styles.tileActive]} 
+                        style={[styles.row, isSelected && styles.rowActive]}
                         onPress={() => toggleLang(lang.id)}
-                        activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11yToggleLanguage', 'Toggle {{lang}}', { lang: lang.label })}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('a11yToggleLang', 'Toggle {{label}}', { label: lang.label })}
                     >
-                        <View style={styles.tileContent}>
-                            <Text style={[styles.tileLabel, active && styles.tileLabelActive]}>{t(`lang_${lang.id}`, lang.label)}</Text>
-                            <Text style={[styles.tileNative, active && styles.tileNativeActive]}>{lang.native}</Text>
+                        <View>
+                            <Text style={[styles.langLabel, isSelected && styles.langLabelActive]}>{lang.label}</Text>
+                            <Text style={styles.langNative}>{lang.native}</Text>
                         </View>
-                        {active && <Icon name="check-circle" size={20} color={theme.colors.primary} />}
+                        <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
+                            {isSelected && <Icon name="check" size={16} color={theme.colors.background} />}
+                        </View>
                     </TouchableOpacity>
-                )
+                );
             })}
         </View>
-
       </ScrollView>
+
+      {/* Sticky Save CTA */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11ySavePreferences', 'Save Preferences')}>
+            <Text style={styles.saveBtnText}>{t('saveBtn', 'Save Preferences ({{count}}/5)', { count: selected.size })}</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 60, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary },
-  saveHeaderBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(212,175,55,0.1)', borderRadius: 12 },
-  saveHeaderBtnText: { fontSize: 14, fontWeight: 'bold', color: theme.colors.primary },
-  
-  scrollContent: { padding: 16, paddingBottom: 40 },
-  
-  infoBanner: { backgroundColor: 'rgba(212, 175, 55, 0.05)', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.2)', marginBottom: 24, alignItems: 'center' },
-  infoText: { fontSize: 14, color: theme.colors.textPrimary, textAlign: 'center', lineHeight: 22, marginBottom: 8 },
-  countText: { fontSize: 12, color: theme.colors.primary, fontWeight: 'bold' },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  tile: { width: '48%', backgroundColor: theme.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  tileActive: { borderColor: 'rgba(212,175,55,0.8)', backgroundColor: 'rgba(212,175,55,0.08)' },
-  tileContent: { flex: 1 },
-  tileLabel: { fontSize: 15, color: theme.colors.textPrimary, fontWeight: '600', marginBottom: 2 },
-  tileLabelActive: { color: theme.colors.primary },
-  tileNative: { fontSize: 13, color: theme.colors.textSecondary },
-  tileNativeActive: { color: theme.colors.primary, opacity: 0.8 },
+  root: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 56,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.textPrimary,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  listContainer: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  rowActive: {
+    backgroundColor: 'rgba(217, 119, 6, 0.05)',
+  },
+  langLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: 2,
+  },
+  langLabelActive: {
+    color: theme.colors.primary,
+  },
+  langNative: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  bottomBar: {
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  saveBtn: {
+    backgroundColor: theme.colors.primary,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.background,
+  },
 });
