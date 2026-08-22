@@ -19,9 +19,11 @@ export interface AuthUser {
   id: string;
   phone: string;
   name?: string | null;
+  email?: string | null;
   avatar?: string | null;
   bio?: string | null;
   age?: number | null;
+  dob?: string | null;
   gender?: string | null;
   city?: string | null;
   accountStatus?: string;

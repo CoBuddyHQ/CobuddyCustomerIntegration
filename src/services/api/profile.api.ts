@@ -19,6 +19,7 @@ export interface CustomerProfile {
   id: string;
   phone: string;
   name?: string | null;
+  email?: string | null;
   bio?: string | null;
   age?: number | null;
   gender?: string | null;
@@ -39,6 +40,7 @@ export interface CustomerProfile {
 
 export interface UpdateProfileRequest {
   name?: string;
+  email?: string;
   bio?: string;
   age?: number;
   dob?: string;
