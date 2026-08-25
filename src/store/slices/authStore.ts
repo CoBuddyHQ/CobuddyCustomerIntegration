@@ -270,9 +270,21 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     // ─── completeOnboarding ───────────────────────────────────────────────────
-    completeOnboarding: () => {
-      set({ isOnboardingComplete: true });
-      profileApi.completeOnboarding({}).catch(() => {});
+    completeOnboarding: async (data?: any) => {
+      set({ isLoading: true, error: null });
+      try {
+        const res = await profileApi.completeOnboarding(data || {});
+        const updated = res.customer;
+        if (updated) {
+          get().updateUser(mapCustomer(updated as any));
+        }
+        set({ isOnboardingComplete: true });
+      } catch (e: any) {
+        set({ error: e?.message || 'Failed to complete onboarding.' });
+        throw e;
+      } finally {
+        set({ isLoading: false });
+      }
     },
 
     // ─── setKycStatus ─────────────────────────────────────────────────────────

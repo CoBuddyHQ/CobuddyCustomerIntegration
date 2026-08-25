@@ -90,8 +90,11 @@ apiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    if (config.data instanceof FormData || (config.headers && config.headers['Content-Type'] === 'multipart/form-data')) {
+      delete config.headers['Content-Type'];
+    }
     if (__DEV__) {
-      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.data ?? '');
+      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.data instanceof FormData ? '[FormData]' : (config.data ?? ''));
     }
     return config;
   },
@@ -179,15 +182,8 @@ apiClient.interceptors.response.use(
 
 export default apiClient;
 
-// ─── Helper: extract error message from backend response ─────────────────────
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 export const getApiError = (error: unknown): string => {
-  if (axios.isAxiosError(error)) {
-    const data = error.response?.data as { message?: string | string[] } | undefined;
-    if (!data) return error.message || 'Network error. Please check your connection.';
-    if (Array.isArray(data.message)) return data.message[0];
-    if (typeof data.message === 'string') return data.message;
-    return 'An unexpected error occurred.';
-  }
-  return 'An unexpected error occurred.';
+  return extractErrorMessage(error);
 };

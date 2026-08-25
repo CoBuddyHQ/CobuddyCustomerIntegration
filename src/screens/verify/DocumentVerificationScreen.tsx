@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { kycApi } from '../../services/api';
+import { showApiError } from '../../utils/errorHandler';
+import { FlowTracker } from '../../services/flowTracker';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -38,6 +40,11 @@ export const DocumentVerificationScreen = () => {
   const [legalName, setLegalName] = useState('');
   const [frontState, setFrontState] = useState<UploadState>('idle');
   const [backState, setBackState]   = useState<UploadState>('idle');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    FlowTracker.saveActiveScreen('DocumentVerificationScreen');
+  }, []);
 
   const formatDocNumber = (val: string, type: DocType) => {
     if (type === 'AADHAAR') {
@@ -229,24 +236,34 @@ export const DocumentVerificationScreen = () => {
           </View>
 
           <TouchableOpacity
-            style={[styles.ctaBtn, !canSubmit() && styles.ctaBtnDisabled]}
-            disabled={!canSubmit()}
+            style={[styles.ctaBtn, (!canSubmit() || isSubmitting) && styles.ctaBtnDisabled]}
+            disabled={!canSubmit() || isSubmitting}
             onPress={async () => {
+              if (!canSubmit() || isSubmitting) return;
+              setIsSubmitting(true);
               try {
                 await kycApi.submitKycDocument({
                   documentType: selectedDoc,
                   documentNumber: docNumber.trim(),
-                  frontDocUri: 'file:///local/front.jpg',
-                  backDocUri: 'file:///local/back.jpg',
+                  legalName: legalName.trim(),
+                  frontDocUri: 'https://images.unsplash.com/photo-1544717305-2782549b5136',
+                  backDocUri: 'https://images.unsplash.com/photo-1544717305-2782549b5136',
                 });
-              } catch {
-                // Fallback
+                navigation.navigate('SelfieCaptureScreen');
+              } catch (e: any) {
+                showApiError(e, {
+                  title: 'Document Upload Failed',
+                  onRetry: async () => {
+                    // Retry trigger
+                  },
+                });
+              } finally {
+                setIsSubmitting(false);
               }
-              navigation.navigate('SelfieCaptureScreen');
             }}
             activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yContinueVerification', 'Continue Verification')}>
             <Icon name="upload" size={18} color={theme.colors.background} />
-            <Text style={styles.ctaBtnText}>{t('continueVerify', 'Continue Verification')}</Text>
+            <Text style={styles.ctaBtnText}>{isSubmitting ? 'Uploading Document...' : t('continueVerify', 'Continue Verification')}</Text>
           </TouchableOpacity>
 
           <View style={styles.securityNote}>

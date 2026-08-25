@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import { BottomActionBar } from '../../components/ui/BottomActionBar';
 import { AppBottomSheet } from '../../components/ui/AppBottomSheet';
 import { OnboardingHeader } from '../../components/onboarding/OnboardingHeader';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { showApiError } from '../../utils/errorHandler';
+import { FlowTracker } from '../../services/flowTracker';
 
 const DocIcon = ({ icon }: { icon: string }) => {
   if (icon === '⚖') return <Icon name="scale-balance" size={22} color={theme.colors.primary} />;
@@ -90,10 +92,15 @@ export const LegalConsentScreen = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    FlowTracker.saveActiveScreen('LegalConsentScreen');
+  }, []);
+
   const allChecked = CONSENTS.every(c => checked[c.id]);
   const toggle = (id: string) => setChecked(prev => ({ ...prev, [id]: !prev[id] }));
 
   const handleAgree = async () => {
+    if (!allChecked || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await profileApi.submitLegalConsent({
@@ -104,9 +111,11 @@ export const LegalConsentScreen = () => {
         allAccepted: true,
       });
       navigation.navigate('LocationPermissionScreen');
-    } catch {
-      // Fallback gracefully
-      navigation.navigate('LocationPermissionScreen');
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Consent Submission Failed',
+        onRetry: handleAgree,
+      });
     } finally {
       setIsSubmitting(false);
     }

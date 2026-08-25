@@ -7,6 +7,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { kycApi } from '../../services/api';
+import { showApiError } from '../../utils/errorHandler';
+import { FlowTracker } from '../../services/flowTracker';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -15,11 +17,29 @@ export const LivenessDetectionScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const [step, setStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Animation for scanning line
   const scanAnim = useRef(new Animated.Value(0)).current;
 
+  const performLivenessSubmission = async () => {
+    setIsSubmitting(true);
+    try {
+      await kycApi.submitKycLiveness('https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4');
+      navigation.replace('VerificationProcessingScreen');
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Liveness Check Failed',
+        onRetry: performLivenessSubmission,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   useEffect(() => {
+    FlowTracker.saveActiveScreen('LivenessDetectionScreen');
+
     Animated.loop(
       Animated.sequence([
         Animated.timing(scanAnim, {
@@ -37,22 +57,16 @@ export const LivenessDetectionScreen = () => {
       ])
     ).start();
 
-    // MOCK / Real: Simulate liveness steps and send to backend
     const timer1 = setTimeout(() => setStep(1), 2500); // "Blink your eyes"
-    const timer2 = setTimeout(async () => {
-      try {
-        await kycApi.submitKycLiveness('file:///local/liveness.mp4');
-      } catch {
-        // Fallback
-      }
-      navigation.replace('VerificationProcessingScreen');
-    }, 5000);
+    const timer2 = setTimeout(() => {
+      performLivenessSubmission();
+    }, 4500);
 
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, [scanAnim, navigation]);
+  }, [scanAnim]);
 
   const translateY = scanAnim.interpolate({
     inputRange: [0, 1],

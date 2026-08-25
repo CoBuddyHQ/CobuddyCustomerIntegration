@@ -15,6 +15,8 @@ import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore
 import { adminValues } from '../../config/adminValues';
 import { selectInterests, selectSetInterests } from '../../store/selectors/userPreferencesSelectors';
 import { profileApi } from '../../services/api';
+import { showApiError } from '../../utils/errorHandler';
+import { FlowTracker } from '../../services/flowTracker';
 
 const MIN_SELECT = 3;
 const MAX_SELECT = 10;
@@ -37,6 +39,10 @@ export const InterestSelectionScreen = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set(initialInterests));
   const [isSaving, setIsSaving] = useState(false);
 
+  React.useEffect(() => {
+    FlowTracker.saveActiveScreen('InterestSelectionScreen');
+  }, []);
+
   const toggle = (id: string) => {
     setSelected(prev => {
       const next = new Set(prev);
@@ -51,25 +57,30 @@ export const InterestSelectionScreen = () => {
   const isValid = count >= MIN_SELECT;
 
   const handleNext = async () => {
+    if (!isValid || isSaving) return;
     const newInterests = Array.from(selected);
-    setGlobalInterests(newInterests);
     setIsSaving(true);
     try {
       // Persist interests to backend: PATCH /profile/interests
       await profileApi.updateInterests(newInterests);
-    } catch {
-      // Non-fatal — local store already updated, proceed
+      setGlobalInterests(newInterests);
+
+      if (isEditMode) {
+        navigation.navigate({
+          name: 'EditProfileScreen',
+          params: { updatedInterests: newInterests },
+          merge: true,
+        });
+      } else {
+        navigation.navigate('SafetyTutorialScreen' as never);
+      }
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Interests Save Failed',
+        onRetry: handleNext,
+      });
     } finally {
       setIsSaving(false);
-    }
-    if (isEditMode) {
-      navigation.navigate({
-        name: 'EditProfileScreen',
-        params: { updatedInterests: newInterests },
-        merge: true,
-      });
-    } else {
-      navigation.navigate('SafetyTutorialScreen' as never);
     }
   };
 

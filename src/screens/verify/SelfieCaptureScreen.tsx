@@ -7,6 +7,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { kycApi } from '../../services/api';
+import { showApiError } from '../../utils/errorHandler';
+import { FlowTracker } from '../../services/flowTracker';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -18,8 +20,10 @@ export const SelfieCaptureScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const [hasPermission, setHasPermission] = useState(false);
   const [photoCaptured, setPhotoCaptured] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    FlowTracker.saveActiveScreen('SelfieCaptureScreen');
     // Simulate camera permission check
     const timer = setTimeout(() => {
       setHasPermission(true);
@@ -36,12 +40,19 @@ export const SelfieCaptureScreen = () => {
   };
 
   const handleNext = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      await kycApi.submitKycSelfie('file:///local/selfie.jpg');
-    } catch {
-      // Graceful fallback
+      await kycApi.submitKycSelfie('https://images.unsplash.com/photo-1534528741775-53994a69daeb');
+      navigation.navigate('LivenessDetectionScreen');
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Selfie Upload Failed',
+        onRetry: handleNext,
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    navigation.navigate('LivenessDetectionScreen');
   };
 
   return (

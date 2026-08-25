@@ -24,6 +24,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { profileApi } from '../../services/api';
 import { useAuthStore } from '../../store/slices/authStore';
+import { showApiError } from '../../utils/errorHandler';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
 const GENDER_OPTION_KEYS: Record<string, string> = {
@@ -39,6 +40,8 @@ const AVATAR_COLORS: Record<AvatarState, string> = {
   photo: '#2a3b5e',
   selfie: '#3b2a5e',
 };
+
+import { FlowTracker } from '../../services/flowTracker';
 
 export const BasicProfileSetupScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -57,6 +60,10 @@ export const BasicProfileSetupScreen = () => {
   const [avatarState, setAvatarState] = useState<AvatarState>(user?.avatar ? 'photo' : 'none');
   const [showAvatarSheet, setShowAvatarSheet] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  React.useEffect(() => {
+    FlowTracker.saveActiveScreen('BasicProfileSetupScreen');
+  }, []);
 
   const { t } = useTranslation(['onboarding']);
 
@@ -109,17 +116,18 @@ export const BasicProfileSetupScreen = () => {
       const birthYear = parseInt(parts[2], 10);
       const age = new Date().getFullYear() - birthYear;
 
-      await profileApi.updateProfile({ name, city, gender, age, bio, dob });
+      const updated = await profileApi.updateProfile({ name, city, gender, age, bio, dob });
 
       // Update local store
-      updateUser({ name, city, gender, age, bio });
+      updateUser({ name, city, gender, age, bio, ...(updated || {}) });
 
       // Navigate to next onboarding step
       navigation.navigate('InterestSelectionScreen');
-    } catch {
-      // Non-fatal — still allow proceeding to next step
-      updateUser({ name, city, gender });
-      navigation.navigate('InterestSelectionScreen');
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Profile Save Failed',
+        onRetry: handleContinue,
+      });
     } finally {
       setIsSaving(false);
     }

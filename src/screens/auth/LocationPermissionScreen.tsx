@@ -17,16 +17,23 @@ import { LOCATION_BENEFITS } from '../../services/mock';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { profileApi } from '../../services/api';
+import { showApiError } from '../../utils/errorHandler';
+import { FlowTracker } from '../../services/flowTracker';
 
 export const LocationPermissionScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { t } = useTranslation(['onboarding']);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  React.useEffect(() => {
+    FlowTracker.saveActiveScreen('LocationPermissionScreen');
+  }, []);
+
   const handleAllowLocation = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // Send real location data to backend
+      // Send location data to backend
       await profileApi.updateLocation({
         latitude: 19.0760,
         longitude: 72.8777,
@@ -35,21 +42,30 @@ export const LocationPermissionScreen = () => {
         permissionGranted: true,
         skipped: false,
       });
-    } catch {
-      // Continue gracefully even on network issue
+      navigation.navigate('NotificationPermissionScreen');
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Location Save Failed',
+        onRetry: handleAllowLocation,
+      });
     } finally {
       setIsSubmitting(false);
-      navigation.navigate('NotificationPermissionScreen');
     }
   };
 
   const handleSkipLocation = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await profileApi.skipLocation();
-    } catch {
-      // Continue gracefully
-    } finally {
       navigation.navigate('NotificationPermissionScreen');
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Action Failed',
+        onRetry: handleSkipLocation,
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

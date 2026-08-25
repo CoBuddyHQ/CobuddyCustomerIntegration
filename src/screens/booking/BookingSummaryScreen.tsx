@@ -20,6 +20,8 @@ import { bookingApi } from '../../services/api';
 import { adminValues } from '../../config/adminValues';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { showApiError } from '../../utils/errorHandler';
+import { FlowTracker } from '../../services/flowTracker';
 
 export const BookingSummaryScreen = () => { 
   const { t } = useTranslation('booking.summary');
@@ -27,6 +29,10 @@ export const BookingSummaryScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'BookingSummaryScreen'>>();
   const { draftBooking, requestBooking } = useBookingStore();
+
+  React.useEffect(() => {
+    FlowTracker.saveActiveScreen('BookingSummaryScreen');
+  }, []);
 
   
   const { activity, venue, date, time, duration = 1, companionId } = route.params || {};
@@ -99,6 +105,10 @@ export const BookingSummaryScreen = () => {
 
       navigation.navigate('BookingRequestSentScreen');
     } catch (err: any) {
+      showApiError(err, {
+        title: 'Booking Request Failed',
+        onRetry: handleSendRequest,
+      });
       const msg = err?.response?.data?.message || 'Failed to submit booking request. Please try again.';
       setSubmitError(Array.isArray(msg) ? msg[0] : msg);
     } finally {

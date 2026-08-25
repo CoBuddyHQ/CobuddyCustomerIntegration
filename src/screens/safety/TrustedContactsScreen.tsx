@@ -27,6 +27,8 @@ import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { safetyApi } from '../../services/api';
+import { showApiError } from '../../utils/errorHandler';
+import { FlowTracker } from '../../services/flowTracker';
 
 const RELATIONSHIPS = ['Family', 'Friend', 'Partner', 'Other'];
 
@@ -43,6 +45,26 @@ export const TrustedContactsScreen = () => {
   const [newPhone, setNewPhone] = useState('');
   const [newRel, setNewRel] = useState('Friend');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isCompleting, setIsCompleting] = useState(false);
+
+  React.useEffect(() => {
+    FlowTracker.saveActiveScreen('TrustedContactsScreen');
+  }, []);
+
+  const handleCompleteOnboarding = async () => {
+    if (isCompleting) return;
+    setIsCompleting(true);
+    try {
+      await completeOnboarding();
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Onboarding Completion Failed',
+        onRetry: handleCompleteOnboarding,
+      });
+    } finally {
+      setIsCompleting(false);
+    }
+  };
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -215,8 +237,9 @@ export const TrustedContactsScreen = () => {
         <BottomActionBar>
           <Button 
             title={isFromSettings ? t('contacts.saveContacts', 'Save Contacts') : t('contacts.btn_complete')} 
-            disabled={!isValid}
-            onPress={() => isFromSettings ? smartGoBack() : completeOnboarding()} 
+            disabled={!isValid || isCompleting}
+            loading={isCompleting}
+            onPress={() => isFromSettings ? smartGoBack() : handleCompleteOnboarding()} 
           />
         </BottomActionBar>
 

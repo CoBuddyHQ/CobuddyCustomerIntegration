@@ -20,6 +20,7 @@ import { OnboardingHeader } from '../../components/onboarding/OnboardingHeader';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { FlowTracker } from '../../services/flowTracker';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -122,6 +123,10 @@ export const SafetyTutorialScreen = () => {
   const [current, setCurrent] = useState(0);
   const [showLearnMore, setShowLearnMore] = useState(false);
   const listRef = useRef<FlatList<Slide>>(null);
+
+  React.useEffect(() => {
+    FlowTracker.saveActiveScreen('SafetyTutorialScreen');
+  }, []);
 
   const isLast = current === SLIDES.length - 1;
 

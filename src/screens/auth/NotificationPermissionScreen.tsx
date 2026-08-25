@@ -17,34 +17,50 @@ import { NOTIFICATION_BENEFITS } from '../../services/mock';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { notificationsApi } from '../../services/api';
+import { showApiError } from '../../utils/errorHandler';
+import { FlowTracker } from '../../services/flowTracker';
 
 export const NotificationPermissionScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { t } = useTranslation(['onboarding']);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  React.useEffect(() => {
+    FlowTracker.saveActiveScreen('NotificationPermissionScreen');
+  }, []);
+
   const handleEnableNotifications = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       await notificationsApi.updateNotificationPermission({
         enabled: true,
         skipped: false,
       });
-    } catch {
-      // Continue gracefully
+      navigation.navigate('BasicProfileSetupScreen');
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Notification Setup Failed',
+        onRetry: handleEnableNotifications,
+      });
     } finally {
       setIsSubmitting(false);
-      navigation.navigate('BasicProfileSetupScreen');
     }
   };
 
   const handleSkipNotifications = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await notificationsApi.skipNotificationPermission();
-    } catch {
-      // Continue gracefully
-    } finally {
       navigation.navigate('BasicProfileSetupScreen');
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Action Failed',
+        onRetry: handleSkipNotifications,
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
