@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
+import { useAuthStore } from '../../store/slices/authStore';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -93,9 +94,17 @@ export const SettingsHubScreen = () => {
       t('logOutAlert.message', 'Are you sure you want to log out of CoBuddy?'),
       [
         { text: t('logOutAlert.cancel', 'Cancel'), style: 'cancel' },
-        { text: t('logOutAlert.confirm', 'Log Out'), style: 'destructive', onPress: () => {
-            Alert.alert(t('logOutAlert.successTitle', 'Logged Out'), t('logOutAlert.successMessage', 'Successfully logged out.'));
-        }}
+        {
+          text: t('logOutAlert.confirm', 'Log Out'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await useAuthStore.getState().logout();
+            } catch (err) {
+              console.error('Logout error:', err);
+            }
+          },
+        },
       ]
     );
   };

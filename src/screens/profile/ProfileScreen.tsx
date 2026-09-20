@@ -84,6 +84,27 @@ export const ProfileScreen = () => {
     }
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      t('logOutAlertTitle', 'Log Out'),
+      t('logOutAlertMessage', 'Are you sure you want to log out of CoBuddy?'),
+      [
+        { text: t('cancel', 'Cancel'), style: 'cancel' },
+        {
+          text: t('logOut', 'Log Out'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await useAuthStore.getState().logout();
+            } catch (err) {
+              console.error('Logout error:', err);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
@@ -382,6 +403,18 @@ export const ProfileScreen = () => {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* ── Logout Button ── */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          activeOpacity={0.8}
+          onPress={handleLogout}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11yLogOut', 'Log Out')}
+        >
+          <Icon name="logout-variant" size={20} color={theme.colors.error} />
+          <Text style={styles.logoutText}>{t('logOut', 'Log Out')}</Text>
+        </TouchableOpacity>
 
         <Text style={styles.versionText}>{t('cobuddyV100Build42', 'CoBuddy v1.0.0 (Build 42)')}</Text>
 
