@@ -17,26 +17,73 @@ import { selectActiveBooking } from '../../store/selectors/bookingSelectors';
 import { useAuthStore } from '../../store/slices/authStore';
 import { discoveryApi, bookingApi, profileApi, notificationsApi, CompanionCard as CompanionCardType } from '../../services/api';
 
+const DEFAULT_CATEGORIES: discoveryApi.HomeCategory[] = [
+  { id: 'coffee', title: 'Coffee Meetups', icon: 'coffee', color: '#D4AF37' },
+  { id: 'movie', title: 'Movie Buffs', icon: 'movie', color: '#E11D48' },
+  { id: 'city', title: 'City Walk', icon: 'map-marker', color: '#10B981' },
+  { id: 'study', title: 'Study Buddy', icon: 'book', color: '#3B82F6' },
+  { id: 'shopping', title: 'Shopping & Lifestyle', icon: 'shopping', color: '#8B5CF6' },
+];
+
+const DEFAULT_FEATURED_LIST: CompanionCardType[] = [
+  {
+    id: 'c1',
+    name: 'Elena Vasquez',
+    age: 26,
+    initials: 'EV',
+    title: 'City guide & local experiences expert',
+    bio: "Hi! I love exploring new cafes in the city and talking about art, literature, and movies.",
+    trustScore: 98,
+    rating: 4.97,
+    reviews: 124,
+    sessions: 312,
+    rate: '₹500 /hr',
+    distance: '2.5 km away',
+    isOnline: true,
+    category: 'coffee',
+    gender: 'Female',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800',
+  },
+  {
+    id: 'c2',
+    name: 'Aisha Sharma',
+    age: 24,
+    initials: 'AS',
+    title: 'Shopping & lifestyle companion',
+    bio: 'Fashion lover, shopping enthusiast and great listener.',
+    trustScore: 97,
+    rating: 5.0,
+    reviews: 76,
+    sessions: 150,
+    rate: '₹400 /hr',
+    distance: '3.0 km away',
+    isOnline: true,
+    category: 'shopping',
+    gender: 'Female',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
+  },
+];
+
 export const HomeDashboardScreen = () => {
   const { t } = useTranslation('home.dashboard');
-
-  const EXPLORE_CATEGORIES = React.useMemo(() => [
-    { id: 'coffee', title: t('categories.coffeeMeetups', 'Coffee Meetups'), icon: 'coffee', color: '#D4AF37' },
-    { id: 'movie', title: t('categories.movieBuffs', 'Movie Buffs'), icon: 'movie', color: '#E11D48' },
-    { id: 'city', title: t('categories.cityWalk', 'City Walk'), icon: 'map-marker', color: '#10B981' },
-    { id: 'study', title: t('categories.studyBuddy', 'Study Buddy'), icon: 'book', color: '#3B82F6' },
-  ], [t]);
-
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [loading, setLoading] = useState(true);
+
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [featuredList, setFeaturedList] = useState<CompanionCardType[]>([]);
-  const [hasUnreadNotifs, setHasUnreadNotifs] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [categories, setCategories] = useState<discoveryApi.HomeCategory[]>(DEFAULT_CATEGORIES);
+  const [featuredList, setFeaturedList] = useState<CompanionCardType[]>(DEFAULT_FEATURED_LIST);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [bookingCount, setBookingCount] = useState(0);
+  const [activeBooking, setActiveBooking] = useState<any | null>(null);
+
   const { user, updateUser } = useAuthStore();
   const selectedInterests = useUserPreferencesStore(selectInterests);
 
-  const sortedExploreCategories = React.useMemo(() => {
-    if (!selectedInterests || selectedInterests.length === 0) return EXPLORE_CATEGORIES;
+  const sortedCategories = React.useMemo(() => {
+    if (!categories || categories.length === 0) return DEFAULT_CATEGORIES;
+    if (!selectedInterests || selectedInterests.length === 0) return categories;
 
     const userCategoryIds = new Set<string>();
     selectedInterests.forEach(interestId => {
@@ -46,51 +93,43 @@ export const HomeDashboardScreen = () => {
       }
     });
 
-    return [...EXPLORE_CATEGORIES].sort((a, b) => {
+    return [...categories].sort((a, b) => {
       const aMatches = userCategoryIds.has(a.id);
       const bMatches = userCategoryIds.has(b.id);
       if (aMatches && !bMatches) return -1;
       if (!aMatches && bMatches) return 1;
       return 0;
     });
-  }, [selectedInterests, EXPLORE_CATEGORIES]);
-
-  // In real app, this comes from global state or API
-  const activeBooking = useBookingStore(selectActiveBooking);
-  const hasActiveBooking = !!activeBooking;
+  }, [selectedInterests, categories]);
 
   const loadHomeData = useCallback(async () => {
+    setError(null);
     try {
-      // 1. Fetch fresh profile from PostgreSQL
-      const profilePromise = profileApi.getProfile().then(profile => {
-        if (profile?.name) {
+      const homeData = await discoveryApi.getHomeDashboardData();
+
+      if (homeData) {
+        if (homeData.categories && homeData.categories.length > 0) {
+          setCategories(homeData.categories);
+        }
+        if (homeData.featuredCompanions && homeData.featuredCompanions.length > 0) {
+          setFeaturedList(homeData.featuredCompanions);
+        }
+        setNotificationCount(homeData.quickAccess?.notificationCount || 0);
+        setBookingCount(homeData.quickAccess?.bookingCount || 0);
+        setActiveBooking(homeData.activeBooking || null);
+
+        if (homeData.profile?.name) {
           updateUser({
-            name: profile.name,
-            avatar: profile.avatar || null,
-            city: profile.city || null,
-            gender: profile.gender || null,
-            bio: profile.bio || null,
+            name: homeData.profile.name,
+            avatar: homeData.profile.photoUrl || null,
+            city: homeData.profile.city || null,
+            gender: homeData.profile.gender || null,
           });
         }
-      }).catch(() => {});
-
-      // 2. Fetch notifications to check unread status
-      const notifsPromise = notificationsApi.listNotifications().then(notifsRes => {
-        const notifs = Array.isArray(notifsRes) ? notifsRes : (notifsRes as any)?.data || [];
-        const unread = notifs.some((n: any) => !n.isRead);
-        setHasUnreadNotifs(unread);
-      }).catch(() => {});
-
-      // 3. Fetch real featured companions
-      const featuredPromise = discoveryApi.getFeaturedCompanions().then(featured => {
-        if (featured && Array.isArray(featured)) {
-          setFeaturedList(featured);
-        }
-      }).catch(() => {});
-
-      await Promise.allSettled([profilePromise, notifsPromise, featuredPromise]);
-    } catch {
-      // Handle gracefully
+      }
+    } catch (err: any) {
+      console.error('[HomeDashboardScreen] Error loading home data:', err);
+      setError('Unable to load home data. Tap to retry.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -100,6 +139,7 @@ export const HomeDashboardScreen = () => {
   useEffect(() => {
     loadHomeData();
   }, [loadHomeData]);
+  
 
   useFocusEffect(
     useCallback(() => {
@@ -111,6 +151,8 @@ export const HomeDashboardScreen = () => {
     setRefreshing(true);
     loadHomeData();
   };
+
+  const hasActiveBooking = !!activeBooking;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -125,7 +167,11 @@ export const HomeDashboardScreen = () => {
         </View>
         <View style={styles.topRightIcons}>
           <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={() => navigation.navigate('NotificationsScreen')} accessibilityRole="button" accessibilityLabel={t('a11yNotifications', 'Notifications')}>
-            {hasUnreadNotifs && <View style={styles.notifDot} />}
+            {notificationCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
+              </View>
+            )}
             <Icon name="bell-outline" size={24} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -146,11 +192,19 @@ export const HomeDashboardScreen = () => {
         
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeText}>{t('greeting')} <Text style={styles.welcomeName}>{user?.name || 'Member'}</Text></Text>
-          <Text style={styles.subtitleText}>{t('subtitle')}</Text>
+          <Text style={styles.welcomeText}>{t('greeting', 'Welcome,')} <Text style={styles.welcomeName}>{user?.name || 'Member'}</Text></Text>
+          <Text style={styles.subtitleText}>{t('subtitle', 'Find verified local companions for your daily activities')}</Text>
         </View>
 
-
+        {error ? (
+          <View style={styles.errorCard}>
+            <Icon name="alert-circle-outline" size={32} color={theme.colors.error} />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={loadHomeData}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {hasActiveBooking ? (
           <>
@@ -158,7 +212,7 @@ export const HomeDashboardScreen = () => {
             <View style={styles.cardSection}>
               <View style={styles.cardHeader}>
                 <Icon name="calendar-check" size={16} color={theme.colors.primary} />
-                <Text style={styles.cardSectionTitle}>{t('upcoming.title')}</Text>
+                <Text style={styles.cardSectionTitle}>{t('upcoming.title', 'UPCOMING MEETUP')}</Text>
               </View>
               
               <View style={styles.activeCard}>
@@ -166,61 +220,23 @@ export const HomeDashboardScreen = () => {
                   <View style={styles.badgeRow}>
                     <View style={styles.badgeSolid}>
                       <Icon name="check" size={12} color={theme.colors.background} />
-                      <Text style={styles.badgeSolidText}>{t('upcoming.status')}</Text>
+                      <Text style={styles.badgeSolidText}>{t('upcoming.status', 'Confirmed')}</Text>
                     </View>
                   </View>
-                  <Text style={styles.activeMeetupTitle}>{activeBooking?.activity}</Text>
+                  <Text style={styles.activeMeetupTitle}>{activeBooking?.activityName || activeBooking?.activity}</Text>
                   <Text style={styles.activeMeetupTime}>
-                    {activeBooking?.scheduledStart ? new Date(activeBooking.scheduledStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '18:00'} · {typeof activeBooking?.venue === 'object' ? (activeBooking?.venue as any)?.name : activeBooking?.venue} · {t('upcoming.idVerified', 'ID Verified')}
+                    {activeBooking?.scheduledStart ? new Date(activeBooking.scheduledStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'} · {typeof activeBooking?.venue === 'object' ? (activeBooking?.venue as any)?.name : (activeBooking?.venueName || activeBooking?.venue || 'City Spot')} · {t('upcoming.idVerified', 'ID Verified')}
                   </Text>
                 </View>
-                <TouchableOpacity style={styles.arrowBtn} accessibilityRole="button" accessibilityLabel={t('a11yArrowRight', 'Arrow Right')}>
+                <TouchableOpacity 
+                  style={styles.arrowBtn} 
+                  onPress={() => navigation.navigate('BookingsTab')}
+                  accessibilityRole="button" 
+                  accessibilityLabel={t('a11yArrowRight', 'View Booking')}
+                >
                   <Icon name="arrow-right" size={20} color={theme.colors.background} />
                 </TouchableOpacity>
               </View>
-            </View>
-
-            {/* Today's Itinerary Timeline */}
-            <View style={styles.itineraryCard}>
-              <View style={styles.itineraryHeaderRow}>
-                <Text style={styles.itineraryTitle}>{t('itinerary.title')}</Text>
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('a11yDotsHorizontal', 'Dots Horizontal')}>
-                  <Icon name="dots-horizontal" size={24} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.timelineContainer}>
-                {/* Start Node */}
-                <View style={styles.timelineNode}>
-                  <View style={styles.nodeIconContainer}>
-                    <View style={styles.nodeDotActive} />
-                  </View>
-                  <View style={styles.nodeContent}>
-                    <Text style={styles.nodeTime}>16:00 - 18:00</Text>
-                    <Text style={styles.nodeTitle}>{t('itinerary.start')}</Text>
-                    <Text style={styles.nodeDesc}>{t('itinerary.start_desc')}</Text>
-                  </View>
-                </View>
-
-                {/* Line connecting nodes */}
-                <View style={styles.timelineLine} />
-
-                {/* End Node */}
-                <View style={styles.timelineNode}>
-                  <View style={styles.nodeIconContainer}>
-                    <View style={styles.nodeDotInactive} />
-                  </View>
-                  <View style={styles.nodeContent}>
-                    <Text style={styles.nodeTimeMuted}>18:00</Text>
-                    <Text style={styles.nodeTitleMuted}>{t('itinerary.end')}</Text>
-                    <Text style={styles.nodeDescMuted}>{t('itinerary.end_desc')}</Text>
-                  </View>
-                </View>
-              </View>
-
-              <TouchableOpacity style={styles.fullItineraryBtn} accessibilityRole="button" accessibilityLabel={t('a11yViewFullItinerary', 'View full itinerary')}>
-                <Text style={styles.fullItineraryText}>{t('itinerary.view_full')}</Text>
-              </TouchableOpacity>
             </View>
           </>
         ) : (
@@ -229,30 +245,44 @@ export const HomeDashboardScreen = () => {
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>{t('exploreActivities', 'Explore Activities')}</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.exploreScroll}>
-              {sortedExploreCategories.map(cat => (
-                <TouchableOpacity 
-                  key={cat.id} 
-                  style={styles.exploreCard}
-                  onPress={() => navigation.navigate('DiscoverTab', { 
-                    screen: 'DiscoverScreen', 
-                    initial: false,
-                    params: { category: cat.id } 
-                  })} accessibilityRole="button" accessibilityLabel={cat.title}
-                >
-                  <View style={[styles.exploreIconBox, { backgroundColor: `${cat.color}20` }]}>
-                    <Icon name={cat.icon} size={28} color={cat.color} />
-                  </View>
-                  <Text style={styles.exploreCardTitle}>{cat.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {loading ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.exploreScroll}>
+                <View style={styles.exploreSkeleton} />
+                <View style={styles.exploreSkeleton} />
+                <View style={styles.exploreSkeleton} />
+              </ScrollView>
+            ) : sortedCategories.length === 0 ? (
+              <View style={styles.emptyContainerSmall}>
+                <Text style={styles.emptyTextSmall}>No activities available</Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.exploreScroll}>
+                {sortedCategories.map(cat => (
+                  <TouchableOpacity 
+                    key={cat.id} 
+                    style={styles.exploreCard}
+                    onPress={() => navigation.navigate('DiscoverTab', { 
+                      screen: 'DiscoverScreen', 
+                      initial: false,
+                      params: { category: cat.id } 
+                    })} 
+                    accessibilityRole="button" 
+                    accessibilityLabel={cat.title}
+                  >
+                    <View style={[styles.exploreIconBox, { backgroundColor: `${cat.color || '#D4AF37'}20` }]}>
+                      <Icon name={cat.icon || 'star-outline'} size={28} color={cat.color || theme.colors.primary} />
+                    </View>
+                    <Text style={styles.exploreCardTitle}>{cat.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
           </View>
         )}
 
         {/* Quick Access Grid */}
         <View style={styles.quickAccessSection}>
-          <Text style={styles.sectionTitleSmall}>{t('quick_access.title')}</Text>
+          <Text style={styles.sectionTitleSmall}>{t('quick_access.title', 'QUICK ACCESS')}</Text>
           <View style={styles.gridRow}>
             
             <TouchableOpacity 
@@ -262,7 +292,7 @@ export const HomeDashboardScreen = () => {
               <View style={[styles.gridIconCircle, { backgroundColor: 'rgba(212, 175, 55, 0.1)' }]}>
                 <Icon name="account-search" size={24} color={theme.colors.primary} />
               </View>
-              <Text style={styles.gridText}>{t('quick_access.find')}</Text>
+              <Text style={styles.gridText}>{t('quick_access.find', 'Find Companion')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -270,19 +300,20 @@ export const HomeDashboardScreen = () => {
               onPress={() => navigation.navigate('BookingsTab')} accessibilityRole="button" accessibilityLabel={t('a11yGoToBookingstab', 'Go to BookingsTab')}
             >
               <View style={[styles.gridIconCircle, { backgroundColor: 'rgba(212, 175, 55, 0.1)' }]}>
+                {bookingCount > 0 && <View style={styles.countBadge}><Text style={styles.countBadgeText}>{bookingCount}</Text></View>}
                 <Icon name="calendar-clock" size={24} color={theme.colors.primary} />
               </View>
-              <Text style={styles.gridText}>{t('quick_access.bookings')}</Text>
+              <Text style={styles.gridText}>{t('quick_access.bookings', 'My Bookings')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.gridItem}
-              onPress={() => navigation.navigate('SafetySupportStack', { screen: 'SafetyHubScreen' })} accessibilityRole="button" accessibilityLabel={t('a11yGoToProfiletab', 'Go to ProfileTab')}
+              onPress={() => navigation.navigate('SafetySupportStack', { screen: 'SafetyHubScreen' })} accessibilityRole="button" accessibilityLabel={t('a11yGoToSafety', 'Go to Safety Toolkit')}
             >
               <View style={[styles.gridIconCircle, { backgroundColor: 'rgba(212, 175, 55, 0.1)' }]}>
                 <Icon name="shield-check" size={24} color={theme.colors.primary} />
               </View>
-              <Text style={styles.gridText}>{t('quick_access.safety')}</Text>
+              <Text style={styles.gridText}>{t('quick_access.safety', 'Safety Toolkit')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -292,7 +323,7 @@ export const HomeDashboardScreen = () => {
               <View style={[styles.gridIconCircle, { backgroundColor: 'rgba(212, 175, 55, 0.1)' }]}>
                 <Icon name="account-outline" size={24} color={theme.colors.primary} />
               </View>
-              <Text style={styles.gridText}>{t('quick_access.profile')}</Text>
+              <Text style={styles.gridText}>{t('quick_access.profile', 'My Profile')}</Text>
             </TouchableOpacity>
 
           </View>
@@ -317,6 +348,10 @@ export const HomeDashboardScreen = () => {
                   <CompanionCardSkeleton />
                 </View>
               </>
+            ) : featuredList.length === 0 ? (
+              <View style={styles.emptyContainerSmall}>
+                <Text style={styles.emptyTextSmall}>No companions available right now</Text>
+              </View>
             ) : (
               featuredList.map((item) => (
                 <View key={item.id} style={styles.featuredCardWrapper}>
@@ -398,6 +433,87 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.colors.error,
     zIndex: 1,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: theme.colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    zIndex: 1,
+  },
+  notifBadgeText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  countBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    zIndex: 1,
+  },
+  countBadgeText: {
+    color: theme.colors.background,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  errorCard: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
+  errorText: {
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    backgroundColor: theme.colors.error,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  retryBtnText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  emptyContainerSmall: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  emptyTextSmall: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  exploreSkeleton: {
+    width: 120,
+    height: 120,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    opacity: 0.6,
   },
   scrollContent: {
     paddingBottom: 40,

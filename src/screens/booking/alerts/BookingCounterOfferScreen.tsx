@@ -107,7 +107,9 @@ export const BookingCounterOfferScreen = ({ route }: { route: any }) => {
             <Icon name="map-marker-outline" size={20} color={theme.colors.textSecondary} style={styles.detailIcon} />
             <View>
               <Text style={styles.detailLabel}>{t('detailLabelVenue', 'Venue')}</Text>
-              <Text style={styles.detailValueFixed}>{bookingData.venue}</Text>
+              <Text style={styles.detailValueFixed}>
+                {typeof bookingData.venue === 'object' ? (bookingData.venue as any)?.name : String(bookingData.venue || 'Public Cafe')}
+              </Text>
             </View>
           </View>
 

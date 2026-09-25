@@ -13,12 +13,24 @@ export interface Booking {
   companionName?: string;
   customerId?: string;
   activity: string;
-  venue: string;
+  activityName?: string;
+  venue: string | any;
+  venueName?: string;
   date: string;
   time: string;
   duration: number;
+  durationHours?: number;
   status: BookingStatus;
   totalAmount?: number;
+  pricing?: {
+    baseRate?: number;
+    durationHours?: number;
+    baseTotal?: number;
+    platformFee?: number;
+    taxAmount?: number;
+    totalAmount?: number;
+    formatted?: any;
+  };
   notes?: string;
   cancellationReason?: string;
   counterOffer?: {

@@ -8,6 +8,7 @@ import apiClient from './apiClient';
 export interface CompanionCard {
   id: string;
   name: string;
+  age?: number;
   initials?: string;
   title?: string;
   activities?: string[];
@@ -144,3 +145,53 @@ export const getActivities = async (): Promise<ActivityOption[]> => {
   const res = await apiClient.get<ActivityOption[]>('/discovery/activities');
   return res.data;
 };
+
+export interface HomeCategory {
+  id: string;
+  title: string;
+  icon: string;
+  color: string;
+}
+
+export interface HomeDashboardResponse {
+  success: boolean;
+  data: {
+    profile?: {
+      id: string;
+      name?: string;
+      photoUrl?: string;
+      city?: string;
+      gender?: string;
+      interests?: string[];
+    } | null;
+    categories: HomeCategory[];
+    featuredCompanions: CompanionCard[];
+    quickAccess: {
+      notificationCount: number;
+      bookingCount: number;
+    };
+    activeBooking?: any | null;
+  };
+}
+
+// ─── Get Home Dashboard aggregated data ───────────────────────────────────────
+export const getHomeDashboardData = async (): Promise<HomeDashboardResponse['data']> => {
+  console.log('[API REQUEST] GET /discovery/home');
+  try {
+    const res = await apiClient.get<any>('/discovery/home');
+    const data = (res.data && typeof res.data === 'object' && ('categories' in res.data || 'featuredCompanions' in res.data))
+      ? res.data
+      : (res.data?.data || res.data);
+
+    console.log('[API RESPONSE] 200 GET /discovery/home', {
+      categoriesCount: data?.categories?.length ?? 0,
+      featuredCount: data?.featuredCompanions?.length ?? 0,
+      notificationCount: data?.quickAccess?.notificationCount ?? 0,
+    });
+    return data;
+  } catch (err: any) {
+    console.error('[API ERROR] GET /discovery/home', err?.message || err);
+    throw err;
+  }
+};
+

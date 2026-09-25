@@ -22,7 +22,7 @@ export interface BookingStackParamList {
   BookingTimeSelectScreen: { activity?: BookingActivity; venue?: BookingVenue; companionId?: string; companionName?: string } | undefined;
   BookingSummaryScreen: { activity?: BookingActivity; venue?: BookingVenue; date?: string; time?: string; duration?: number; bookingId?: string; companionId?: string; companionName?: string; } | undefined;
   BookingSuccessScreen: undefined;
-  BookingRequestSentScreen: undefined;
+  BookingRequestSentScreen: { bookingId?: string; companionName?: string; date?: string; time?: string; venue?: string; amount?: string; } | undefined;
   BookingAcceptedScreen: undefined;
   BookingDeclinedScreen: undefined;
   BookingCounterOfferScreen: { bookingId?: string; companionName?: string; companionId?: string } | undefined;

@@ -81,7 +81,9 @@ export const BookingRequestSentScreen = ({ route }: { route: any }) => {
           </View>
           <View style={styles.detailRow}>
             <Icon name="map-marker-outline" size={18} color={theme.colors.textSecondary} />
-            <Text style={styles.detailText}>{bookingData.venue}</Text>
+            <Text style={styles.detailText}>
+              {typeof bookingData.venue === 'object' ? (bookingData.venue as any)?.name : String(bookingData.venue || 'Public Cafe')}
+            </Text>
           </View>
           
           <View style={styles.divider} />

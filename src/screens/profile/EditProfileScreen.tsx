@@ -81,7 +81,8 @@ export const EditProfileScreen = () => {
         });
 
         if (form.interests && form.interests.length > 0) {
-          await profileApi.updateInterests(form.interests.map(i => i.id));
+          const interestLabels = form.interests.map(i => i.label || i.id);
+          await profileApi.updateInterests(interestLabels);
         }
       } catch {
         // Fallback

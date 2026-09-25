@@ -51,13 +51,13 @@ export const BookingsListScreen = () => {
         companionId: b.companionId,
         companionName: b.companionName || 'Companion',
         rating: '5.0',
-        activity: b.activity,
-        date: b.date || 'Today',
-        time: `${b.time || '18:00'} (${b.duration || 1} hrs)`,
-        venue: b.venue || 'Public Venue',
-        price: b.totalAmount ? `₹${b.totalAmount}` : '₹550',
-        displayStatus: b.status === 'accepted' ? 'Accepted' : b.status === 'countered' ? 'Counter-Proposed' : b.status === 'declined' ? 'Declined' : b.status === 'completed' ? 'Completed' : 'Awaiting Reply',
-        duration: `${b.duration || 1} hrs`,
+        activity: b.activityName || b.activity || 'Coffee Meetup',
+        date: b.date ? new Date(b.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short' }) : 'Today',
+        time: `${b.time || '18:00'} (${b.durationHours || b.duration || 1} hrs)`,
+        venue: typeof b.venue === 'object' ? ((b.venue as any)?.name || 'Public Venue') : (b.venueName || b.venue || 'Public Venue'),
+        price: (b.pricing?.totalAmount || b.totalAmount) ? `₹${b.pricing?.totalAmount || b.totalAmount}` : '₹550',
+        displayStatus: (b.status as string) === 'accepted' ? 'Accepted' : (b.status as string) === 'countered' || (b.status as string) === 'counter_proposed' ? 'Counter-Proposed' : (b.status as string) === 'declined' ? 'Declined' : (b.status as string) === 'completed' ? 'Completed' : 'Awaiting Reply',
+        duration: `${b.durationHours || b.duration || 1} hrs`,
       }))
     : mockFiltered;
 
@@ -216,7 +216,9 @@ export const BookingsListScreen = () => {
               <View style={styles.cardFooter}>
                 <View style={styles.venueContainer}>
                   <Icon name="map-marker-outline" size={16} color={theme.colors.textSecondary} />
-                  <Text style={styles.venueText} numberOfLines={1}>{booking.venue}</Text>
+                  <Text style={styles.venueText} numberOfLines={1}>
+                    {typeof booking.venue === 'object' ? (booking.venue as any)?.name : String(booking.venue || 'Public Venue')}
+                  </Text>
                 </View>
                 <View style={styles.priceContainer}>
                   <Text style={styles.priceValue}>{booking.price}</Text>

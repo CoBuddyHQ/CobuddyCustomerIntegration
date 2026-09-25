@@ -102,7 +102,9 @@ export const BookingAcceptedScreen = ({ route }: { route: any }) => {
             </View>
             <View>
               <Text style={styles.detailLabel}>{t('detailLabelVenue', 'Venue')}</Text>
-              <Text style={styles.detailText}>{bookingData.venue}</Text>
+              <Text style={styles.detailText}>
+                {typeof bookingData.venue === 'object' ? (bookingData.venue as any)?.name : String(bookingData.venue || 'Public Cafe')}
+              </Text>
               <Text style={styles.subText}>{bookingData.address}</Text>
             </View>
           </View>

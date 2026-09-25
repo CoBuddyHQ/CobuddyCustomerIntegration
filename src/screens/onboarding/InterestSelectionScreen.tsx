@@ -59,10 +59,15 @@ export const InterestSelectionScreen = () => {
   const handleNext = async () => {
     if (!isValid || isSaving) return;
     const newInterests = Array.from(selected);
+    // Convert IDs to real names/labels for backend storage
+    const interestLabels = newInterests.map(id => {
+      const item = INTERESTS_DATA.find(i => i.id === id);
+      return item ? item.label : id;
+    });
     setIsSaving(true);
     try {
       // Persist interests to backend: PATCH /profile/interests
-      await profileApi.updateInterests(newInterests);
+      await profileApi.updateInterests(interestLabels);
       setGlobalInterests(newInterests);
 
       if (isEditMode) {

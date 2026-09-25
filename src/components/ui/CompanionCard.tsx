@@ -13,8 +13,10 @@ export interface CompanionCardProps {
   activities?: string[];
   trustScore?: number;
   rating?: number;
-  reviews?: number;
+  reviews?: number | { count?: number; average?: number };
+  reviewsCount?: number;
   sessions?: number;
+  sessionsCount?: number;
   rate?: string; // e.g. "₹500 /hr"
   distance?: string; // e.g. "2.5 km away"
   isOnline?: boolean;
@@ -32,13 +34,18 @@ export const CompanionCard = ({
   trustScore = 95,
   rating = 4.8,
   reviews = 10,
+  reviewsCount,
   sessions = 12,
+  sessionsCount,
   rate = '₹500 /hr',
   distance,
   isOnline = false,
   onPress,
 }: CompanionCardProps) => {
   const { t } = useTranslation('common');
+  const computedReviews = typeof reviews === 'object' ? (reviews as any)?.count ?? 0 : (reviews ?? reviewsCount ?? 0);
+  const computedSessions = sessions ?? sessionsCount ?? 0;
+
   return (
     <View style={styles.cardContainer}>
       
@@ -72,7 +79,7 @@ export const CompanionCard = ({
 
           <View style={styles.statsRow}>
             <Icon name="star" size={14} color={theme.colors.primary} />
-            <Text style={styles.statsText}>{rating} <Text style={styles.statsMuted}>{t('companionCard.statsMuted', '• {{reviews}} reviews • {{sessions}} sessions', { reviews, sessions })}</Text></Text>
+            <Text style={styles.statsText}>{rating} <Text style={styles.statsMuted}>{t('companionCard.statsMuted', '• {{reviews}} reviews • {{sessions}} sessions', { reviews: computedReviews, sessions: computedSessions })}</Text></Text>
           </View>
           
           {distance && (

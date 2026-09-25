@@ -13,9 +13,10 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { useBookingStore } from '../../store/slices/bookingStore';
-import { ACTIVITIES } from '../../services/mock';
+import { ACTIVITIES } from '../../services/mock/activities.mock';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { discoveryApi } from '../../services/api';
 
 export const BookingActivitySelectScreen = () => { 
   const { t } = useTranslation('booking.activitySelect');
@@ -25,15 +26,32 @@ export const BookingActivitySelectScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const { setDraftBooking, clearDraftBooking } = useBookingStore();
 
-    // State for selected activity
+  const defaultActivities = ACTIVITIES || [];
+  const [activitiesList, setActivitiesList] = React.useState<any[]>(defaultActivities);
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    discoveryApi.getActivities()
+      .then((data) => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setActivitiesList(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[BookingActivitySelectScreen] Failed to fetch activities from API, using fallback:', err?.message || err);
+      });
+    return () => { isMounted = false; };
+  }, []);
 
   const handleNext = () => {
     if (!selectedActivityId) return;
     
-    const selectedActivity = ACTIVITIES.find(a => a.id === selectedActivityId);
+    const selectedActivity = activitiesList.find(a => a.id === selectedActivityId) || (defaultActivities && defaultActivities.find(a => a.id === selectedActivityId));
     if (selectedActivity) {
-      const activityTitle = t(selectedActivity.titleKey, selectedActivity.defaultTitle) as string;
+      const activityTitle = selectedActivity.titleKey 
+        ? (t(selectedActivity.titleKey, selectedActivity.defaultTitle) as string) 
+        : (selectedActivity.defaultTitle || selectedActivity.name || 'Activity');
       setDraftBooking({ activity: activityTitle });
     }
     
@@ -66,7 +84,7 @@ export const BookingActivitySelectScreen = () => {
         <Text style={styles.subtitle}>{t('subtitle', 'Select an activity for your booking request.')}</Text>
 
         <View style={styles.listContainer}>
-          {ACTIVITIES.map((activity) => {
+          {activitiesList.map((activity) => {
             const isSelected = selectedActivityId === activity.id;
             return (
               <TouchableOpacity
@@ -77,7 +95,7 @@ export const BookingActivitySelectScreen = () => {
               >
                 <View style={[styles.iconWrap, isSelected && styles.iconWrapSelected]}>
                   <Icon 
-                    name={activity.icon} 
+                    name={activity.icon || 'star'} 
                     size={24} 
                     color={isSelected ? theme.colors.background : theme.colors.primary} 
                   />
@@ -85,15 +103,15 @@ export const BookingActivitySelectScreen = () => {
                 
                 <View style={styles.cardContent}>
                   <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>
-                    {t(activity.titleKey, activity.defaultTitle) as string}
+                    {activity.titleKey ? (t(activity.titleKey, activity.defaultTitle) as string) : (activity.defaultTitle || activity.name)}
                   </Text>
                   <Text style={[styles.cardDesc, isSelected && styles.cardDescSelected]}>
-                    {t(activity.descKey, activity.defaultDesc) as string}
+                    {activity.descKey ? (t(activity.descKey, activity.defaultDesc) as string) : (activity.defaultDesc || activity.description || 'Activity session')}
                   </Text>
                 </View>
                 
                 <Text style={[styles.cardPrice, isSelected && styles.cardPriceSelected]}>
-                  {activity.price}
+                  {activity.price || `₹${activity.basePrice || 500}/hr`}
                 </Text>
               </TouchableOpacity>
             );

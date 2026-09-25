@@ -10,6 +10,8 @@ import { MOCK_DETAILS, MOCK_BOOKINGS } from '../../services/mock';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import { bookingApi } from '../../services/api';
+
 export const BookingDetailScreen = () => { 
   const { t } = useTranslation('bookings.detail');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -19,10 +21,27 @@ export const BookingDetailScreen = () => {
   const bookingId = route.params?.bookingId;
   const matchedBooking = MOCK_BOOKINGS.find(b => b.id === bookingId);
 
+  const [apiBooking, setApiBooking] = React.useState<any | null>(null);
+
+  React.useEffect(() => {
+    if (!bookingId) return;
+    let isMounted = true;
+    bookingApi.getBooking(bookingId)
+      .then(res => {
+        if (isMounted && res) {
+          setApiBooking(res);
+        }
+      })
+      .catch(err => {
+        console.warn('[BookingDetailScreen] Failed to fetch booking detail from API, using fallback:', err?.message || err);
+      });
+    return () => { isMounted = false; };
+  }, [bookingId]);
+
   const calculatePayment = (priceStr: string) => {
     const base = parseInt(priceStr.replace(/[^0-9]/g, ''), 10) || 0;
-    const platformFee = Math.round(base * 0.05);
-    const taxes = Math.round(base * 0.018);
+    const platformFee = Math.round(base * 0.15);
+    const taxes = Math.round(base * 0.18);
     const total = base + platformFee + taxes;
     const formatPrice = (num: number) => '₹' + num.toLocaleString('en-IN');
     return {
@@ -33,16 +52,40 @@ export const BookingDetailScreen = () => {
     };
   };
 
-  const data = matchedBooking
-    ? { 
-        ...MOCK_DETAILS, 
-        ...matchedBooking, 
-        status: route.params?.status || matchedBooking.displayStatus,
-        companionRating: matchedBooking.rating,
-        ...calculatePayment(matchedBooking.price)
-        // companionId and companionReviews use static values from MOCK_DETAILS until per-companion data exists
+  const rawStatus = apiBooking?.status || route.params?.status || matchedBooking?.displayStatus || 'Pending';
+  const displayStatus = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
+
+  const data = apiBooking
+    ? {
+        ...MOCK_DETAILS,
+        id: apiBooking.id,
+        bookingRef: apiBooking.bookingRef || apiBooking.id?.slice(0, 8),
+        companionName: apiBooking.companionName || 'Companion',
+        companionTitle: 'Verified Companion',
+        companionId: apiBooking.companionId || 'c1',
+        activity: apiBooking.activityName || apiBooking.activity || 'Coffee Meetup',
+        date: apiBooking.date ? new Date(apiBooking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short' }) : 'Today',
+        time: apiBooking.time || '18:00',
+        duration: `${apiBooking.durationHours || apiBooking.duration || 2} hours`,
+        venue: typeof apiBooking.venue === 'object' ? (apiBooking.venue?.name || 'Public Cafe') : (apiBooking.venueName || apiBooking.venue || 'Public Cafe'),
+        address: apiBooking.venueAddress || 'Public Area',
+        meetingPoint: apiBooking.meetingPoint || apiBooking.venue?.meetingPoint || 'Main Entrance',
+        status: displayStatus,
+        notes: apiBooking.specialInstructions || apiBooking.notes || '',
+        sessionRate: `₹${apiBooking.pricing?.baseRate || 500}/hr`,
+        platformFee: `₹${apiBooking.pricing?.platformFee || 150}`,
+        taxes: `₹${apiBooking.pricing?.taxAmount || 180}`,
+        total: `₹${apiBooking.pricing?.totalAmount || apiBooking.totalAmount || 1330}`,
       }
-    : { ...MOCK_DETAILS, id: bookingId || MOCK_DETAILS.id, status: route.params?.status || MOCK_DETAILS.status };
+    : (matchedBooking
+      ? { 
+          ...MOCK_DETAILS, 
+          ...matchedBooking, 
+          status: route.params?.status || matchedBooking.displayStatus,
+          companionRating: matchedBooking.rating,
+          ...calculatePayment(matchedBooking.price)
+        }
+      : { ...MOCK_DETAILS, id: bookingId || MOCK_DETAILS.id, status: route.params?.status || MOCK_DETAILS.status });
 
   const handleBack = () => smartGoBack('BookingsTab');
 
@@ -265,7 +308,9 @@ export const BookingDetailScreen = () => {
             </View>
             <View style={styles.detailTextContent}>
               <Text style={styles.detailLabel}>{t('meetingVenue', 'Meeting Venue')}</Text>
-              <Text style={styles.detailValue}>{data.venue}</Text>
+              <Text style={styles.detailValue}>
+                {typeof data.venue === 'object' ? (data.venue as any)?.name : String(data.venue || 'Public Cafe')}
+              </Text>
               <Text style={styles.detailSubValue}>{data.address}</Text>
             </View>
           </View>

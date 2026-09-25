@@ -84,8 +84,9 @@ export const BookingSummaryScreen = () => {
       const slotStart = draftBooking?.scheduledStart || time || new Date().toISOString();
       const slotEnd = draftBooking?.scheduledEnd || time || new Date(Date.now() + duration * 3600000).toISOString();
 
-      await bookingApi.createBooking({
+      const resBooking = await bookingApi.createBooking({
         companionId: companionId || 'c1',
+        companionName: route.params?.companionName || 'Companion',
         activity: actTitle,
         venue: venueObj.name,
         date: date || new Date().toISOString().split('T')[0],
@@ -103,7 +104,17 @@ export const BookingSummaryScreen = () => {
         sessionPassCode: '1234',
       });
 
-      navigation.navigate('BookingRequestSentScreen');
+      const formattedDateStr = date ? new Date(date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short' }) : 'Today';
+      const formattedAmountStr = `₹${(resBooking as any)?.pricing?.totalAmount || (resBooking as any)?.totalAmount || totalAmount}`;
+
+      navigation.navigate('BookingRequestSentScreen', {
+        bookingId: resBooking?.id || 'CB-REQ-8829',
+        companionName: route.params?.companionName || (resBooking as any)?.companionName || 'Companion',
+        date: formattedDateStr,
+        time: typeof slotStart === 'string' ? slotStart : '18:00',
+        venue: venueObj.name,
+        amount: formattedAmountStr,
+      });
     } catch (err: any) {
       showApiError(err, {
         title: 'Booking Request Failed',
