@@ -10,19 +10,11 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useBookingStore } from '../../../store/slices/bookingStore';
 import { selectClearActiveBooking } from '../../../store/selectors/bookingSelectors';
 
-const DEFAULT_MOCK_DATA = {
-  companionName: 'Natasha',
-  date: 'Fri, 24 Oct',
-  time: '7:00 PM - 9:00 PM',
-  reason: 'Schedule conflict',
-};
-
-
 export const BookingDeclinedScreen = ({ route }: { route: any }) => { 
   const { t } = useTranslation('booking.declined');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   
-  const bookingData = route?.params || DEFAULT_MOCK_DATA;
+  const bookingData = route?.params || {};
   const clearActiveBooking = useBookingStore(selectClearActiveBooking);
 
   useEffect(() => {

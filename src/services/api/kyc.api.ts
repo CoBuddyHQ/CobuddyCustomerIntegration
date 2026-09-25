@@ -31,30 +31,47 @@ export const submitKycDocument = async (data: {
   frontDocUri?: string;
   backDocUri?: string;
 }): Promise<{ message: string }> => {
-  const formData = new FormData();
   const rawType = (data.docType || data.documentType || 'AADHAAR').toUpperCase();
   const normalizedType = rawType === 'DRIVING_LICENSE' ? 'DL' : rawType;
-  const num = data.docNumber || data.documentNumber || '1234567890';
-  const name = data.legalName || 'Verified User';
+  const num = data.docNumber || data.documentNumber || '';
+  const name = data.legalName || '';
 
-  formData.append('docType', normalizedType);
-  formData.append('documentType', normalizedType);
-  formData.append('docNumber', num);
-  formData.append('documentNumber', num);
-  formData.append('legalName', name);
+  const isLocalFile = (uri?: string) =>
+    uri?.startsWith('file://') || uri?.startsWith('content://');
 
-  if (data.frontDocUri && !data.frontDocUri.startsWith('file:///local/')) {
-    const frontFilename = data.frontDocUri.split('/').pop() || 'front.jpg';
-    formData.append('frontDoc', { uri: data.frontDocUri, name: frontFilename, type: 'image/jpeg' } as unknown as Blob);
+  // If real local files are provided — use multipart/form-data
+  if (isLocalFile(data.frontDocUri) || isLocalFile(data.backDocUri)) {
+    const formData = new FormData();
+    formData.append('docType', normalizedType);
+    formData.append('documentType', normalizedType);
+    formData.append('docNumber', num);
+    formData.append('documentNumber', num);
+    formData.append('legalName', name);
+
+    if (isLocalFile(data.frontDocUri)) {
+      const frontFilename = data.frontDocUri!.split('/').pop() || 'front.jpg';
+      formData.append('frontDoc', { uri: data.frontDocUri, name: frontFilename, type: 'image/jpeg' } as unknown as Blob);
+    }
+    if (isLocalFile(data.backDocUri)) {
+      const backFilename = data.backDocUri!.split('/').pop() || 'back.jpg';
+      formData.append('backDoc', { uri: data.backDocUri, name: backFilename, type: 'image/jpeg' } as unknown as Blob);
+    }
+
+    const res = await apiClient.post<{ message: string }>('/kyc/document', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
   }
 
-  if (data.backDocUri && !data.backDocUri.startsWith('file:///local/')) {
-    const backFilename = data.backDocUri.split('/').pop() || 'back.jpg';
-    formData.append('backDoc', { uri: data.backDocUri, name: backFilename, type: 'image/jpeg' } as unknown as Blob);
-  }
-
-  const res = await apiClient.post<{ message: string }>('/kyc/document', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  // Otherwise — send JSON (works for URL strings or no-file dev flow)
+  const res = await apiClient.post<{ message: string }>('/kyc/document', {
+    docType: normalizedType,
+    documentType: normalizedType,
+    docNumber: num,
+    documentNumber: num,
+    legalName: name,
+    frontDocUri: data.frontDocUri,
+    backDocUri: data.backDocUri,
   });
   return res.data;
 };

@@ -10,7 +10,6 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { ChatInputBar } from '../../components/common/ChatInputBar';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { getMockChatMessages } from '../../services/mock/chat.mock';
 import { chatApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { isFeatureEnabled } from '../../config/featureFlags';

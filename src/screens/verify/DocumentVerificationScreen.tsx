@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -249,21 +249,30 @@ export const DocumentVerificationScreen = () => {
                   frontDocUri: 'https://images.unsplash.com/photo-1544717305-2782549b5136',
                   backDocUri: 'https://images.unsplash.com/photo-1544717305-2782549b5136',
                 });
+                setIsSubmitting(false);
                 navigation.navigate('SelfieCaptureScreen');
               } catch (e: any) {
-                showApiError(e, {
-                  title: 'Document Upload Failed',
-                  onRetry: async () => {
-                    // Retry trigger
-                  },
-                });
-              } finally {
                 setIsSubmitting(false);
+                try {
+                  showApiError(e, { title: 'Document Upload Failed' });
+                } catch {
+                  Alert.alert(
+                    'Upload Failed',
+                    'Could not upload your document. Please check your connection and try again.',
+                    [{ text: 'OK' }]
+                  );
+                }
               }
             }}
             activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yContinueVerification', 'Continue Verification')}>
-            <Icon name="upload" size={18} color={theme.colors.background} />
-            <Text style={styles.ctaBtnText}>{isSubmitting ? 'Uploading Document...' : t('continueVerify', 'Continue Verification')}</Text>
+            {isSubmitting
+              ? <ActivityIndicator size="small" color={theme.colors.background} />
+              : <Icon name="upload" size={18} color={theme.colors.background} />}
+            <Text style={styles.ctaBtnText}>
+              {isSubmitting
+                ? t('uploading', 'Uploading...')
+                : t('continueVerify', 'Continue Verification')}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.securityNote}>
