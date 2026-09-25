@@ -1,7 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
-import common from './locales/en/common.json';;
+import common from './locales/en/common.json';
 
 import settingsHub from './locales/en/settings/hub.json';
 import settingsAccountSettings from './locales/en/settings/accountSettings.json';
