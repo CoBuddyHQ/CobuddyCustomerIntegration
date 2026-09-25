@@ -41,8 +41,8 @@ export const VerificationProcessingScreen = () => {
     const t3 = setTimeout(async () => {
       try {
         const res = await kycApi.getKycStatus();
-        const status = res?.status || 'pending';
-        if (status === 'approved') {
+        const status = (res?.status || 'pending').toLowerCase();
+        if (status === 'approved' || status === 'verified') {
           setKycStatus('verified');
           navigation.replace('VerificationSuccessScreen');
         } else if (status === 'rejected') {

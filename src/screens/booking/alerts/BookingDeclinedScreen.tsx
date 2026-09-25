@@ -22,7 +22,12 @@ export const BookingDeclinedScreen = ({ route }: { route: any }) => {
   }, [clearActiveBooking]);
 
   const handleFindAnother = () => {
-    navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] });
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.reset({ index: 0, routes: [{ name: 'MainTabNavigator', params: { screen: 'DiscoverTab' } }] });
+    } else {
+      (navigation as any).navigate('MainTabNavigator', { screen: 'DiscoverTab' });
+    }
   };
 
   return (

@@ -42,25 +42,37 @@ export const BookingAcceptedScreen = ({ route }: { route: any }) => {
   };
 
   const handleMessage = () => {
-    navigation.navigate('MainTabNavigator', {
+    const parent = navigation.getParent();
+    const target = {
       screen: 'ChatTab',
       params: {
         screen: 'CompanionChatScreen',
         initial: false,
         params: { companionName: bookingData.companionName, bookingId: bookingData.bookingId, companionId: bookingData.companionId }
       }
-    });
+    };
+    if (parent) {
+      parent.reset({ index: 0, routes: [{ name: 'MainTabNavigator', params: target }] });
+    } else {
+      (navigation as any).navigate('MainTabNavigator', target);
+    }
   };
 
   const handleViewItinerary = () => {
-    navigation.navigate('MainTabNavigator', {
+    const parent = navigation.getParent();
+    const target = {
       screen: 'BookingsTab',
       params: {
         screen: 'BookingDetailScreen',
         initial: false,
         params: { bookingId: bookingData.bookingId }
       }
-    });
+    };
+    if (parent) {
+      parent.reset({ index: 0, routes: [{ name: 'MainTabNavigator', params: target }] });
+    } else {
+      (navigation as any).navigate('MainTabNavigator', target);
+    }
   };
 
   return (

@@ -32,18 +32,32 @@ export const BookingRequestSentScreen = ({ route }: { route: any }) => {
   }, [pulseAnim]);
 
   const handleReturnHome = () => {
-    navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] });
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.reset({ index: 0, routes: [{ name: 'MainTabNavigator', params: { screen: 'HomeTab' } }] });
+    } else {
+      (navigation as any).navigate('MainTabNavigator', { screen: 'HomeTab' });
+    }
   };
 
   const handleViewDetails = () => {
-    navigation.navigate('MainTabNavigator', {
+    const parent = navigation.getParent();
+    const target = {
       screen: 'BookingsTab',
       params: {
         screen: 'BookingDetailScreen',
         initial: false,
         params: { bookingId: bookingData.bookingId }
       }
-    });
+    };
+    if (parent) {
+      parent.reset({
+        index: 0,
+        routes: [{ name: 'MainTabNavigator', params: target }]
+      });
+    } else {
+      (navigation as any).navigate('MainTabNavigator', target);
+    }
   };
 
   return (

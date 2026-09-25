@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -46,10 +46,14 @@ export const SelfieCaptureScreen = () => {
       await kycApi.submitKycSelfie('https://images.unsplash.com/photo-1534528741775-53994a69daeb');
       navigation.navigate('LivenessDetectionScreen');
     } catch (e: any) {
-      showApiError(e, {
-        title: 'Selfie Upload Failed',
-        onRetry: handleNext,
-      });
+      try {
+        showApiError(e, {
+          title: 'Selfie Upload Failed',
+          onRetry: handleNext,
+        });
+      } catch {
+        Alert.alert('Upload Failed', 'Could not upload selfie. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -103,9 +107,21 @@ export const SelfieCaptureScreen = () => {
               <TouchableOpacity style={styles.retakeBtn} onPress={handleRetake} accessibilityRole="button" accessibilityLabel={t('a11yRetake', 'Retake')}>
                 <Text style={styles.retakeBtnText}>{t('retakeBtn', 'Retake')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleNext} accessibilityRole="button" accessibilityLabel={t('a11yConfirm', 'Confirm')}>
-                <Text style={styles.confirmBtnText}>{t('confirmBtn', 'Confirm')}</Text>
-                <Icon name="check" size={20} color={theme.colors.background} />
+              <TouchableOpacity
+                style={[styles.confirmBtn, isSubmitting && { opacity: 0.7 }]}
+                onPress={handleNext}
+                disabled={isSubmitting}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11yConfirm', 'Confirm')}>
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color={theme.colors.background} />
+                ) : (
+                  <>
+                    <Text style={styles.confirmBtnText}>{t('confirmBtn', 'Confirm')}</Text>
+                    <Icon name="check" size={20} color={theme.colors.background} />
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           ) : (

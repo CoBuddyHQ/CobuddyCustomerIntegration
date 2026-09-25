@@ -6,10 +6,11 @@
 import apiClient from './apiClient';
 
 export interface KycStatus {
-  status: 'not_started' | 'pending' | 'processing' | 'approved' | 'rejected' | 'resubmit';
-  documentStatus?: string;
-  selfieStatus?: string;
-  livenessStatus?: string;
+  status: 'not_started' | 'unverified' | 'pending' | 'processing' | 'approved' | 'verified' | 'rejected' | 'resubmit';
+  currentStep?: string;
+  documentSubmitted?: boolean;
+  selfieSubmitted?: boolean;
+  livenessSubmitted?: boolean;
   rejectionReason?: string;
   submittedAt?: string;
   reviewedAt?: string;
@@ -78,24 +79,40 @@ export const submitKycDocument = async (data: {
 
 // ─── Submit selfie ────────────────────────────────────────────────────────────
 export const submitKycSelfie = async (localUri: string): Promise<{ message: string }> => {
-  const formData = new FormData();
-  const filename = localUri.split('/').pop() || 'selfie.jpg';
-  formData.append('file', { uri: localUri, name: filename, type: 'image/jpeg' } as unknown as Blob);
+  const isLocalFile = localUri.startsWith('file://') || localUri.startsWith('content://');
+  if (isLocalFile) {
+    const formData = new FormData();
+    const filename = localUri.split('/').pop() || 'selfie.jpg';
+    formData.append('file', { uri: localUri, name: filename, type: 'image/jpeg' } as unknown as Blob);
 
-  const res = await apiClient.post<{ message: string }>('/kyc/selfie', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    const res = await apiClient.post<{ message: string }>('/kyc/selfie', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  }
+
+  const res = await apiClient.post<{ message: string }>('/kyc/selfie', {
+    selfieUrl: localUri,
   });
   return res.data;
 };
 
 // ─── Submit liveness ──────────────────────────────────────────────────────────
 export const submitKycLiveness = async (localUri: string): Promise<{ message: string }> => {
-  const formData = new FormData();
-  const filename = localUri.split('/').pop() || 'liveness.mp4';
-  formData.append('file', { uri: localUri, name: filename, type: 'video/mp4' } as unknown as Blob);
+  const isLocalFile = localUri.startsWith('file://') || localUri.startsWith('content://');
+  if (isLocalFile) {
+    const formData = new FormData();
+    const filename = localUri.split('/').pop() || 'liveness.mp4';
+    formData.append('file', { uri: localUri, name: filename, type: 'video/mp4' } as unknown as Blob);
 
-  const res = await apiClient.post<{ message: string }>('/kyc/liveness', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    const res = await apiClient.post<{ message: string }>('/kyc/liveness', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  }
+
+  const res = await apiClient.post<{ message: string }>('/kyc/liveness', {
+    livenessUrl: localUri,
   });
   return res.data;
 };

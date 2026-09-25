@@ -71,14 +71,20 @@ export const BookingCounterOfferScreen = ({ route }: { route: any }) => {
           {
             text: 'View Itinerary',
             onPress: () => {
-              navigation.navigate('MainTabNavigator', {
+              const parent = navigation.getParent();
+              const target = {
                 screen: 'BookingsTab',
                 params: {
                   screen: 'BookingDetailScreen',
                   initial: false,
                   params: { bookingId: bookingData.bookingId, status: 'Accepted' },
                 } as any,
-              });
+              };
+              if (parent) {
+                parent.reset({ index: 0, routes: [{ name: 'MainTabNavigator', params: target }] });
+              } else {
+                (navigation as any).navigate('MainTabNavigator', target);
+              }
             },
           },
         ]
@@ -106,7 +112,12 @@ export const BookingCounterOfferScreen = ({ route }: { route: any }) => {
           {
             text: 'OK',
             onPress: () => {
-              navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+              const parent = navigation.getParent();
+              if (parent) {
+                parent.reset({ index: 0, routes: [{ name: 'MainTabNavigator', params: { screen: 'BookingsTab' } }] });
+              } else {
+                (navigation as any).navigate('MainTabNavigator', { screen: 'BookingsTab' });
+              }
             },
           },
         ]
@@ -119,15 +130,20 @@ export const BookingCounterOfferScreen = ({ route }: { route: any }) => {
   };
 
   const handleMessageBack = () => {
-    const nav = navigation as unknown as { navigate: (route: string, params?: unknown) => void };
-    nav.navigate('MainTabNavigator', { 
+    const parent = navigation.getParent();
+    const target = { 
       screen: 'ChatTab', 
       params: { 
         screen: 'CompanionChatScreen', 
         initial: false, 
         params: { companionName: bookingData.companionName, bookingId: bookingData.bookingId, companionId: bookingData.companionId } 
       } 
-    });
+    };
+    if (parent) {
+      parent.reset({ index: 0, routes: [{ name: 'MainTabNavigator', params: target }] });
+    } else {
+      (navigation as any).navigate('MainTabNavigator', target);
+    }
   };
 
   if (isLoading) {
