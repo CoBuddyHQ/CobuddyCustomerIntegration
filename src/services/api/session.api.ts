@@ -11,13 +11,15 @@ export interface Session {
   companionId: string;
   companionName?: string;
   customerId: string;
-  status: 'active' | 'completed' | 'ended_early';
+  status: 'active' | 'completed' | 'ended_early' | 'checked_in' | 'extending';
   startedAt?: string;
   endedAt?: string;
   durationMinutes?: number;
+  extensionMinutes?: number;
   passCode?: string;
   checkedIn?: boolean;
   tipAmount?: number;
+  booking?: any;
 }
 
 export interface SessionPass {

@@ -15,19 +15,22 @@ export const ActiveSessionScreen = () => {
   const route = useRoute<any>();
   const [sessionData, setSessionData] = useState<any>(null);
   const companionId = route.params?.companionId || sessionData?.companionId;
-  const companionName = route.params?.companionName || sessionData?.companionName || 'Companion';
+  const companionName = route.params?.companionName || sessionData?.companionName || sessionData?.booking?.companionName || 'Elena Vasquez';
   const [etiquetteVisible, setEtiquetteVisible] = useState(true);
   
-  // Timer State (e.g. 2 hours = 7200 seconds default)
+  // Timer State (in seconds)
   const [totalSeconds, setTotalSeconds] = useState(7200);
   const [timeLeft, setTimeLeft] = useState(7200);
 
-  // Modals
+  // Modals & Prompts
   const [extendModalVisible, setExtendModalVisible] = useState(false);
   const [selectedExtension, setSelectedExtension] = useState<30 | 60>(60);
   const [endEarlyModalVisible, setEndEarlyModalVisible] = useState(false);
   const [bookingDetailsModalVisible, setBookingDetailsModalVisible] = useState(false);
+  const [timeoutModalVisible, setTimeoutModalVisible] = useState(false);
   
+  const timeoutPromptedRef = useRef(false);
+
   // Pulse Animation for LIVE badge
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -36,12 +39,20 @@ export const ActiveSessionScreen = () => {
     sessionApi.getCurrentSession().then((sess) => {
       if (sess) {
         setSessionData(sess);
-        const durationSec = (sess.durationMinutes || 120) * 60;
-        setTotalSeconds(durationSec);
+        const baseDurationSec = (sess.durationMinutes || 60) * 60;
+        const extraSec = (sess.extensionMinutes || 0) * 60;
+        const fullDurationSec = baseDurationSec + extraSec;
+        setTotalSeconds(fullDurationSec);
+
         if (sess.startedAt) {
           const elapsedSec = Math.floor((Date.now() - new Date(sess.startedAt).getTime()) / 1000);
-          const remaining = Math.max(0, durationSec - elapsedSec);
+          const remaining = Math.max(0, fullDurationSec - elapsedSec);
           setTimeLeft(remaining);
+
+          if (remaining === 0 && !timeoutPromptedRef.current) {
+            timeoutPromptedRef.current = true;
+            setTimeoutModalVisible(true);
+          }
         }
       }
     }).catch(() => {});
@@ -56,13 +67,22 @@ export const ActiveSessionScreen = () => {
 
     // Countdown Timer
     const interval = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          if (!timeoutPromptedRef.current) {
+            timeoutPromptedRef.current = true;
+            setTimeoutModalVisible(true);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
 
     return () => clearInterval(interval);
   }, [pulseAnim]);
 
-  // Format Time
+  // Format Time (HH:MM:SS)
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -70,10 +90,31 @@ export const ActiveSessionScreen = () => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const progressPercentage = totalSeconds > 0 ? ((totalSeconds - timeLeft) / totalSeconds) * 100 : 0;
+  const isTimedOut = timeLeft <= 0 && totalSeconds > 0;
+  const progressPercentage = totalSeconds > 0 ? Math.min(100, ((totalSeconds - timeLeft) / totalSeconds) * 100) : 0;
+
+  // Real timestamps calculation
+  const formatAmPm = (d: Date) => {
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+  const startDate = sessionData?.startedAt ? new Date(sessionData.startedAt) : new Date(Date.now() - (totalSeconds - timeLeft) * 1000);
+  const endDate = new Date(startDate.getTime() + totalSeconds * 1000);
+  const startedLabel = `Started: ${formatAmPm(startDate)}`;
+  const endsLabel = isTimedOut ? `Ended: ${formatAmPm(endDate)}` : `Ends: ${formatAmPm(endDate)}`;
+
+  // Pro-rata breakdown for Early End
+  const elapsedSeconds = Math.max(0, totalSeconds - timeLeft);
+  const completedMins = Math.max(1, Math.floor(elapsedSeconds / 60));
+  const completedHours = Math.floor(completedMins / 60);
+  const completedRemMins = completedMins % 60;
+  const timeCompletedText = completedHours > 0 ? `${completedHours} hr ${completedRemMins} mins` : `${completedMins} mins`;
+  const totalBookingAmount = Number(sessionData?.booking?.totalAmount || 3000);
+  const proRataEscrow = Math.min(totalBookingAmount, Math.round((completedMins / Math.max(1, Math.floor(totalSeconds / 60))) * totalBookingAmount));
+  const refundAmount = Math.max(0, totalBookingAmount - proRataEscrow);
 
   const handleEndEarly = async () => {
     setEndEarlyModalVisible(false);
+    setTimeoutModalVisible(false);
     try {
       const current = await sessionApi.getCurrentSession();
       if (current?.id) {
@@ -87,8 +128,13 @@ export const ActiveSessionScreen = () => {
   };
 
   const handleConfirmExtension = async () => {
-    setTimeLeft(prev => prev + (selectedExtension * 60));
+    const extraSec = selectedExtension * 60;
+    setTimeLeft(prev => prev + extraSec);
+    setTotalSeconds(prev => prev + extraSec);
     setExtendModalVisible(false);
+    setTimeoutModalVisible(false);
+    timeoutPromptedRef.current = false; // Reset trigger so it warns again on new timeout
+
     try {
       const current = await sessionApi.getCurrentSession();
       if (current?.id) {
@@ -105,11 +151,18 @@ export const ActiveSessionScreen = () => {
       
       {/* Urgent Header */}
       <View style={styles.header}>
-        <View style={styles.liveBadge}>
-          <Animated.View style={[styles.liveDot, { opacity: pulseAnim }]} />
-          <Text style={styles.liveText}>{t('liveSession', 'LIVE SESSION')}</Text>
+        <View style={isTimedOut ? styles.timeoutBadge : styles.liveBadge}>
+          <Animated.View style={[isTimedOut ? styles.timeoutDot : styles.liveDot, { opacity: pulseAnim }]} />
+          <Text style={isTimedOut ? styles.timeoutText : styles.liveText}>
+            {isTimedOut ? t('timeoutSession', 'MEETUP TIME COMPLETE') : t('liveSession', 'LIVE SESSION')}
+          </Text>
         </View>
-        <TouchableOpacity style={styles.sosBtn} onPress={() => navigation.navigate('SafetySupportStack', { screen: 'SafetyHubScreen' })} accessibilityRole="button" accessibilityLabel={t('a11ySosEmergency', 'SOS / EMERGENCY')}>
+        <TouchableOpacity 
+          style={styles.sosBtn} 
+          onPress={() => navigation.navigate('SafetySupportStack', { screen: 'SafetyHubScreen' })} 
+          accessibilityRole="button" 
+          accessibilityLabel={t('a11ySosEmergency', 'SOS / EMERGENCY')}
+        >
           <Icon name="shield-half-full" size={18} color={theme.colors.background} />
           <Text style={styles.sosBtnText}>{t('sosEmergency', 'SOS / EMERGENCY')}</Text>
         </TouchableOpacity>
@@ -134,28 +187,49 @@ export const ActiveSessionScreen = () => {
         )}
 
         {/* Live Timer Card */}
-        <View style={styles.timerCard}>
-          <Text style={styles.timerSub}>{t('timeRemainingLabel', 'Time Remaining')}</Text>
-          <Text style={styles.timerMain}>{formatTime(timeLeft)}</Text>
+        <View style={[styles.timerCard, isTimedOut && styles.timerCardTimeout]}>
+          <Text style={[styles.timerSub, isTimedOut && { color: theme.colors.warning }]}>
+            {isTimedOut ? t('meetupEndedLabel', 'Meetup Duration Reached') : t('timeRemainingLabel', 'Time Remaining')}
+          </Text>
+          <Text style={[styles.timerMain, isTimedOut && { color: theme.colors.warning }]}>
+            {formatTime(timeLeft)}
+          </Text>
           
           <View style={styles.timerProgressBg}>
-            <View style={[styles.timerProgressFill, { width: `${progressPercentage}%` }]} />
+            <View style={[
+              styles.timerProgressFill, 
+              { width: `${progressPercentage}%` },
+              isTimedOut && { backgroundColor: theme.colors.warning }
+            ]} />
           </View>
           
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 8 }}>
-            <Text style={styles.timerLimitText}>{t('mockStarted', 'Started: 7:00 PM')}</Text>
-            <Text style={styles.timerLimitText}>{t('mockEnds', 'Ends: 9:00 PM')}</Text>
+            <Text style={styles.timerLimitText}>{startedLabel}</Text>
+            <Text style={[styles.timerLimitText, isTimedOut && { color: theme.colors.warning, fontWeight: '700' }]}>{endsLabel}</Text>
           </View>
+
+          {isTimedOut && (
+            <View style={styles.timeoutNoticePill}>
+              <Icon name="alert-circle-outline" size={16} color={theme.colors.warning} />
+              <Text style={styles.timeoutNoticeText}>
+                {t('sessionOvertimeNotice', 'Meetup time ended. Please complete session or extend.')}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Companion Snapshot */}
         <View style={styles.companionCard}>
           <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitials}>{(companionName || 'Elena Vasquez').charAt(0)}</Text>
+            <Text style={styles.avatarInitials}>{(companionName || 'Elena').charAt(0)}</Text>
           </View>
           <View style={{ flex: 1, paddingLeft: 12 }}>
-            <Text style={styles.companionName} numberOfLines={1}>{companionName || 'Elena Vasquez'}</Text>
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }} accessibilityRole="button" accessibilityLabel={t('a11yViewFullProfile', 'View Full Profile')}>
+            <Text style={styles.companionName} numberOfLines={1}>{companionName}</Text>
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }} 
+              accessibilityRole="button" 
+              accessibilityLabel={t('a11yViewFullProfile', 'View Full Profile')}
+            >
               <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: 'bold' }}>{t('viewFullProfile', 'View Full Profile')}</Text>
               <Icon name="chevron-right" size={14} color={theme.colors.primary} />
             </TouchableOpacity>
@@ -185,14 +259,81 @@ export const ActiveSessionScreen = () => {
             <Text style={styles.actionBtnPrimarySub}>{t('addMoreTime', 'Add more time')}</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => setEndEarlyModalVisible(true)} accessibilityRole="button" accessibilityLabel={t('a11yClockRemoveOutline', 'clock remove outline')}>
-            <Icon name="clock-remove-outline" size={24} color={theme.colors.error} />
-            <Text style={styles.actionBtnSecondaryText}>{t('endEarly', 'End Early')}</Text>
-            <Text style={styles.actionBtnSecondarySub}>{t('proRataCharges', 'Pro-rata charges')}</Text>
+          <TouchableOpacity 
+            style={[styles.actionBtnSecondary, isTimedOut && { borderColor: theme.colors.primary, backgroundColor: 'rgba(212,175,55,0.1)' }]} 
+            onPress={() => isTimedOut ? navigation.navigate('SessionCompleteScreen', { companionId, companionName }) : setEndEarlyModalVisible(true)} 
+            accessibilityRole="button" 
+            accessibilityLabel={isTimedOut ? 'Complete Meetup' : 'End Early'}
+          >
+            <Icon name={isTimedOut ? 'check-decagram' : 'clock-remove-outline'} size={24} color={isTimedOut ? theme.colors.primary : theme.colors.error} />
+            <Text style={[styles.actionBtnSecondaryText, isTimedOut && { color: theme.colors.primary }]}>
+              {isTimedOut ? t('completeMeetup', 'Complete Meetup') : t('endEarly', 'End Early')}
+            </Text>
+            <Text style={[styles.actionBtnSecondarySub, isTimedOut && { color: theme.colors.primary }]}>
+              {isTimedOut ? t('reviewAndPay', 'Review & ratings') : t('proRataCharges', 'Pro-rata charges')}
+            </Text>
           </TouchableOpacity>
         </View>
 
       </ScrollView>
+
+      {/* MEETUP TIME COMPLETE / TIMEOUT MODAL */}
+      <Modal visible={timeoutModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="clock-check-outline" size={24} color={theme.colors.warning} />
+                <Text style={styles.modalTitle}>{t('meetupTimeComplete', 'Meetup Time Complete')}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setTimeoutModalVisible(false)} style={styles.modalCloseBtn} accessibilityRole="button" accessibilityLabel={t('a11yClose', 'Close')}>
+                <Icon name="close" size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.timeoutAlertCard}>
+              <Text style={styles.timeoutAlertText}>
+                {t('meetupTimeoutDesc', 'Your scheduled meetup duration with {{name}} has now ended. Would you like to wrap up and review or add extra time?', { name: companionName })}
+              </Text>
+            </View>
+
+            <View style={{ gap: 12, marginBottom: 20 }}>
+              <TouchableOpacity 
+                style={styles.primaryBtn} 
+                onPress={() => {
+                  setTimeoutModalVisible(false);
+                  navigation.navigate('SessionCompleteScreen', { companionId, companionName });
+                }} 
+                accessibilityRole="button" 
+                accessibilityLabel="Complete and Review Session"
+              >
+                <Text style={styles.primaryBtnText}>{t('completeAndReview', 'Complete & Review Meetup')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.primaryBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.colors.primary }]} 
+                onPress={() => {
+                  setTimeoutModalVisible(false);
+                  setExtendModalVisible(true);
+                }} 
+                accessibilityRole="button" 
+                accessibilityLabel="Extend Meetup Time"
+              >
+                <Text style={[styles.primaryBtnText, { color: theme.colors.primary }]}>{t('extendMeetupTime', '+ Extend Meetup Time')}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={{ alignItems: 'center', paddingVertical: 8 }} 
+              onPress={() => setTimeoutModalVisible(false)} 
+              accessibilityRole="button" 
+              accessibilityLabel="Dismiss modal and wrap up"
+            >
+              <Text style={{ color: theme.colors.textSecondary, fontWeight: '600' }}>{t('dismissWrapUp', 'Wrap up in person')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* EXTEND SESSION MODAL */}
       <Modal visible={extendModalVisible} transparent animationType="slide">
@@ -250,15 +391,15 @@ export const ActiveSessionScreen = () => {
             <View style={{ gap: 8, marginBottom: 24 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ color: theme.colors.textSecondary }}>{t('timeCompleted', 'Time completed')}</Text>
-                <Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>{t('mockTimeCompleted', '1 hr 15 mins')}</Text>
+                <Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>{timeCompletedText}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ color: theme.colors.textSecondary }}>{t('escrowReleased', 'Escrow to be released')}</Text>
-                <Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>₹1,875</Text>
+                <Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>₹{proRataEscrow.toLocaleString('en-IN')}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ color: theme.colors.textSecondary }}>{t('refundToYou', 'Refund to you')}</Text>
-                <Text style={{ color: theme.colors.success, fontWeight: 'bold' }}>₹1,125</Text>
+                <Text style={{ color: theme.colors.success, fontWeight: 'bold' }}>₹{refundAmount.toLocaleString('en-IN')}</Text>
               </View>
             </View>
 
@@ -290,18 +431,24 @@ export const ActiveSessionScreen = () => {
             <View style={{ gap: 16, marginBottom: 24 }}>
               <View>
                 <Text style={{ color: theme.colors.textSecondary, fontSize: 12, textTransform: 'uppercase', marginBottom: 4 }}>{t('activityLabel', 'Activity')}</Text>
-                <Text style={{ color: theme.colors.textPrimary, fontSize: 15, fontWeight: 'bold' }}>{t('mockActivity', 'Fine Dining & Drinks')}</Text>
+                <Text style={{ color: theme.colors.textPrimary, fontSize: 15, fontWeight: 'bold' }}>
+                  {sessionData?.booking?.activityName || t('fineDiningDrinks', 'Fine Dining & Social Meetup')}
+                </Text>
               </View>
               
               <View>
                 <Text style={{ color: theme.colors.textSecondary, fontSize: 12, textTransform: 'uppercase', marginBottom: 4 }}>{t('dateTimeLabel', 'Date & Time')}</Text>
-                <Text style={{ color: theme.colors.textPrimary, fontSize: 15, fontWeight: 'bold' }}>{t('mockDateTime', 'Today, 7:00 PM - 9:00 PM')}</Text>
+                <Text style={{ color: theme.colors.textPrimary, fontSize: 15, fontWeight: 'bold' }}>
+                  {startedLabel} — {endsLabel}
+                </Text>
               </View>
 
               <View>
                 <Text style={{ color: theme.colors.textSecondary, fontSize: 12, textTransform: 'uppercase', marginBottom: 4 }}>{t('specialNoteLabel', 'Your Special Note')}</Text>
                 <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border }}>
-                  <Text style={{ color: theme.colors.textPrimary, fontSize: 14, fontStyle: 'italic' }}>{t('iPreferSittingNearThe', '"I prefer sitting near the window. Please wear smart casuals."')}</Text>
+                  <Text style={{ color: theme.colors.textPrimary, fontSize: 14, fontStyle: 'italic' }}>
+                    {sessionData?.booking?.specialInstructions ? `"${sessionData.booking.specialInstructions}"` : t('standardPublicMeetup', '"Standard public venue meetup. Please observe etiquette policy."')}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -313,13 +460,33 @@ export const ActiveSessionScreen = () => {
         </View>
       </Modal>
 
+      {/* Dynamic Bottom Bar based on session time state */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity 
-          style={styles.primaryBtn} 
-          onPress={() => navigation.navigate('SessionCompleteScreen', { companionId, companionName })} accessibilityRole="button" accessibilityLabel={t('a11yMockTimesUpAutoEnd', "[MOCK] Time's Up / Auto End")}
-        >
-          <Text style={styles.primaryBtnText}>{t('mockTimesUp', "[MOCK] Time's Up / Auto End")}</Text>
-        </TouchableOpacity>
+        {isTimedOut ? (
+          <TouchableOpacity 
+            style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]} 
+            onPress={() => navigation.navigate('SessionCompleteScreen', { companionId, companionName })} 
+            accessibilityRole="button" 
+            accessibilityLabel={t('a11yCompleteReview', 'Complete & Review Meetup')}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Icon name="check-decagram" size={20} color={theme.colors.background} />
+              <Text style={styles.primaryBtnText}>{t('completeAndReview', 'Complete & Review Meetup')}</Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={styles.primaryBtn} 
+            onPress={() => setExtendModalVisible(true)} 
+            accessibilityRole="button" 
+            accessibilityLabel={t('a11yExtendMeetupTime', 'Extend Meetup Time')}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Icon name="clock-plus-outline" size={20} color={theme.colors.background} />
+              <Text style={styles.primaryBtnText}>{t('extendMeetupTime', 'Extend Meetup Time')}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -332,6 +499,10 @@ const styles = StyleSheet.create({
   liveBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, gap: 6 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.success },
   liveText: { color: theme.colors.success, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
+
+  timeoutBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245, 158, 11, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, gap: 6 },
+  timeoutDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.warning },
+  timeoutText: { color: theme.colors.warning, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
   
   sosBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.error, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, gap: 6, shadowColor: theme.colors.error, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   sosBtnText: { color: theme.colors.background, fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
@@ -343,11 +514,14 @@ const styles = StyleSheet.create({
   etiquetteDesc: { fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20 },
 
   timerCard: { alignItems: 'center', padding: 32, backgroundColor: theme.colors.surface, borderRadius: 24, borderWidth: 1, borderColor: theme.colors.border },
+  timerCardTimeout: { borderColor: 'rgba(245, 158, 11, 0.5)', backgroundColor: 'rgba(245, 158, 11, 0.05)' },
   timerSub: { fontSize: 14, color: theme.colors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
   timerMain: { fontSize: 48, fontWeight: '900', color: theme.colors.textPrimary, fontVariant: ['tabular-nums'], letterSpacing: 2, marginBottom: 24 },
   timerProgressBg: { width: '100%', height: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' },
   timerProgressFill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 4 },
   timerLimitText: { fontSize: 12, color: theme.colors.textSecondary, fontWeight: '500' },
+  timeoutNoticePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245, 158, 11, 0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginTop: 16 },
+  timeoutNoticeText: { color: theme.colors.warning, fontSize: 12, fontWeight: '600' },
 
   companionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border },
   avatarPlaceholder: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.primary },
@@ -367,13 +541,16 @@ const styles = StyleSheet.create({
   actionBtnSecondaryText: { fontSize: 15, fontWeight: 'bold', color: theme.colors.error },
   actionBtnSecondarySub: { fontSize: 11, color: theme.colors.error, opacity: 0.8 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: theme.colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary },
   modalCloseBtn: { padding: 4 },
   modalDesc: { color: theme.colors.textSecondary, fontSize: 14, marginBottom: 24, lineHeight: 22 },
   
+  timeoutAlertCard: { backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.3)', marginBottom: 20 },
+  timeoutAlertText: { color: theme.colors.textPrimary, fontSize: 14, lineHeight: 22 },
+
   extensionOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.background },
   extensionTime: { fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary },
   extensionPrice: { fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary },
