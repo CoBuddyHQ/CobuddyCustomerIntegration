@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -10,47 +10,133 @@ import { RootStackParamList } from '../../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useBookingStore } from '../../../store/slices/bookingStore';
 import { selectClearActiveBooking } from '../../../store/selectors/bookingSelectors';
-
+import { bookingApi, Booking as BookingApiType } from '../../../services/api';
 
 export const BookingCounterOfferScreen = ({ route }: { route: any }) => { 
   const { t } = useTranslation('booking.counterOffer');
-
-  const DEFAULT_MOCK_DATA = {
-    bookingId: 'CB-REQ-8830',
-    companionName: 'Aisha Sharma',
-    companionId: 'c2',
-    activity: 'Shopping Companion',
-    venue: 'DLF Promenade, Vasant Kunj',
-    date: 'Sun, 26 Oct 2026',
-    
-    originalTime: '5:00 PM - 8:00 PM',
-    newTime: '6:00 PM - 9:00 PM',
-    originalAmount: '₹4,000',
-    newAmount: '₹4,500', 
-    
-    message: t('defaultMessage', 'Hi! I have another engagement that runs late. Can we shift by 1 hour? Also due to weekend peak rates, I have slightly adjusted the price. Let me know if this works!'),
-  };
-
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
-  const bookingData = { ...DEFAULT_MOCK_DATA, ...(route?.params || {}) };
   const clearActiveBooking = useBookingStore(selectClearActiveBooking);
 
-  const handleAccept = () => {
-    navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] });
+  const bookingId = route?.params?.bookingId;
+  const [booking, setBooking] = useState<BookingApiType | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (bookingId) {
+      setIsLoading(true);
+      bookingApi.getBooking(bookingId)
+        .then((res) => {
+          if (isMounted && res) {
+            setBooking(res);
+          }
+        })
+        .catch((err) => {
+          console.warn('[BookingCounterOfferScreen] Failed to load booking:', err?.message || err);
+        })
+        .finally(() => {
+          if (isMounted) setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
+    }
+    return () => { isMounted = false; };
+  }, [bookingId]);
+
+  const bookingData = {
+    bookingId: booking?.id || bookingId || '',
+    companionName: booking?.companionName || route?.params?.companionName || 'Companion',
+    companionId: booking?.companionId || route?.params?.companionId || 'c1',
+    activity: booking?.activityName || booking?.activity || 'Meetup Experience',
+    venue: typeof booking?.venue === 'object' ? (booking?.venue?.name || 'Public Venue') : (booking?.venueName || booking?.venue || 'Public Venue'),
+    date: booking?.date ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Scheduled Date',
+    originalTime: booking?.time || '18:00',
+    newTime: (booking as any)?.counterOffer?.time || (booking as any)?.counterTime || (booking as any)?.time || '19:00',
+    originalAmount: (booking?.pricing?.totalAmount || booking?.totalAmount) ? `₹${booking?.pricing?.totalAmount || booking?.totalAmount}` : '₹1,000',
+    newAmount: (booking as any)?.counterOffer?.totalAmount ? `₹${(booking as any).counterOffer.totalAmount}` : (booking as any)?.counterTotalAmount ? `₹${(booking as any).counterTotalAmount}` : undefined,
+    message: (booking as any)?.counterOffer?.message || (booking as any)?.counterMessage || t('defaultMessage', 'The companion proposed an adjusted time/details for this meetup.'),
   };
 
-  const handleDecline = () => {
-    clearActiveBooking();
-    navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] });
+  const handleAccept = async () => {
+    if (!bookingData.bookingId) return;
+    setIsProcessing(true);
+    try {
+      await bookingApi.respondToCounterOffer(bookingData.bookingId, { action: 'accept' });
+      Alert.alert(
+        t('alertSuccessTitle', 'Counter Offer Accepted!'),
+        t('alertSuccessMsg', 'Your booking is now confirmed with the updated schedule.'),
+        [
+          {
+            text: 'View Itinerary',
+            onPress: () => {
+              navigation.navigate('MainTabNavigator', {
+                screen: 'BookingsTab',
+                params: {
+                  screen: 'BookingDetailScreen',
+                  initial: false,
+                  params: { bookingId: bookingData.bookingId, status: 'Accepted' },
+                } as any,
+              });
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to accept counter offer');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDecline = async () => {
+    if (!bookingData.bookingId) {
+      smartGoBack();
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      await bookingApi.respondToCounterOffer(bookingData.bookingId, { action: 'decline' });
+      clearActiveBooking();
+      Alert.alert(
+        t('alertDeclinedTitle', 'Counter Offer Declined'),
+        t('alertDeclinedMsg', 'The booking proposal has been declined.'),
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to decline counter offer');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleMessageBack = () => {
-    const nav = navigation as unknown as { navigate: (route: string, params?: unknown) => void }; nav.navigate('MainTabNavigator', { 
+    const nav = navigation as unknown as { navigate: (route: string, params?: unknown) => void };
+    nav.navigate('MainTabNavigator', { 
       screen: 'ChatTab', 
-      params: { screen: 'CompanionChatScreen', initial: false, params: { companionName: bookingData.companionName, bookingId: bookingData.bookingId, companionId: bookingData.companionId } } 
+      params: { 
+        screen: 'CompanionChatScreen', 
+        initial: false, 
+        params: { companionName: bookingData.companionName, bookingId: bookingData.bookingId, companionId: bookingData.companionId } 
+      } 
     });
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>

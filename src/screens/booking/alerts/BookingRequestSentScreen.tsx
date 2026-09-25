@@ -8,23 +8,19 @@ import { theme } from '../../../theme';
 import { RootStackParamList } from '../../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-const DEFAULT_MOCK_DATA = {
-  bookingId: 'CB-REQ-8829',
-  companionName: 'Natasha',
-  date: 'Fri, 24 Oct',
-  time: '7:00 PM - 9:00 PM',
-  venue: 'Blue Tokai Coffee Roasters',
-  amount: '₹3,000'
-};
-
-
 export const BookingRequestSentScreen = ({ route }: { route: any }) => { 
   const { t } = useTranslation('booking.requestSent');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   
-  // Backend Integration: Data will come from route.params
-  const bookingData = route?.params || DEFAULT_MOCK_DATA;
+  const bookingData = {
+    bookingId: route?.params?.bookingId || '',
+    companionName: route?.params?.companionName || 'Companion',
+    date: route?.params?.date || 'Today',
+    time: route?.params?.time || '18:00',
+    venue: route?.params?.venue || 'Public Venue',
+    amount: route?.params?.amount || '₹1,000',
+  };
 
   useEffect(() => {
     Animated.loop(

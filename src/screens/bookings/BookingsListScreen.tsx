@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
-import { MOCK_BOOKINGS } from '../../services/mock';
 import { bookingApi, Booking as BookingApiType } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,49 +18,69 @@ export const BookingsListScreen = () => {
   const [apiBookings, setApiBookings] = useState<BookingApiType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  React.useEffect(() => {
-    let isMounted = true;
-    const fetchBookings = async () => {
-      setIsLoading(true);
-      try {
-        const list = await bookingApi.listBookings(activeTab);
-        if (isMounted && list && list.length > 0) {
-          setApiBookings(list);
-        } else if (isMounted) {
-          setApiBookings([]);
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      const fetchBookings = async () => {
+        setIsLoading(true);
+        try {
+          const list = await bookingApi.listBookings(activeTab);
+          if (isMounted && list && list.length > 0) {
+            setApiBookings(list);
+          } else if (isMounted) {
+            setApiBookings([]);
+          }
+        } catch {
+          if (isMounted) setApiBookings([]);
+        } finally {
+          if (isMounted) setIsLoading(false);
         }
-      } catch {
-        if (isMounted) setApiBookings([]);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
+      };
+
+      fetchBookings();
+      return () => {
+        isMounted = false;
+      };
+    }, [activeTab])
+  );
+
+  const displayList = apiBookings.map(b => {
+    const rawTime = b.time || '18:00';
+    const formattedTime = rawTime.includes('T') ? rawTime.split('T')[1].replace(/(:00)$/, '') : rawTime;
+    const refId = (b as any).bookingRef || (b.id?.length > 12 ? 'CB-' + b.id.slice(0, 8).toUpperCase() : b.id);
+    const st = (b.status as string)?.toLowerCase();
+
+    let displayStatus = 'Awaiting Reply';
+    if (st === 'accepted' || st === 'confirmed' || st === 'in_progress') {
+      displayStatus = 'Accepted';
+    } else if (st === 'counter_proposed' || st === 'countered') {
+      displayStatus = 'Counter-Proposed';
+    } else if (st === 'declined') {
+      displayStatus = 'Declined';
+    } else if (st === 'completed') {
+      displayStatus = 'Completed';
+    } else if (st === 'cancelled') {
+      displayStatus = 'Cancelled';
+    }
+
+    return {
+      id: b.id,
+      displayId: refId,
+      type: 'companion',
+      companionId: b.companionId,
+      companionName: b.companionName || 'Companion',
+      rating: '5.0',
+      activity: b.activityName || b.activity || 'Experience Meetup',
+      date: b.date ? new Date(b.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short' }) : 'Today',
+      time: `${formattedTime} (${b.durationHours || b.duration || 1} hrs)`,
+      venue: typeof b.venue === 'object' ? ((b.venue as any)?.name || 'Public Venue') : (b.venueName || b.venue || 'Public Venue'),
+      price: (b.pricing?.totalAmount || b.totalAmount) ? `₹${b.pricing?.totalAmount || b.totalAmount}` : '₹550',
+      displayStatus,
+      duration: `${b.durationHours || b.duration || 1} hrs`,
     };
+  });
 
-    fetchBookings();
-    return () => {
-      isMounted = false;
-    };
-  }, [activeTab]);
-
-  const mockFiltered = MOCK_BOOKINGS.filter(b => b.type === activeTab);
-  const displayList = apiBookings.length > 0
-    ? apiBookings.map(b => ({
-        id: b.id,
-        type: 'companion',
-        companionId: b.companionId,
-        companionName: b.companionName || 'Companion',
-        rating: '5.0',
-        activity: b.activityName || b.activity || 'Coffee Meetup',
-        date: b.date ? new Date(b.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short' }) : 'Today',
-        time: `${b.time || '18:00'} (${b.durationHours || b.duration || 1} hrs)`,
-        venue: typeof b.venue === 'object' ? ((b.venue as any)?.name || 'Public Venue') : (b.venueName || b.venue || 'Public Venue'),
-        price: (b.pricing?.totalAmount || b.totalAmount) ? `₹${b.pricing?.totalAmount || b.totalAmount}` : '₹550',
-        displayStatus: (b.status as string) === 'accepted' ? 'Accepted' : (b.status as string) === 'countered' || (b.status as string) === 'counter_proposed' ? 'Counter-Proposed' : (b.status as string) === 'declined' ? 'Declined' : (b.status as string) === 'completed' ? 'Completed' : 'Awaiting Reply',
-        duration: `${b.durationHours || b.duration || 1} hrs`,
-      }))
-    : mockFiltered;
-
-  const handlePressCard = (booking: typeof MOCK_BOOKINGS[0]) => {
+  const handlePressCard = (booking: any) => {
     if (booking.displayStatus === 'Counter-Proposed') {
       navigation.navigate('BookingFlowStack', { 
         screen: 'BookingCounterOfferScreen', 
@@ -100,6 +119,10 @@ export const BookingsListScreen = () => {
       color = theme.colors.error;
       bgColor = 'rgba(239, 68, 68, 0.15)';
       icon = 'cancel';
+    } else if (status === 'Cancelled') {
+      color = theme.colors.error;
+      bgColor = 'rgba(239, 68, 68, 0.15)';
+      icon = 'close-circle-outline';
     }
 
     return (
@@ -148,7 +171,12 @@ export const BookingsListScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {displayList.length === 0 ? (
+        {isLoading && displayList.length === 0 ? (
+          <View style={[styles.emptyState, { paddingTop: 60 }]}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.emptyDesc, { marginTop: 16 }]}>Loading your bookings...</Text>
+          </View>
+        ) : displayList.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconGlow}>
               <View style={styles.emptyIconCircle}>
@@ -171,7 +199,7 @@ export const BookingsListScreen = () => {
             >
               {/* Top Section: ID & Status */}
               <View style={styles.cardTopRow}>
-                <Text style={styles.bookingId}>{booking.id}</Text>
+                <Text style={styles.bookingId}>{booking.displayId}</Text>
                 {renderStatusBadge(booking.displayStatus)}
               </View>
 

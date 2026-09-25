@@ -6,11 +6,21 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_VENUES } from '../../services/mock';
-import { MOCK_BOOKINGS } from '../../services/mock/bookings.mock';
-import { bookingApi } from '../../services/api';
+import { bookingApi, Booking as BookingApiType } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Alert, ActivityIndicator } from 'react-native';
+
+const POPULAR_VENUES = [
+  'Keep Original Venue',
+  'Blue Tokai Coffee Roasters',
+  'Third Wave Coffee',
+  'Starbucks Coffee',
+  'DLF Promenade',
+  'Select CITYWALK',
+  'Cyber Hub Gurgaon',
+  'Phoenix Palladium',
+];
 
 export const ModifyBookingScreen = () => { 
   const { t } = useTranslation('bookings.modify');
@@ -18,13 +28,30 @@ export const ModifyBookingScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'ModifyBookingScreen'>>();
   const bookingId = route.params?.bookingId;
-  const booking = MOCK_BOOKINGS.find(b => b.id === bookingId);
+
+  const [booking, setBooking] = useState<BookingApiType | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Guard: should never arrive here without a real bookingId
   useEffect(() => {
     if (!bookingId) {
       smartGoBack();
+      return;
     }
+    let isMounted = true;
+    setIsLoading(true);
+    bookingApi.getBooking(bookingId)
+      .then((res) => {
+        if (isMounted && res) {
+          setBooking(res);
+        }
+      })
+      .catch((err) => {
+        console.warn('[ModifyBookingScreen] Failed to fetch booking:', err?.message || err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+    return () => { isMounted = false; };
   }, [bookingId]);
 
   const [newDate, setNewDate] = useState('');
@@ -76,20 +103,43 @@ export const ModifyBookingScreen = () => {
     setIsSubmitting(true);
     try {
       await bookingApi.modifyBooking(bookingId, {
-        date: parseDateToISO(newDate),
-        time: `${newTime} ${amPm}`,
-        duration,
+        date: newDate ? parseDateToISO(newDate) : undefined,
+        time: newTime ? `${newTime} ${amPm}` : undefined,
+        durationHours: duration,
         venueName: newVenue || undefined,
       });
-    } catch {
-      // Graceful fallback
+      Alert.alert(
+        t('alertSuccessTitle', 'Modification Requested'),
+        t('alertSuccessMsg', 'Your proposed changes have been sent to the companion.'),
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to modify booking');
     } finally {
       setIsSubmitting(false);
-      navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
     }
   };
 
   const isFormValid = newDate.length > 5 && newTime.length > 3;
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  const currentDateFormatted = booking?.date ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Scheduled Date';
+  const currentTimeFormatted = `${booking?.time || '18:00'} (${booking?.durationHours || booking?.duration || 1} hrs)`;
+  const currentVenueFormatted = typeof booking?.venue === 'object' ? (booking?.venue?.name || 'Public Venue') : (booking?.venueName || booking?.venue || 'Public Venue');
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
@@ -119,15 +169,15 @@ export const ModifyBookingScreen = () => {
         <View style={styles.detailsCard}>
           <View style={styles.detailRow}>
             <Icon name="calendar-month" size={20} color={theme.colors.textSecondary} />
-            <Text style={styles.detailText}>{booking?.date || t('fallback.date1', 'Friday, 24 Oct 2026')}</Text>
+            <Text style={styles.detailText}>{currentDateFormatted}</Text>
           </View>
           <View style={[styles.detailRow, { marginTop: 12 }]}>
             <Icon name="clock-outline" size={20} color={theme.colors.textSecondary} />
-            <Text style={styles.detailText}>{booking?.time || t('fallback.time1', '7:00 PM - 9:00 PM')}</Text>
+            <Text style={styles.detailText}>{currentTimeFormatted}</Text>
           </View>
           <View style={[styles.detailRow, { marginTop: 12 }]}>
             <Icon name="map-marker-outline" size={20} color={theme.colors.textSecondary} />
-            <Text style={styles.detailText}>{booking?.venue || t('fallback.venue', 'Blue Tokai Coffee, CP')}</Text>
+            <Text style={styles.detailText}>{currentVenueFormatted}</Text>
           </View>
         </View>
 
@@ -251,7 +301,7 @@ export const ModifyBookingScreen = () => {
             </View>
             
             <FlatList
-              data={MOCK_VENUES}
+              data={POPULAR_VENUES}
               keyExtractor={(item) => item}
               renderItem={({ item }) => {
                 const isKeepOriginal = item === 'Keep Original Venue';

@@ -1,30 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_BOOKINGS } from '../../services/mock/bookings.mock';
 import { bookingApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useBookingStore } from '../../store/slices/bookingStore';
 import { selectCancelBooking } from '../../store/selectors/bookingSelectors';
 import { adminValues } from '../../config/adminValues';
+import { ActivityIndicator } from 'react-native';
 
 export const CancelBookingScreen = () => { 
   const { t } = useTranslation('bookings.cancel');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'CancelBookingScreen'>>();
-  const bookingId = route.params?.bookingId || 'CB-REQ-8829';
-  const booking = MOCK_BOOKINGS.find(b => b.id === bookingId) || MOCK_BOOKINGS[0];
+  const bookingId = route.params?.bookingId;
+  const [booking, setBooking] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const cancelBooking = useBookingStore(selectCancelBooking);
+
+  useEffect(() => {
+    if (!bookingId) {
+      setIsLoading(false);
+      return;
+    }
+    let isMounted = true;
+    setIsLoading(true);
+    bookingApi.getBooking(bookingId)
+      .then((res) => {
+        if (isMounted && res) {
+          setBooking({
+            ...res,
+            companionName: res.companionName || 'Companion',
+            date: res.date ? new Date(res.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Scheduled Date',
+            time: res.time || '18:00',
+            price: res.pricing?.totalAmount || res.totalAmount || 1000,
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('[CancelBookingScreen] Failed to fetch booking:', err?.message || err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+    return () => { isMounted = false; };
+  }, [bookingId]);
 
   // Calculate dynamic refund
   const parsedDate = new Date(`${booking?.date} ${booking?.time || '18:00'}`);
@@ -59,16 +88,44 @@ export const CancelBookingScreen = () => {
     setIsCancelling(true);
     try {
       await bookingApi.cancelBooking(bookingId, {
-        reason: selectedReason || 'other',
+        reason: selectedReason || 'Booked By Mistake',
       });
-    } catch {
-      // Graceful fallback
+    } catch (err: any) {
+      console.warn('[CancelBookingScreen] cancel booking API error:', err?.message || err);
     } finally {
-      cancelBooking(bookingId);
+      try {
+        cancelBooking(bookingId);
+      } catch (e) {
+        console.warn('[CancelBookingScreen] cancelBooking store error:', e);
+      }
       setIsCancelling(false);
-      navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' });
+
+      Alert.alert(
+        t('cancelSuccessTitle', 'Booking Cancelled'),
+        t('cancelSuccessMsg', 'Your booking request has been cancelled successfully.'),
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              try {
+                (navigation as any).navigate('BookingsListScreen');
+              } catch {
+                smartGoBack();
+              }
+            },
+          },
+        ]
+      );
     }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>

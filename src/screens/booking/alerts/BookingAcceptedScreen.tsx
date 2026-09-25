@@ -8,29 +8,38 @@ import { theme } from '../../../theme';
 import { RootStackParamList } from '../../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-const DEFAULT_MOCK_DATA = {
-  bookingId: 'CB-REQ-8829',
-  companionName: 'Natasha',
-  companionId: 'c4',
-  activity: 'Fine Dining & Drinks',
-  date: 'Friday, 24 Oct 2026',
-  time: '7:00 PM - 9:00 PM',
-  venue: 'Blue Tokai Coffee Roasters',
-  address: 'Connaught Place, Inner Circle',
-  amount: '₹3,000'
-};
-
+import { bookingApi } from '../../../services/api';
 
 export const BookingAcceptedScreen = ({ route }: { route: any }) => { 
   const { t } = useTranslation('booking.accepted');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
-  const bookingData = { ...DEFAULT_MOCK_DATA, ...(route?.params || {}) };
+  const [booking, setBooking] = React.useState<any>(null);
+  const routeBookingId = route?.params?.bookingId;
 
   useEffect(() => {
     Animated.spring(scaleAnim, { toValue: 1, tension: 40, friction: 6, useNativeDriver: true }).start();
-  }, [scaleAnim]);
+    if (routeBookingId) {
+      bookingApi.getBooking(routeBookingId)
+        .then((res) => {
+          if (res) setBooking(res);
+        })
+        .catch(() => {});
+    }
+  }, [scaleAnim, routeBookingId]);
+
+  const bookingData = {
+    bookingId: routeBookingId || booking?.id || '',
+    companionName: route?.params?.companionName || booking?.companionName || 'Companion',
+    companionId: route?.params?.companionId || booking?.companionId || 'c1',
+    activity: route?.params?.activity || booking?.activityName || booking?.activity || 'Experience Meetup',
+    date: route?.params?.date || (booking?.date ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Upcoming Date'),
+    time: route?.params?.time || booking?.time || '18:00',
+    venue: route?.params?.venue || (typeof booking?.venue === 'object' ? booking?.venue?.name : booking?.venueName || booking?.venue) || 'Public Venue',
+    address: route?.params?.address || booking?.venueAddress || 'Public Area',
+    amount: route?.params?.amount || (booking?.pricing?.totalAmount || booking?.totalAmount ? `₹${booking?.pricing?.totalAmount || booking?.totalAmount}` : '₹1,000'),
+  };
 
   const handleMessage = () => {
     navigation.navigate('MainTabNavigator', {

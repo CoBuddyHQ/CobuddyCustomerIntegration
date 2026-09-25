@@ -21,9 +21,9 @@ export const CompanionChatScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'CompanionChatScreen'>>();
-  const companionName = route.params?.companionName || 'Elena Vasquez';
-  const bookingId = route.params?.bookingId || 'CB-REQ-8829';
-  const companionId = route.params?.companionId || 'c1';
+  const companionName = route.params?.companionName || 'Companion';
+  const bookingId = route.params?.bookingId || '';
+  const companionId = route.params?.companionId || '';
   
   const [isOptionsMenuVisible, setOptionsMenuVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);

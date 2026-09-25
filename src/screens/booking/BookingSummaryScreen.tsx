@@ -108,7 +108,7 @@ export const BookingSummaryScreen = () => {
       const formattedAmountStr = `₹${(resBooking as any)?.pricing?.totalAmount || (resBooking as any)?.totalAmount || totalAmount}`;
 
       navigation.navigate('BookingRequestSentScreen', {
-        bookingId: resBooking?.id || 'CB-REQ-8829',
+        bookingId: resBooking?.id || '',
         companionName: route.params?.companionName || (resBooking as any)?.companionName || 'Companion',
         date: formattedDateStr,
         time: typeof slotStart === 'string' ? slotStart : '18:00',

@@ -14,7 +14,7 @@ import {useNavigation} from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { MOCK_CHAT_LIST } from '../../services/mock';
-import { chatApi, Conversation } from '../../services/api';
+import { chatApi, bookingApi, Conversation } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -36,10 +36,7 @@ export const ChatListScreen = () => {
 
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const activeBookings = [
-    { id: 'CB-REQ-9401', name: 'Kabir Singh', role: 'Event Companion', online: true, companionId: 'c6' },
-    { id: 'CB-REQ-9402', name: 'Sneha Verma', role: 'Local Guide', online: false, companionId: 'c7' },
-  ];
+  const [activeBookings, setActiveBookings] = useState<any[]>([]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -48,6 +45,19 @@ export const ChatListScreen = () => {
         setConversations(list);
       }
     }).catch(() => {});
+
+    bookingApi.listBookings('accepted').then(list => {
+      if (isMounted && list && list.length > 0) {
+        setActiveBookings(list.map(b => ({
+          id: b.id,
+          name: b.companionName || 'Companion',
+          role: b.activityName || b.activity || 'Meetup Experience',
+          online: true,
+          companionId: b.companionId,
+        })));
+      }
+    }).catch(() => {});
+
     return () => { isMounted = false; };
   }, []);
 
@@ -198,27 +208,35 @@ export const ChatListScreen = () => {
             <Text style={styles.modalTitle}>{t('newMessageTitle', 'New Message')}</Text>
             <Text style={styles.modalSub}>{t('newMessageSub', 'Select an active booking to start a conversation.')}</Text>
             
-            {activeBookings.map(bk => (
-              <TouchableOpacity 
-                key={bk.id} 
-                style={styles.newChatOption}
-                activeOpacity={0.8}
-                onPress={() => {
-                  setShowNewMessageModal(false);
-                  navigation.navigate('CompanionChatScreen', { companionName: bk.name, bookingId: bk.id, companionId: bk.companionId });
-                }} accessibilityRole="button" accessibilityLabel={t('a11yStartChatWith', 'Start chat with {{name}}', { name: bk.name })}
-              >
-                <View style={styles.newChatAvatar}>
-                   <Text style={styles.newChatAvatarText}>{bk.name.charAt(0)}</Text>
-                   {bk.online && <View style={styles.newChatOnlineDot} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.newChatName}>{bk.name}</Text>
-                  <Text style={styles.newChatRole}>{t(`role.${bk.role.replace(' ', '')}`, bk.role)}</Text>
-                </View>
-                <Icon name="chevron-right" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            ))}
+            {activeBookings.length === 0 ? (
+              <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                <Text style={{ color: Colors.textSecondary, textAlign: 'center' }}>
+                  No active bookings available to chat with yet.
+                </Text>
+              </View>
+            ) : (
+              activeBookings.map(bk => (
+                <TouchableOpacity 
+                  key={bk.id} 
+                  style={styles.newChatOption}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setShowNewMessageModal(false);
+                    navigation.navigate('CompanionChatScreen', { companionName: bk.name, bookingId: bk.id, companionId: bk.companionId });
+                  }} accessibilityRole="button" accessibilityLabel={t('a11yStartChatWith', 'Start chat with {{name}}', { name: bk.name })}
+                >
+                  <View style={styles.newChatAvatar}>
+                     <Text style={styles.newChatAvatarText}>{bk.name.charAt(0)}</Text>
+                     {bk.online && <View style={styles.newChatOnlineDot} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.newChatName}>{bk.name}</Text>
+                    <Text style={styles.newChatRole}>{bk.role}</Text>
+                  </View>
+                  <Icon name="chevron-right" size={20} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </TouchableOpacity>
       </Modal>

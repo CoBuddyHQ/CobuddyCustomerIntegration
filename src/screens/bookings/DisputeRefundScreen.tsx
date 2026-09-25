@@ -6,8 +6,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_BOOKINGS } from '../../services/mock/bookings.mock';
-import { bookingApi } from '../../services/api';
+import { bookingApi, Booking as BookingApiType } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { adminValues } from '../../config/adminValues';
@@ -17,8 +16,18 @@ export const DisputeRefundScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'DisputeRefundScreen'>>();
-  const bookingId = route.params?.bookingId || 'CB-HIS-9921';
-  const booking = MOCK_BOOKINGS.find(b => b.id === bookingId) || MOCK_BOOKINGS[0];
+  const bookingId = route.params?.bookingId || '';
+  const [booking, setBooking] = useState<BookingApiType | null>(null);
+
+  React.useEffect(() => {
+    if (bookingId) {
+      bookingApi.getBooking(bookingId)
+        .then((res) => {
+          if (res) setBooking(res);
+        })
+        .catch(() => {});
+    }
+  }, [bookingId]);
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [description, setDescription] = useState('');
@@ -27,7 +36,7 @@ export const DisputeRefundScreen = () => {
   const handleBack = () => smartGoBack();
   
   const handleSubmit = async () => {
-    if (!isFormValid) return;
+    if (!isFormValid || !bookingId) return;
     setIsSubmitting(true);
     try {
       await bookingApi.disputeBooking(bookingId, {

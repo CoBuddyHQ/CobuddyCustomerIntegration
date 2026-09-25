@@ -6,7 +6,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { sessionApi } from '../../services/api';
+import { sessionApi, bookingApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -27,7 +27,15 @@ export const ArrivalCheckInScreen = () => {
         setPassCode(sess.passCode);
       }
     }).catch(() => {});
-  }, []);
+
+    if (bookingId) {
+      bookingApi.getBooking(bookingId).then((b: any) => {
+        if (b?.sessionPassCode) {
+          setPassCode(b.sessionPassCode);
+        }
+      }).catch(() => {});
+    }
+  }, [bookingId]);
 
   const handleSimulateArrival = async () => {
     setIsLocating(true);

@@ -71,9 +71,9 @@ export const CompanionReviewScreen = () => {
           {/* Rating Section */}
           <View style={styles.ratingSection}>
             <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarInitials}>{(companionName || 'Elena Vasquez').charAt(0)}</Text>
+              <Text style={styles.avatarInitials}>{(companionName || 'Companion').charAt(0)}</Text>
             </View>
-            <Text style={styles.question}>{t('questionRate', 'Rate your time with {{name}}', { name: (companionName || 'Elena Vasquez') })}</Text>
+            <Text style={styles.question}>{t('questionRate', 'Rate your time with {{name}}', { name: (companionName || 'Companion') })}</Text>
             
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map(star => (
