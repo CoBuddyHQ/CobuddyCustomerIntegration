@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Switch,
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,12 +40,9 @@ export const BookingSummaryScreen = () => {
   const dayName = parsedDate.toLocaleDateString('en-US', { weekday: 'short' });
   const dayNumber = parsedDate.getDate().toString();
 
-  const { kycStatus } = useAuthStore();
+  const { kycStatus, user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-
-  // DEV MOCK: Toggle to test KYC interceptor
-  const [isKycVerified, setIsKycVerified] = useState(kycStatus === 'verified');
   
   // User Input State
   const [specialInstructions, setSpecialInstructions] = useState('');
@@ -61,7 +57,12 @@ export const BookingSummaryScreen = () => {
 
   const handleSendRequest = async () => {
     setSubmitError('');
-    const verified = isKycVerified || kycStatus === 'verified';
+    if (!agreedToSafety) {
+      setSubmitError('Please check the safety agreement box to continue.');
+      return;
+    }
+
+    const verified = kycStatus === 'verified' || user?.kycStatus === 'verified' || (user as any)?.isVerified;
     if (!verified) {
       // KYC Interceptor: Redirect to KYC Stack
       navigation.navigate('KYCStack');
@@ -227,37 +228,23 @@ export const BookingSummaryScreen = () => {
             {t('safetyAgreement', 'I agree to meet in a public place and strictly follow the CoBuddy safety guidelines.')}
           </Text>
         </TouchableOpacity>
-
-        {/* DEV MOCK: KYC Toggle */}
-        <View style={styles.devBox}>
-          <Text style={styles.devTitle}>{t('devTitle', '[Dev] Simulate KYC Status')}</Text>
-          <View style={styles.devRow}>
-            <Text style={styles.devText}>{t('devText', 'KYC Verified?')}</Text>
-            <Switch 
-              value={isKycVerified} 
-              onValueChange={setIsKycVerified}
-              trackColor={{ false: '#767577', true: theme.colors.success }}
-            />
-          </View>
-          <Text style={styles.devDesc}>
-            {t('devDesc', 'If FALSE, pressing "Send Request" will trigger the KYC interceptor.')}
-          </Text>
-        </View>
       </ScrollView>
 
       {/* Bottom Action Bar */}
       <View style={styles.bottomBar}>
         {submitError ? <Text style={{ color: theme.colors.error, fontSize: 13, marginBottom: 8, textAlign: 'center' }}>{submitError}</Text> : null}
         <TouchableOpacity
-          style={[styles.nextBtn, (!agreedToSafety || isSubmitting) && styles.nextBtnDisabled]}
-          disabled={!agreedToSafety || isSubmitting}
+          style={[styles.nextBtn, isSubmitting && styles.nextBtnDisabled]}
+          disabled={isSubmitting}
           onPress={handleSendRequest}
-          activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11ySendRequest', 'Send Request')}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11ySendRequest', 'Send Request')}
         >
-          <Text style={[styles.nextBtnText, (!agreedToSafety || isSubmitting) && styles.nextBtnTextDisabled]}>
+          <Text style={styles.nextBtnText}>
             {isSubmitting ? 'Sending...' : t('nextBtnText', 'Send Request')}
           </Text>
-          <Icon name="send-outline" size={20} color={agreedToSafety && !isSubmitting ? theme.colors.background : 'rgba(255,255,255,0.4)'} />
+          <Icon name="send-outline" size={20} color={theme.colors.background} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -262,10 +262,32 @@ export const useAuthStore = create<AuthState>((set, get) => {
         } else {
           set({ isHydrated: true });
         }
-      } catch {
-        // Token invalid or network error — clear and show login
-        await TokenStorage.clearAll();
-        set({ isAuthenticated: false, isHydrated: true });
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          // Token explicitly invalid or expired
+          await TokenStorage.clearAll();
+          set({ isAuthenticated: false, isHydrated: true });
+        } else {
+          // Network failure or server delay - preserve cached session if present
+          try {
+            const token = await TokenStorage.getAccessToken();
+            const user = await TokenStorage.getUser<AuthUser>();
+            if (token && user) {
+              set({
+                token,
+                user,
+                isAuthenticated: true,
+                isOnboardingComplete: true,
+                kycStatus: user.kycStatus as any,
+                isHydrated: true,
+              });
+            } else {
+              set({ isAuthenticated: false, isHydrated: true });
+            }
+          } catch {
+            set({ isAuthenticated: false, isHydrated: true });
+          }
+        }
       }
     },
 

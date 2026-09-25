@@ -56,8 +56,6 @@ const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
 import { NotificationsScreen } from '../screens/home/NotificationsScreen';
-import { MOCK_CHAT_LIST } from '../services/mock';
-const unreadCount = MOCK_CHAT_LIST.reduce((sum, c) => sum + (c.unread || 0), 0);
 
 const HomeTabStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -217,7 +215,7 @@ export const MainTabNavigator = () => {
       <Tab.Screen name="HomeTab" component={HomeTabStack} options={{ title: t('tabHome', 'Home') }} />
       <Tab.Screen name="DiscoverTab" component={DiscoverTabStack} options={{ title: t('tabDiscover', 'Discover') }} />
       <Tab.Screen name="BookingsTab" component={BookingsTabStack} options={{ title: t('tabBookings', 'Bookings') }} />
-      <Tab.Screen name="ChatTab" component={ChatTabStack} options={{ title: t('tabMessages', 'Messages'), tabBarBadge: unreadCount > 0 ? unreadCount : undefined }} />
+      <Tab.Screen name="ChatTab" component={ChatTabStack} options={{ title: t('tabMessages', 'Messages') }} />
       <Tab.Screen name="ProfileTab" component={ProfileTabStack} options={{ title: t('tabProfile', 'Profile') }} />
     </Tab.Navigator>
   );

@@ -15,7 +15,7 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { useBookingStore } from '../../store/slices/bookingStore';
 import { adminValues } from '../../config/adminValues';
-import { selectSetDraftBooking } from '../../store/selectors/bookingSelectors';
+import { selectSetDraftBooking, selectDraftBooking } from '../../store/selectors/bookingSelectors';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -31,18 +31,17 @@ export const BookingVenueSelectScreen = () => {
   const { t } = useTranslation('booking.venueSelect');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
-  const clearDraftBooking = useBookingStore(state => state.clearDraftBooking);
   const route = useRoute<RouteProp<RootStackParamList, 'BookingVenueSelectScreen'>>();
   const setDraftBooking = useBookingStore(selectSetDraftBooking);
+  const draftBooking = useBookingStore(selectDraftBooking);
 
   const { activity, companionId, companionName } = route.params || {};
 
-  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(draftBooking?.venue?.venueId || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlaceType, setSelectedPlaceType] = useState<string | null>(null);
 
   const handleBack = () => {
-    clearDraftBooking();
     smartGoBack();
   };
 

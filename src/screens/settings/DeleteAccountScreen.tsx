@@ -6,22 +6,48 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 
+import { deleteAccount } from '../../services/api/account.api';
+import { useAuthStore } from '../../store/slices/authStore';
+
 export const DeleteAccountScreen = () => { 
   const { t } = useTranslation('settings.deleteAccount');
   const { smartGoBack } = useSmartNavigation();
   const [confirmText, setConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const isDeleteEnabled = confirmText === 'DELETE';
+  const isDeleteEnabled = confirmText.trim().toUpperCase() === 'DELETE';
 
   const handleDelete = () => {
-      if (!isDeleteEnabled) return;
+      if (!isDeleteEnabled || isDeleting) return;
       
-      Alert.alert(t('alertTitleFinalConfirmati', 'Final Confirmation'), t('alertMsgThisactionisirrevers', 'This action is irreversible. All your data, wallet balance, and history will be permanently deleted.'),
+      Alert.alert(
+          t('alertTitleFinalConfirmati', 'Final Confirmation'), 
+          t('alertMsgThisactionisirrevers', 'This action is irreversible. All your data, wallet balance, and history will be permanently deleted.'),
           [
               { text: t('cancelBtn', 'Cancel'), style: 'cancel' },
-              { text: t('confirmDelete', 'Yes, Delete'), style: 'destructive', onPress: () => {
-                  Alert.alert(t('alertTitleAccountDeleted', 'Account Deleted'), t('alertMsgYouraccounthasbeende', 'Your account has been deleted.'), [{ text: t('okBtn', 'OK') }]);
-              }}
+              { 
+                  text: t('confirmDelete', 'Yes, Delete'), 
+                  style: 'destructive', 
+                  onPress: async () => {
+                      try {
+                          setIsDeleting(true);
+                          await deleteAccount();
+                          await useAuthStore.getState().logout();
+                          Alert.alert(
+                              t('alertTitleAccountDeleted', 'Account Deleted'), 
+                              t('alertMsgYouraccounthasbeende', 'Your account has been deleted.'), 
+                              [{ text: t('okBtn', 'OK') }]
+                          );
+                      } catch (err: any) {
+                          Alert.alert(
+                              'Error', 
+                              err?.response?.data?.message || err?.message || 'Failed to delete account. Please try again.'
+                          );
+                      } finally {
+                          setIsDeleting(false);
+                      }
+                  }
+              }
           ]
       );
   };
@@ -68,12 +94,14 @@ export const DeleteAccountScreen = () => {
             </View>
 
             <TouchableOpacity 
-                style={[styles.deleteBtn, !isDeleteEnabled && styles.deleteBtnDisabled]} 
+                style={[styles.deleteBtn, (!isDeleteEnabled || isDeleting) && styles.deleteBtnDisabled]} 
                 activeOpacity={0.8}
-                disabled={!isDeleteEnabled}
+                disabled={!isDeleteEnabled || isDeleting}
                 onPress={handleDelete} accessibilityRole="button" accessibilityLabel={t('a11yPermanentlyDeleteMyAccount', 'Permanently Delete My Account')}
             >
-                <Text style={[styles.deleteBtnText, !isDeleteEnabled && styles.deleteBtnTextDisabled]}>{t('deleteBtn', 'Permanently Delete My Account')}</Text>
+                <Text style={[styles.deleteBtnText, (!isDeleteEnabled || isDeleting) && styles.deleteBtnTextDisabled]}>
+                    {isDeleting ? 'Deleting Account...' : t('deleteBtn', 'Permanently Delete My Account')}
+                </Text>
             </TouchableOpacity>
 
         </ScrollView>

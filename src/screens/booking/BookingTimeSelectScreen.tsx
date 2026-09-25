@@ -46,11 +46,9 @@ export const BookingTimeSelectScreen = () => {
   const { t } = useTranslation('booking.timeSelect');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
-    const clearDraftBooking = useBookingStore(state => state.clearDraftBooking);
   const route = useRoute<RouteProp<RootStackParamList, 'BookingTimeSelectScreen'>>();
   const setDraftBooking = useBookingStore(selectSetDraftBooking);
 
-  
   const { activity, venue, companionId, companionName } = route.params || {};
 
   const [selectedDateId, setSelectedDateId] = useState<string>(DATES[0].id);
@@ -58,9 +56,8 @@ export const BookingTimeSelectScreen = () => {
   const [duration, setDuration] = useState<number>(1); // Default 1 hour
 
   const handleBack = () => {
-      clearDraftBooking();
-      smartGoBack();
-    };
+    smartGoBack();
+  };
 
     const handleNext = () => {
     if (!selectedTime) return;
