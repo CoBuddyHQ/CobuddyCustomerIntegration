@@ -5,29 +5,30 @@ import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_BLOCKED_USERS } from '../../services/mock';
 import { accountApi } from '../../services/api';
+
 
 export const BlockedUsersScreen = () => { 
   const { t } = useTranslation('settings.blockedUsers');
   const { smartGoBack } = useSmartNavigation();
-  const [blockedUsers, setBlockedUsers] = useState(MOCK_BLOCKED_USERS);
+  const [blockedUsers, setBlockedUsers] = useState<{ id: string; name: string; date: string }[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   React.useEffect(() => {
     let isMounted = true;
     accountApi.getBlockedUsers().then(list => {
-      if (isMounted && list && list.length > 0) {
-        setBlockedUsers(list.map(u => ({
+      if (isMounted) {
+        setBlockedUsers((list || []).map(u => ({
           id: u.id,
           name: u.name || 'CoBuddy User',
           date: u.blockedAt ? new Date(u.blockedAt).toLocaleDateString() : 'Recently',
         })));
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => { if (isMounted) setIsLoading(false); });
     return () => { isMounted = false; };
   }, []);
 
-  const handleUnblock = (user: typeof MOCK_BLOCKED_USERS[0]) => {
+  const handleUnblock = (user: { id: string; name: string; date: string }) => {
     Alert.alert(
       t('unblockTitle', 'Unblock User'),
       t('unblockMessage', 'Are you sure you want to unblock {{name}}? They will be able to message you and view your profile again.', { name: user.name }),

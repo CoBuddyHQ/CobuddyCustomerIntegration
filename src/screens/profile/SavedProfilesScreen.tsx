@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -7,7 +7,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { AppBottomSheet } from '../../components/ui/AppBottomSheet';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_SAVED } from '../../services/mock';
+import { discoveryApi } from '../../services/api';
+import type { CompanionCard } from '../../services/api/discovery.api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -15,16 +16,25 @@ export const SavedProfilesScreen = () => {
   const { t } = useTranslation('profile.saved');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
-  const [savedProfiles, setSavedProfiles] = useState(MOCK_SAVED);
-  const [selectedProfile, setSelectedProfile] = useState<typeof MOCK_SAVED[0] | null>(null);
+  const [savedProfiles, setSavedProfiles] = useState<CompanionCard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedProfile, setSelectedProfile] = useState<CompanionCard | null>(null);
   const [showSheet, setShowSheet] = useState(false);
+
+  useEffect(() => {
+    discoveryApi.getFavorites()
+      .then(data => setSavedProfiles(Array.isArray(data) ? data : []))
+      .catch(() => setSavedProfiles([]))
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const handleUnsave = (id: string) => {
     setSavedProfiles(prev => prev.filter(p => p.id !== id));
     setShowSheet(false);
+    discoveryApi.removeFavorite(id).catch(() => {});
   };
 
-  const openOptions = (profile: typeof MOCK_SAVED[0]) => {
+  const openOptions = (profile: CompanionCard) => {
     setSelectedProfile(profile);
     setShowSheet(true);
   };
@@ -46,7 +56,7 @@ export const SavedProfilesScreen = () => {
     </View>
   );
 
-  const renderItem = ({ item }: { item: typeof MOCK_SAVED[0] }) => (
+  const renderItem = ({ item }: { item: CompanionCard }) => (
     <TouchableOpacity 
         style={styles.card} 
         activeOpacity={0.8}
@@ -65,23 +75,23 @@ export const SavedProfilesScreen = () => {
 
         <View style={styles.cardContent}>
             <View style={styles.cardHeader}>
-                <Text style={styles.name}>{item.name}, {item.age}</Text>
-                <Text style={styles.rate}>{item.rate}</Text>
+                <Text style={styles.name}>{item.name}{item.age ? `, ${item.age}` : ''}</Text>
+                <Text style={styles.rate}>{item.rate || '—'}</Text>
             </View>
 
             <View style={styles.statsRow}>
                 <View style={styles.ratingBox}>
                     <Icon name="star" size={14} color={theme.colors.background} />
-                    <Text style={styles.ratingText}>{item.rating}</Text>
+                    <Text style={styles.ratingText}>{item.rating ?? '—'}</Text>
                 </View>
-                <Text style={styles.reviewsText}>({item.reviews} {t('reviews.count', 'reviews')})</Text>
+                <Text style={styles.reviewsText}>({item.reviews ?? 0} {t('reviews.count', 'reviews')})</Text>
                 <View style={styles.dot} />
                 <Icon name="map-marker" size={12} color={theme.colors.textSecondary} />
-                <Text style={styles.locationText} numberOfLines={1}>{item.location}</Text>
+                <Text style={styles.locationText} numberOfLines={1}>{item.city || item.distance || '—'}</Text>
             </View>
 
             <View style={styles.tagsRow}>
-                {item.tags.map((tag: string) => (
+                {(item.activities || []).slice(0, 3).map((tag: string) => (
                     <View key={tag} style={styles.tag}>
                         <Text style={styles.tagText}>{tag}</Text>
                     </View>
@@ -109,7 +119,11 @@ export const SavedProfilesScreen = () => {
         renderItem={renderItem}
         contentContainerStyle={savedProfiles.length === 0 ? styles.emptyList : styles.listContent}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={renderEmpty}
+        ListEmptyComponent={isLoading ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        ) : renderEmpty}
       />
 
       <AppBottomSheet

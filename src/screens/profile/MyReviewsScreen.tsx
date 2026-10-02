@@ -1,15 +1,29 @@
-﻿import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_REVIEWS } from '../../services/mock';
+import { reviewsApi } from '../../services/api';
+import type { Review } from '../../services/api/reviews.api';
 
 export const MyReviewsScreen = () => { 
   const { t } = useTranslation('profile.reviews');
   const { smartGoBack } = useSmartNavigation();
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    reviewsApi.getMyReviews()
+      .then(data => setReviews(Array.isArray(data) ? data : []))
+      .catch(() => setReviews([]))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const avgRating = reviews.length > 0
+    ? (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1)
+    : '—';
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -28,12 +42,16 @@ export const MyReviewsScreen = () => {
         <View style={styles.heroCard}>
             <View style={styles.heroGlow} />
             <Text style={styles.heroSubtitle}>{t('overallScore', 'OVERALL TRUST SCORE')}</Text>
-            <View style={styles.scoreRow}>
-                <Icon name="star" size={32} color={theme.colors.primary} />
-                <Text style={styles.scoreText}>4.8</Text>
-                <Text style={styles.scoreTotal}>/5</Text>
-            </View>
-            <Text style={styles.reviewsCount}>{t('reviews.basedOn', 'Based on ')}{MOCK_REVIEWS.length} {t('reviews.fromCompanions', 'reviews from companions')}</Text>
+            {isLoading ? (
+              <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginVertical: 16 }} />
+            ) : (
+              <View style={styles.scoreRow}>
+                  <Icon name="star" size={32} color={theme.colors.primary} />
+                  <Text style={styles.scoreText}>{avgRating}</Text>
+                  <Text style={styles.scoreTotal}>/5</Text>
+              </View>
+            )}
+            <Text style={styles.reviewsCount}>{t('reviews.basedOn', 'Based on ')}{reviews.length} {t('reviews.fromCompanions', 'reviews from companions')}</Text>
         </View>
 
         <View style={styles.trustBanner}>
@@ -43,7 +61,7 @@ export const MyReviewsScreen = () => {
 
         <Text style={styles.sectionTitle}>{t('recentReviews', 'RECENT REVIEWS')}</Text>
 
-        {MOCK_REVIEWS.length === 0 ? (
+        {reviews.length === 0 && !isLoading ? (
             <View style={styles.emptyState}>
                 <Icon name="star-outline" size={48} color={theme.colors.textSecondary} style={{opacity: 0.5, marginBottom: 16}} />
                 <Text style={styles.emptyTitle}>{t('emptyTitle', 'No reviews yet')}</Text>
@@ -51,24 +69,24 @@ export const MyReviewsScreen = () => {
             </View>
         ) : (
             <View style={styles.reviewsList}>
-                {MOCK_REVIEWS.map(rev => (
+                {reviews.map(rev => (
                     <View key={rev.id} style={styles.reviewCard}>
                         <View style={styles.reviewHeader}>
                             <View style={styles.reviewerInfo}>
                                 <View style={styles.avatarPlaceholder}>
-                                    <Text style={styles.avatarInitials}>{rev.companionName.charAt(0)}</Text>
+                                    <Text style={styles.avatarInitials}>{(rev.companionName || 'C').charAt(0)}</Text>
                                 </View>
                                 <View>
-                                    <Text style={styles.reviewerName}>{rev.companionName}</Text>
-                                    <Text style={styles.reviewDate}>{rev.date}</Text>
+                                    <Text style={styles.reviewerName}>{rev.companionName || t('unknownCompanion', 'Companion')}</Text>
+                                    <Text style={styles.reviewDate}>{new Date(rev.createdAt).toLocaleDateString()}</Text>
                                 </View>
                             </View>
                             <View style={styles.ratingBadge}>
-                                <Text style={styles.ratingText}>{rev.rating}.0</Text>
+                                <Text style={styles.ratingText}>{rev.rating}</Text>
                                 <Icon name="star" size={12} color={theme.colors.primary} />
                             </View>
                         </View>
-                        <Text style={styles.reviewComment}>{rev.comment}</Text>
+                        {rev.text ? <Text style={styles.reviewComment}>{rev.text}</Text> : null}
                     </View>
                 ))}
             </View>

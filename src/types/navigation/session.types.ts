@@ -1,7 +1,7 @@
 export interface SessionStackParamList {
   ActiveSessionScreen: { companionId?: string; companionName?: string } | undefined;
   ArrivalCheckInScreen: { companionId?: string; companionName?: string } | undefined;
-  SessionReminderScreen: undefined;
+  SessionReminderScreen: { bookingId?: string; companionName?: string; time?: string; venue?: string } | undefined;
   SessionCompleteScreen: { companionId?: string; companionName?: string } | undefined;
   PostSessionFeedbackScreen: { companionId?: string; companionName?: string } | undefined;
   TipGratuityScreen: { companionId?: string; companionName?: string } | undefined;

@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_DATA } from '../../services/mock';
+import { bookingApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -14,6 +14,24 @@ export const SessionReminderScreen = () => {
   const { t } = useTranslation('session.reminder');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
+  const route = useRoute<RouteProp<RootStackParamList, 'SessionReminderScreen'>>();
+
+  const [companionName, setCompanionName] = useState(route.params?.companionName || '');
+  const [sessionTime, setSessionTime] = useState(route.params?.time || '');
+  const [venue, setVenue] = useState(route.params?.venue || '');
+
+  useEffect(() => {
+    const bookingId = route.params?.bookingId;
+    if (bookingId && (!companionName || !sessionTime)) {
+      bookingApi.getBookingById(bookingId).then((b: any) => {
+        if (b) {
+          setCompanionName(prev => prev || b.companion?.name || b.companionName || '');
+          setSessionTime(prev => prev || (b.date && b.time ? `${b.date}, ${b.time}` : b.scheduledAt || ''));
+          setVenue(prev => prev || b.location || b.venue || '');
+        }
+      }).catch(() => {});
+    }
+  }, [route.params?.bookingId]);
 
     const SAFETY_TIPS = [
     { icon: 'shield-account-outline', text: t('safetyTip.public', 'Meet in a public place with good lighting.') },
@@ -38,7 +56,7 @@ export const SessionReminderScreen = () => {
         
         <View style={styles.alertBox}>
           <Icon name="clock-outline" size={24} color={theme.colors.primary} />
-          <Text style={styles.alertText}>{t('alertPrefix', 'Your session with ')}{MOCK_DATA.companionName}{t('alertMid', ' starts in ')}<Text style={{fontWeight: 'bold', color: theme.colors.textPrimary}}>{t('alertHours', '2 hours')}</Text>{t('alertSuffix', '.')}</Text>
+          <Text style={styles.alertText}>{t('alertPrefix', 'Your session with ')}{companionName || t('yourCompanion', 'your companion')}{t('alertMid', ' starts in ')}<Text style={{fontWeight: 'bold', color: theme.colors.textPrimary}}>{t('alertHours', '2 hours')}</Text>{t('alertSuffix', '.')}</Text>
         </View>
 
         <View style={styles.card}>
@@ -47,13 +65,13 @@ export const SessionReminderScreen = () => {
             <View style={styles.iconCircleSm}>
               <Icon name="calendar-clock" size={16} color={theme.colors.primary} />
             </View>
-            <Text style={styles.detailText}>{MOCK_DATA.time}</Text>
+            <Text style={styles.detailText}>{sessionTime || t('timeNotSet', 'Time TBD')}</Text>
           </View>
           <View style={styles.detailRow}>
             <View style={styles.iconCircleSm}>
               <Icon name="map-marker" size={16} color={theme.colors.primary} />
             </View>
-            <Text style={styles.detailText}>{MOCK_DATA.venue}</Text>
+            <Text style={styles.detailText}>{venue || t('venueNotSet', 'Venue TBD')}</Text>
           </View>
           
           <View style={styles.mapPlaceholder}>

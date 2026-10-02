@@ -22,10 +22,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /**
- * BASE_URL for Android Emulator: use 10.0.2.2 to reach host localhost.
- * For physical device: replace with your LAN IP e.g. 'http://192.168.1.X:4002/api/v1'
+ * Production Azure App Service — India South Central.
+ * This is used for BOTH release builds AND debug builds running on the emulator
+ * that should connect to the deployed Azure backend.
+ *
+ * ⚠️  LOCAL DEV OVERRIDE: If you are running the backend locally on port 4002
+ *     and want the emulator to connect to it, change AZURE_API_URL to:
+ *       'http://10.0.2.2:4002/api/v1'      (Android emulator)
+ *       'http://localhost:4002/api/v1'      (iOS Simulator)
+ *
+ * ⚠️  Never commit real secrets (.env, JWT keys, DB passwords) here.
+ *     The base URL is not a secret — it appears in every network request.
  */
-export const BASE_URL = 'http://10.0.2.2:4002/api/v1';
+const AZURE_API_URL = 'https://cobuddy-customer-api-avinash-gshhhhfbdrf2dab4.indiasouthcentral-01.azurewebsites.net/api/v1';
+
+export const BASE_URL: string = AZURE_API_URL;
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'cb_access_token',

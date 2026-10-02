@@ -7,8 +7,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { adminValues } from '../../config/adminValues';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_PROFILE } from '../../services/mock';
 import { profileApi } from '../../services/api';
+import { useAuthStore } from '../../store/slices/authStore';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -19,27 +19,33 @@ export const EditProfileScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'EditProfileScreen'>>();
   
+  const { user } = useAuthStore();
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [form, setForm] = useState({
-      name: MOCK_PROFILE.name,
-      bio: MOCK_PROFILE.bio,
-      city: MOCK_PROFILE.city,
-      languages: MOCK_PROFILE.languages,
-      langIds: MOCK_PROFILE.langIds,
-      interests: MOCK_PROFILE.interests.map((i) => INTERESTS_DATA.find((d) => d.id === i.id) || i),
+      name: '',
+      bio: '',
+      city: '',
+      languages: [] as string[],
+      langIds: [] as string[],
+      interests: [] as { id: string; label: string; icon: string }[],
   });
 
   useEffect(() => {
+    setIsLoadingProfile(true);
     profileApi.getProfile().then(p => {
       if (p) {
         setForm(prev => ({
           ...prev,
-          name: p.name || prev.name,
-          bio: p.bio || prev.bio,
-          city: p.city || prev.city,
+          name: p.name || '',
+          bio: p.bio || '',
+          city: p.city || '',
+          languages: p.spokenLanguages || [],
+          langIds: p.spokenLanguages || [],
+          interests: (p.interests || []).map((id: string) => INTERESTS_DATA.find(d => d.id === id) || { id, label: id, icon: 'star' }),
         }));
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setIsLoadingProfile(false));
   }, []);
 
   // Handle incoming params from sub-screens (Location, Interests, Languages)
@@ -201,7 +207,7 @@ export const EditProfileScreen = () => {
             <View style={styles.formSection}>
                 <View style={styles.rowHeader}>
                     <Text style={[styles.sectionTitle, {marginBottom: 0}]}>{t('lockedDemographics', 'LOCKED DEMOGRAPHICS')}</Text>
-                    {MOCK_PROFILE.kycVerified && (
+                    {user?.kycStatus === 'verified' && (
                         <View style={styles.kycBadge}>
                             <Icon name="shield-check" size={12} color={theme.colors.success} />
                             <Text style={styles.kycBadgeText}>{t('kycVerified', 'KYC Verified')}</Text>
@@ -214,7 +220,7 @@ export const EditProfileScreen = () => {
                         <Text style={styles.lockedLabel}>{t('gender', 'Gender')}</Text>
                         <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
                             <Icon name="lock" size={14} color={theme.colors.textSecondary} />
-                            <Text style={styles.lockedValue}>{MOCK_PROFILE.gender}</Text>
+                            <Text style={styles.lockedValue}>{user?.gender || t('notSet', '—')}</Text>
                         </View>
                     </View>
                     <View style={styles.lockedDivider} />
@@ -222,11 +228,11 @@ export const EditProfileScreen = () => {
                         <Text style={styles.lockedLabel}>{t('age', 'Age')}</Text>
                         <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
                             <Icon name="lock" size={14} color={theme.colors.textSecondary} />
-                            <Text style={styles.lockedValue}>{MOCK_PROFILE.age} {t('units.yrs', 'yrs')}</Text>
+                            <Text style={styles.lockedValue}>{user?.age ? `${user.age} ${t('units.yrs', 'yrs')}` : t('notSet', '—')}</Text>
                         </View>
                     </View>
                 </View>
-                {MOCK_PROFILE.kycVerified && (
+                {user?.kycStatus === 'verified' && (
                     <Text style={styles.helperTextLocked}>{t('lockedNotice', 'These details are locked for safety after KYC verification. Contact support to change.')}</Text>
                 )}
             </View>

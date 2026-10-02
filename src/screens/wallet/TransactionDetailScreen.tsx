@@ -1,12 +1,13 @@
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { useTranslation } from 'react-i18next';
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
-import { MOCK_TRANSACTION_DETAILS } from '../../services/mock';
+import { walletApi } from '../../services/api';
+import type { Transaction } from '../../services/api/wallet.api';
 import { RootStackParamList } from '../../types/navigation';
 
 
@@ -14,9 +15,39 @@ export const TransactionDetailScreen = () => {
   const { t } = useTranslation('wallet.transactionDetail');
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'TransactionDetailScreen'>>();
-  const tx = MOCK_TRANSACTION_DETAILS[route.params?.transactionId || 'tx_002'];
+  const [tx, setTx] = useState<Transaction | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
-  if (!tx) {
+  useEffect(() => {
+    const id = route.params?.transactionId;
+    if (!id) { setNotFound(true); setIsLoading(false); return; }
+    walletApi.getTransaction(id)
+      .then(data => { setTx(data); })
+      .catch(() => { setNotFound(true); })
+      .finally(() => setIsLoading(false));
+  }, [route.params?.transactionId]);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => smartGoBack()} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11yGoBack', 'Go back')}>
+            <Icon name="arrow-left" size={24} color={theme.colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('headerTitle', 'Transaction Details')}</Text>
+          <View style={styles.backBtn} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (notFound || !tx) {
+
     return (
       <SafeAreaView style={styles.root} edges={['top']}>
         <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
