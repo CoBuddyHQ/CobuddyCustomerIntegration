@@ -6,9 +6,16 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { GUIDELINES } from '../../services/mock';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+const GUIDELINES = [
+  { id: 'g1', icon: 'map-marker-radius', titleKey: 'guideline.g1.title', defaultTitle: 'Meet in Public Places', descKey: 'guideline.g1.desc', defaultDesc: 'Always arrange your first meetup in a well-lit, public location like a café, mall, or popular tourist spot. Avoid secluded areas or private residences.' },
+  { id: 'g2', icon: 'shield-account', titleKey: 'guideline.g2.title', defaultTitle: 'Verify Their Identity', descKey: 'guideline.g2.desc', defaultDesc: 'Look for the "Identity Verified" badge on their profile. Trust your instincts—if a profile seems fake or suspicious, report it immediately.' },
+  { id: 'g3', icon: 'share-variant', titleKey: 'guideline.g3.title', defaultTitle: 'Share Your Plans', descKey: 'guideline.g3.desc', defaultDesc: 'Use the "Trusted Contacts" feature to automatically share your live location and meetup details with a friend or family member.' },
+  { id: 'g4', icon: 'car', titleKey: 'guideline.g4.title', defaultTitle: 'Control Your Transport', descKey: 'guideline.g4.desc', defaultDesc: 'Always be in control of how you get to and from the meetup. Do not rely entirely on the companion for transportation.' },
+  { id: 'g5', icon: 'message-text-lock', titleKey: 'guideline.g5.title', defaultTitle: 'Keep Chat on CoBuddy', descKey: 'guideline.g5.desc', defaultDesc: 'Do not move your conversation to WhatsApp or SMS before meeting. Our chat filters protect you from scams and inappropriate content.' },
+];
 
 export const SafetyGuidelinesScreen = () => { 
   const { t } = useTranslation('safety.guidelines');
