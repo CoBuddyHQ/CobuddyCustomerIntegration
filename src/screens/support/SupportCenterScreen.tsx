@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { MOCK_TICKETS } from '../../services/mock/support.mock';
+import { supportApi } from '../../services/api';
+import type { SupportTicket } from '../../services/api/support.api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -15,17 +16,39 @@ export const SupportCenterScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const [activeTab, setActiveTab] = useState<'Active' | 'Closed'>('Active');
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredTickets = MOCK_TICKETS.filter(t => 
-    activeTab === 'Active' ? (t.status === 'Open' || t.status === 'In Progress') : t.status === 'Closed'
+  useEffect(() => {
+    supportApi.listTickets()
+      .then(data => setTickets(Array.isArray(data) ? data : []))
+      .catch(() => setTickets([]))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const filteredTickets = tickets.filter(ticket =>
+    activeTab === 'Active'
+      ? (ticket.status === 'open' || ticket.status === 'in_progress')
+      : (ticket.status === 'resolved' || ticket.status === 'closed')
   );
 
   const getStatusColor = (status: string) => {
     switch(status) {
-      case 'Open': return theme.colors.error;
-      case 'In Progress': return theme.colors.primary;
-      case 'Closed': return theme.colors.success;
+      case 'open': return theme.colors.error;
+      case 'in_progress': return theme.colors.primary;
+      case 'resolved': return theme.colors.success;
+      case 'closed': return theme.colors.textSecondary;
       default: return theme.colors.textSecondary;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch(status) {
+      case 'open': return 'Open';
+      case 'in_progress': return 'In Progress';
+      case 'resolved': return 'Resolved';
+      case 'closed': return 'Closed';
+      default: return status;
     }
   };
 
@@ -70,7 +93,11 @@ export const SupportCenterScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {filteredTickets.length === 0 ? (
+        {isLoading ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        ) : filteredTickets.length === 0 ? (
           <View style={styles.emptyState}>
             <Icon name="ticket-confirmation-outline" size={48} color={theme.colors.textSecondary} style={{opacity: 0.5, marginBottom: 16}} />
             <Text style={styles.emptyTitle}>{t('noTickets', 'No {{tab}} tickets', { tab: activeTab.toLowerCase() })}</Text>
@@ -87,13 +114,13 @@ export const SupportCenterScreen = () => {
               >
                 <View style={styles.ticketHeader}>
                   <View style={styles.ticketMeta}>
-                    <Text style={styles.ticketId}>{ticket.id}</Text>
+                    <Text style={styles.ticketId}>{ticket.id.slice(0, 8).toUpperCase()}</Text>
                     <View style={styles.dot} />
-                    <Text style={styles.ticketDate}>{ticket.date}</Text>
+                    <Text style={styles.ticketDate}>{new Date(ticket.createdAt).toLocaleDateString()}</Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(ticket.status)}15` }]}>
                     <View style={[styles.statusDot, { backgroundColor: getStatusColor(ticket.status) }]} />
-                    <Text style={[styles.statusText, { color: getStatusColor(ticket.status) }]}>{t(`status.${ticket.status}`, ticket.status)}</Text>
+                    <Text style={[styles.statusText, { color: getStatusColor(ticket.status) }]}>{t(`status.${ticket.status}`, getStatusLabel(ticket.status))}</Text>
                   </View>
                 </View>
 
