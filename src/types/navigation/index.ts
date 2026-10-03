@@ -45,6 +45,7 @@ export type RootStackParamList = {
   CancelBookingScreen: { bookingId?: string } | undefined;
   ModifyBookingScreen: { bookingId?: string } | undefined;
   DisputeRefundScreen: { bookingId?: string } | undefined;
+  PaymentScreen: { bookingId?: string; amount?: number; companionName?: string; activityName?: string } | undefined;
   ChatListScreen: undefined;
   CompanionChatScreen: { companionName?: string; bookingId?: string; companionId?: string } | undefined;
   ConciergeChatScreen: undefined;
@@ -71,7 +72,7 @@ export type RootStackParamList = {
   SafetySettingsScreen: undefined;
   ActiveSessionScreen: { companionId?: string; companionName?: string } | undefined;
   ArrivalCheckInScreen: { companionId?: string; companionName?: string } | undefined;
-  SessionReminderScreen: undefined;
+  SessionReminderScreen: { bookingId?: string; companionName?: string; time?: string; venue?: string } | undefined;
   SessionCompleteScreen: { companionId?: string; companionName?: string } | undefined;
   PostSessionFeedbackScreen: { companionId?: string; companionName?: string } | undefined;
   TipGratuityScreen: { companionId?: string; companionName?: string } | undefined;

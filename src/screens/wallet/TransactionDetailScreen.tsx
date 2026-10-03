@@ -147,19 +147,21 @@ export const TransactionDetailScreen = () => {
         ) : null}
 
         
-        <View style={styles.card}>
+        {tx.breakdown && tx.breakdown.length > 0 ? (
+          <View style={styles.card}>
             <Text style={styles.sectionTitle}>{t('breakdownTitle', 'PAYMENT BREAKDOWN')}</Text>
-            {tx.breakdown.map((item: typeof tx.breakdown[0], i: number) => (
-                <View key={item.label} style={[styles.summaryRow, i !== tx.breakdown.length - 1 && styles.summaryBorder]}>
-                    <Text style={styles.summaryLabel}>{t(`breakdownLabels.${item.label}`, String(item.label))}</Text>
-                    <Text style={styles.summaryValue}>{item.value}</Text>
-                </View>
+            {tx.breakdown.map((item: { label: string; value: string }, i: number) => (
+              <View key={item.label} style={[styles.summaryRow, i !== (tx.breakdown?.length ?? 0) - 1 && styles.summaryBorder]}>
+                <Text style={styles.summaryLabel}>{t(`breakdownLabels.${item.label}`, String(item.label))}</Text>
+                <Text style={styles.summaryValue}>{item.value}</Text>
+              </View>
             ))}
             <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>{t('totalLabel', 'TOTAL')}</Text>
-                <Text style={styles.totalValue}>{tx.amount.replace('-', '').replace('+', '')}</Text>
+              <Text style={styles.totalLabel}>{t('totalLabel', 'TOTAL')}</Text>
+              <Text style={styles.totalValue}>{String(tx.amount).replace('-', '').replace('+', '')}</Text>
             </View>
-        </View>
+          </View>
+        ) : null}
 
         
         <TouchableOpacity style={styles.downloadBtn} activeOpacity={0.8} onPress={handleDownload} accessibilityRole="button" accessibilityLabel={t('a11yDownloadReceipt', 'Download Receipt')}>

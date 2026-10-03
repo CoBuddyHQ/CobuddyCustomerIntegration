@@ -30,4 +30,5 @@ export interface BookingStackParamList {
   CancelBookingScreen: { bookingId?: string } | undefined;
   ModifyBookingScreen: { bookingId?: string } | undefined;
   DisputeRefundScreen: { bookingId?: string } | undefined;
+  PaymentScreen: { bookingId?: string; amount?: number; companionName?: string; activityName?: string } | undefined;
 };

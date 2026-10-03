@@ -159,24 +159,47 @@ export const BookingDetailScreen = () => {
     }
     
     if (data.status === 'Accepted') {
+      const isPaid = (apiBooking as any)?.paymentStatus === 'completed' || (apiBooking as any)?.paymentStatus === 'paid';
+
       return (
         <View style={styles.actionCol}>
-          {/* Active OTP Button for Meetup Day */}
-          <View>
-            <TouchableOpacity 
-              style={styles.primaryBtn} 
-              onPress={() => navigation.navigate('LiveSessionStack', {
+          {!isPaid ? (
+            <View>
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={() => navigation.navigate('PaymentScreen', {
+                  bookingId: data.id,
+                  amount: typeof data.total === 'string' ? parseInt(data.total.replace(/[^\d]/g, ''), 10) : data.total,
+                  companionName: data.companionName,
+                  activityName: data.activity,
+                })}
+                accessibilityRole="button"
+                accessibilityLabel="Proceed to Escrow Payment"
+              >
+                <Icon name="shield-check" size={18} color={theme.colors.background} />
+                <Text style={styles.primaryBtnText}>Proceed to Escrow Payment ({data.total})</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+                Funds are held in secure escrow until session completion.
+              </Text>
+            </View>
+          ) : (
+            <View>
+              <TouchableOpacity 
+                style={styles.primaryBtn} 
+                onPress={() => navigation.navigate('LiveSessionStack', {
        screen: 'ArrivalCheckInScreen',
        params: { companionId: data.companionId, companionName: data.companionName, bookingId: data.id } as any,
      })} accessibilityRole="button" accessibilityLabel={t('a11yViewUpcomingMeetup', 'View Upcoming Meetup')}
-            >
-              <Icon name="key" size={18} color={theme.colors.background} />
-              <Text style={styles.primaryBtnText}>{t('viewUpcoming', 'View Upcoming Meetup')}</Text>
-            </TouchableOpacity>
-            <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
-              {t('unlockedText', 'Unlocked! Share this with your companion upon meeting.')}
-            </Text>
-          </View>
+              >
+                <Icon name="key" size={18} color={theme.colors.background} />
+                <Text style={styles.primaryBtnText}>{t('viewUpcoming', 'View Upcoming Meetup')}</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+                {t('unlockedText', 'Unlocked! Share this with your companion upon meeting.')}
+              </Text>
+            </View>
+          )}
 
           <View style={styles.actionRow}>
             <TouchableOpacity style={[styles.secondaryBtn, { flex: 1, backgroundColor: 'rgba(212, 175, 55, 0.1)', borderColor: theme.colors.primary }]} onPress={handleMessage} accessibilityRole="button" accessibilityLabel={t('a11yMessage', 'Message')}>

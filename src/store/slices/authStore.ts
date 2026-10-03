@@ -10,6 +10,7 @@
  */
 
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, profileApi, TokenStorage, setLogoutListener } from '../../services/api';
 import type { CustomerFromAuth } from '../../services/api';
 
@@ -228,6 +229,17 @@ export const useAuthStore = create<AuthState>((set, get) => {
       } catch {
         // Best-effort — always clear local state even if backend call fails
       } finally {
+        try {
+          const user = get().user;
+          const keysToRemove = ['cb_active_screen'];
+          if (user?.id) {
+            const flows = ['ONBOARDING', 'KYC', 'BOOKING', 'SESSION', 'PAYMENT'];
+            flows.forEach((f) => keysToRemove.push(`cb_flow_state_${user.id}_${f}`));
+          }
+          await Promise.all(keysToRemove.map((k) => AsyncStorage.removeItem(k)));
+        } catch {
+          // Non-critical
+        }
         await TokenStorage.clearAll();
         get()._clearAuth();
         set({ isLoading: false });
@@ -271,13 +283,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
           // Network failure or server delay - preserve cached session if present
           try {
             const token = await TokenStorage.getAccessToken();
-            const user = await TokenStorage.getUser<AuthUser>();
+            const user = await TokenStorage.getUser<AuthUser & { isOnboardingComplete?: boolean }>();
             if (token && user) {
               set({
                 token,
                 user,
                 isAuthenticated: true,
-                isOnboardingComplete: true,
+                isOnboardingComplete: Boolean(user.isOnboardingComplete ?? false),
                 kycStatus: user.kycStatus as any,
                 isHydrated: true,
               });

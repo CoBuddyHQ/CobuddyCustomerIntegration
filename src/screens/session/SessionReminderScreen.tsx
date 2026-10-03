@@ -23,11 +23,11 @@ export const SessionReminderScreen = () => {
   useEffect(() => {
     const bookingId = route.params?.bookingId;
     if (bookingId && (!companionName || !sessionTime)) {
-      bookingApi.getBookingById(bookingId).then((b: any) => {
+      bookingApi.getBooking(bookingId).then((b: any) => {
         if (b) {
-          setCompanionName(prev => prev || b.companion?.name || b.companionName || '');
-          setSessionTime(prev => prev || (b.date && b.time ? `${b.date}, ${b.time}` : b.scheduledAt || ''));
-          setVenue(prev => prev || b.location || b.venue || '');
+          setCompanionName((prev: string) => prev || b.companion?.name || b.companionName || '');
+          setSessionTime((prev: string) => prev || (b.date && b.time ? `${b.date}, ${b.time}` : b.scheduledAt || ''));
+          setVenue((prev: string) => prev || (typeof b.venue === 'object' ? b.venue?.name : b.venue) || b.location || '');
         }
       }).catch(() => {});
     }

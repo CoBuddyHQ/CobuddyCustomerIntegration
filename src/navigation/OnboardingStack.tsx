@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { theme } from '../theme';
 import { FlowTracker } from '../services/flowTracker';
+import { useAuthStore } from '../store/slices/authStore';
 
 import { LegalConsentScreen } from '../screens/onboarding/LegalConsentScreen';
 import { LocationPermissionScreen } from '../screens/auth/LocationPermissionScreen';
@@ -22,7 +23,11 @@ export const OnboardingStack = () => {
     const resolveStep = async () => {
       const result = await FlowTracker.reconcileOnboarding();
       if (isMounted) {
-        setInitialRoute(result.screenName === 'MainTabNavigator' ? 'TrustedContactsScreen' : result.screenName);
+        if (result.screenName === 'MainTabNavigator' || result.isOnboardingComplete) {
+          useAuthStore.setState({ isOnboardingComplete: true });
+        } else {
+          setInitialRoute(result.screenName || 'LegalConsentScreen');
+        }
       }
     };
     resolveStep();

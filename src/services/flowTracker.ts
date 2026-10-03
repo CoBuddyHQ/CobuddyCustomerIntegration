@@ -103,6 +103,17 @@ export const FlowTracker = {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
+   * Clear active screen key from storage
+   */
+  async clearActiveScreen(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(ACTIVE_SCREEN_KEY);
+    } catch {
+      // Non-critical
+    }
+  },
+
+  /**
    * Reconcile Onboarding flow against backend authoritative state.
    * Returns exact next screen to render.
    */
@@ -113,16 +124,15 @@ export const FlowTracker = {
     currentStep: string;
   }> {
     try {
-      // Check if user was already on an active screen in this session
-      const lastScreen = await this.getActiveScreen();
-
       const progress = await profileApi.getOnboardingProgress();
       const authStore = useAuthStore.getState();
 
       if (progress.isOnboardingComplete) {
         if (!authStore.isOnboardingComplete) {
-          authStore.updateUser({ ...progress.customer });
+          authStore.updateUser({ ...progress.customer, isOnboardingComplete: true } as any);
+          useAuthStore.setState({ isOnboardingComplete: true });
         }
+        await this.clearActiveScreen();
         return {
           screenName: 'MainTabNavigator',
           isOnboardingComplete: true,
@@ -147,8 +157,9 @@ export const FlowTracker = {
 
       let targetScreen = stepToScreen[backendStep] || 'LegalConsentScreen';
 
-      // If user had a last active screen and it's valid for current progress, stay on it!
-      const validOnboardingScreens = [
+      // Check if user was already on an active screen in this session
+      const lastScreen = await this.getActiveScreen();
+      const stepOrder = [
         'LegalConsentScreen',
         'LocationPermissionScreen',
         'NotificationPermissionScreen',
@@ -157,8 +168,14 @@ export const FlowTracker = {
         'SafetyTutorialScreen',
         'TrustedContactsScreen',
       ];
-      if (lastScreen && validOnboardingScreens.includes(lastScreen)) {
-        targetScreen = lastScreen as any;
+      const backendIndex = stepOrder.indexOf(targetScreen);
+
+      // Only allow lastScreen if it does not skip ahead of uncompleted steps
+      if (lastScreen && stepOrder.includes(lastScreen)) {
+        const lastIndex = stepOrder.indexOf(lastScreen);
+        if (lastIndex <= backendIndex && lastIndex >= 0) {
+          targetScreen = lastScreen as any;
+        }
       }
 
       this.log('ONBOARDING', targetScreen, 'reconcileOnboarding', 'SUCCESS', { completed, backendStep, lastScreen });

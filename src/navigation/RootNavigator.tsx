@@ -13,6 +13,7 @@ import { BookingFlowStack } from './BookingFlowStack';
 import { KYCStack } from './KYCStack';
 import { LiveSessionStack } from './LiveSessionStack';
 import { SafetySupportStack } from './SafetySupportStack';
+import { PaymentScreen } from '../screens/booking/PaymentScreen';
 
 import { useAuthStore } from '../store/slices/authStore';
 
@@ -61,6 +62,7 @@ export const RootNavigator = () => {
       <Stack.Screen name="KYCStack" component={KYCStack} options={{ presentation: 'modal' }} />
       <Stack.Screen name="LiveSessionStack" component={LiveSessionStack} options={{ presentation: 'modal' }} />
       <Stack.Screen name="SafetySupportStack" component={SafetySupportStack} options={{ presentation: 'modal' }} />
+      <Stack.Screen name="PaymentScreen" component={PaymentScreen} options={{ presentation: 'modal' }} />
     </Stack.Navigator>
   );
 };

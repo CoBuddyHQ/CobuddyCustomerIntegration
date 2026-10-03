@@ -15,6 +15,7 @@ import { BookingDetailScreen } from '../screens/bookings/BookingDetailScreen';
 import { CancelBookingScreen } from '../screens/bookings/CancelBookingScreen';
 import { ModifyBookingScreen } from '../screens/bookings/ModifyBookingScreen';
 import { DisputeRefundScreen } from '../screens/bookings/DisputeRefundScreen';
+import { PaymentScreen } from '../screens/booking/PaymentScreen';
 import { ChatListScreen } from '../screens/chat/ChatListScreen';
 import { ConciergeChatScreen } from '../screens/chat/ConciergeChatScreen';
 import { CompanionChatScreen } from '../screens/chat/CompanionChatScreen';
@@ -85,6 +86,7 @@ const BookingsTabStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="BookingsListScreen" component={BookingsListScreen} />
       <Stack.Screen name="BookingDetailScreen" component={BookingDetailScreen} />
+      <Stack.Screen name="PaymentScreen" component={PaymentScreen} />
       <Stack.Screen name="CancelBookingScreen" component={CancelBookingScreen} />
       <Stack.Screen name="ModifyBookingScreen" component={ModifyBookingScreen} />
       <Stack.Screen name="DisputeRefundScreen" component={DisputeRefundScreen} />

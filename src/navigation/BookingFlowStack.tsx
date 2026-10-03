@@ -11,6 +11,7 @@ import { BookingDeclinedScreen } from '../screens/booking/alerts/BookingDeclined
 import { BookingCounterOfferScreen } from '../screens/booking/alerts/BookingCounterOfferScreen';
 import { BookingDetailScreen } from '../screens/bookings/BookingDetailScreen';
 import { CompanionChatScreen } from '../screens/chat/CompanionChatScreen';
+import { PaymentScreen } from '../screens/booking/PaymentScreen';
 
 const Stack = createStackNavigator();
 
@@ -27,6 +28,7 @@ export const BookingFlowStack = () => {
       <Stack.Screen name="BookingCounterOfferScreen" component={BookingCounterOfferScreen} />
       <Stack.Screen name="BookingDetailScreen" component={BookingDetailScreen} />
       <Stack.Screen name="CompanionChatScreen" component={CompanionChatScreen} />
+      <Stack.Screen name="PaymentScreen" component={PaymentScreen} />
     </Stack.Navigator>
   );
 };
