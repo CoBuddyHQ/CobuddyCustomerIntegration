@@ -5,5 +5,6 @@ module.exports = {
   ],
   setupFiles: [
     'react-native-gesture-handler/jestSetup',
+    './jest.setup.js',
   ],
 };

@@ -170,10 +170,11 @@ export const FlowTracker = {
       ];
       const backendIndex = stepOrder.indexOf(targetScreen);
 
-      // Only allow lastScreen if it does not skip ahead of uncompleted steps
+      // Backend authoritative step always takes precedence.
+      // Only keep lastScreen if it matches the exact current backend step.
       if (lastScreen && stepOrder.includes(lastScreen)) {
         const lastIndex = stepOrder.indexOf(lastScreen);
-        if (lastIndex <= backendIndex && lastIndex >= 0) {
+        if (lastIndex === backendIndex) {
           targetScreen = lastScreen as any;
         }
       }
@@ -233,17 +234,17 @@ export const FlowTracker = {
         screenName = 'VerificationPendingScreen';
       }
 
-      const validKycScreens = [
-        'KYCIntroScreen',
-        'DocumentVerificationScreen',
-        'SelfieCaptureScreen',
-        'LivenessDetectionScreen',
-        'VerificationPendingScreen',
-        'VerificationSuccessScreen',
-        'VerificationRejectedScreen',
-      ];
-      if (lastScreen && validKycScreens.includes(lastScreen)) {
-        screenName = lastScreen as any;
+      // Backend authoritative state wins: never allow lastScreen to reopen a completed step
+      if (lastScreen) {
+        if (lastScreen === 'KYCIntroScreen' && !documentSubmitted) {
+          screenName = 'KYCIntroScreen';
+        } else if (lastScreen === 'DocumentVerificationScreen' && !documentSubmitted) {
+          screenName = 'DocumentVerificationScreen';
+        } else if (lastScreen === 'SelfieCaptureScreen' && documentSubmitted && !selfieSubmitted) {
+          screenName = 'SelfieCaptureScreen';
+        } else if (lastScreen === 'LivenessDetectionScreen' && selfieSubmitted && !livenessSubmitted) {
+          screenName = 'LivenessDetectionScreen';
+        }
       }
 
       this.log('KYC', screenName, 'reconcileKyc', 'SUCCESS', { status, documentSubmitted, selfieSubmitted, livenessSubmitted, lastScreen });
