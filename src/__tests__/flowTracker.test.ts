@@ -18,7 +18,6 @@ jest.mock('../services/api', () => ({
     clearTokens: jest.fn(),
   },
 }));
-
 describe('FlowTracker Unit Tests', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
