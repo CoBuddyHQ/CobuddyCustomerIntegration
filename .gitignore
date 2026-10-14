@@ -98,4 +98,13 @@ GoogleService-Info.plist
 release.keystore
 *.jks
 
+# Audit reports, system dumps, and patches
+*AUDIT*.md
+AUDIT_*.md
+*REPORT*.md
+*.patch
+*.diff
+*.zip
+bugreport*
+
 
