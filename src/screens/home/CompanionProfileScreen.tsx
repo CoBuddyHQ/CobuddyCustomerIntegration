@@ -8,7 +8,6 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
 import { AppBottomSheet } from '../../components/ui/AppBottomSheet';
-import { DUMMY_PROFILE, DUMMY_COMPANIONS, DUMMY_FEATURED } from '../../services/mock';
 import { discoveryApi, accountApi, CompanionDetail as CompanionDetailType } from '../../services/api';
 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -22,35 +21,34 @@ const VERIFICATION_LABEL_KEYS: Record<string, string> = {
   'Background Checked': 'badges.background_checked',
 };
 
-// Dummy data enhanced with details
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../types/navigation';
 
+const EMPTY_REVIEWS = { average: 5.0, count: 0, categories: { punctuality: 5.0, communication: 5.0, behavior: 5.0 }, items: [] };
+
 export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackParamList, 'CompanionProfileScreen'> }) => {
   const { companionId } = route?.params || {};
-  const matchedCompanion = [...DUMMY_COMPANIONS, ...DUMMY_FEATURED].find(c => c.id === companionId);
 
   const [apiProfile, setApiProfile] = useState<CompanionDetailType | null>(null);
   const profile = apiProfile
     ? {
-        ...DUMMY_PROFILE,
         ...apiProfile,
-        name: apiProfile.name || matchedCompanion?.name || DUMMY_PROFILE.name,
-        trustScore: apiProfile.trustScore ?? matchedCompanion?.trustScore ?? DUMMY_PROFILE.trustScore,
-        distance: apiProfile.distance || matchedCompanion?.distance || DUMMY_PROFILE.distance,
-        bio: apiProfile.bio || DUMMY_PROFILE.bio,
-        photos: apiProfile.photos && apiProfile.photos.length > 0 ? apiProfile.photos : DUMMY_PROFILE.photos,
+        name: apiProfile.name || 'Companion',
+        photos: apiProfile.photos && apiProfile.photos.length > 0 ? apiProfile.photos : (apiProfile.avatar ? [apiProfile.avatar] : []),
+        languages: apiProfile.languages || [],
+        personality: apiProfile.personality || [],
+        hobbies: apiProfile.hobbies || [],
+        rules: apiProfile.rules || ['Public places only'],
+        pricing: apiProfile.pricing || [
+          { activity: 'Experience', price: `₹${apiProfile.rate || '500'}`, icon: 'coffee-outline' },
+        ],
+        verifications: apiProfile.verifications || [
+          { label: 'ID Verified', icon: 'badge-account-horizontal-outline', color: '#10B981' },
+          { label: 'Phone Verified', icon: 'phone-check-outline', color: '#10B981' },
+        ],
+        reviews: apiProfile.reviews || EMPTY_REVIEWS,
       }
-    : matchedCompanion
-    ? {
-        ...DUMMY_PROFILE,
-        name: matchedCompanion.name,
-        trustScore: matchedCompanion.trustScore,
-        distance: matchedCompanion.distance,
-        reviews: { ...DUMMY_PROFILE.reviews, count: matchedCompanion.reviews },
-        completedSessions: matchedCompanion.sessions,
-      }
-    : DUMMY_PROFILE;
+    : null;
   const { t } = useTranslation(['companionProfile']);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
@@ -201,6 +199,23 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
           </View>
           <SkeletonLoader width={160} height={48} borderRadius={24} />
         </View>
+      </View>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+        <Icon name="account-search-outline" size={64} color={theme.colors.textSecondary} style={{ marginBottom: 16 }} />
+        <Text style={[styles.heroName, { fontSize: 20, textAlign: 'center', marginBottom: 8 }]}>Companion Not Found</Text>
+        <Text style={{ color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+          This companion profile is currently unavailable or does not exist.
+        </Text>
+        <TouchableOpacity
+          style={styles.requestBtn}
+          onPress={() => smartGoBack('DiscoverTab')}>
+          <Text style={styles.requestBtnText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }

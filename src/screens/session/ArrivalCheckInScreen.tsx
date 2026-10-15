@@ -155,9 +155,9 @@ export const ArrivalCheckInScreen = () => {
         <View style={styles.bottomBar}>
           <TouchableOpacity 
             style={styles.primaryBtn} 
-            onPress={() => navigation.navigate('ActiveSessionScreen', { companionId, companionName })} accessibilityRole="button" accessibilityLabel={t('a11yMockCompanionEnteredOtp', '[MOCK] Companion entered OTP')}
+            onPress={() => navigation.navigate('ActiveSessionScreen', { companionId, companionName })} accessibilityRole="button" accessibilityLabel={t('a11yContinueToActiveSession', 'Continue to Active Session')}
           >
-            <Text style={styles.primaryBtnText}>{t('mockOtp', '[MOCK] Companion entered OTP')}</Text>
+            <Text style={styles.primaryBtnText}>{t('continueSession', 'Continue to Active Session')}</Text>
           </TouchableOpacity>
         </View>
       )}

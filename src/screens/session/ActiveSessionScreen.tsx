@@ -15,7 +15,7 @@ export const ActiveSessionScreen = () => {
   const route = useRoute<any>();
   const [sessionData, setSessionData] = useState<any>(null);
   const companionId = route.params?.companionId || sessionData?.companionId;
-  const companionName = route.params?.companionName || sessionData?.companionName || sessionData?.booking?.companionName || 'Elena Vasquez';
+  const companionName = route.params?.companionName || sessionData?.companionName || sessionData?.booking?.companionName || 'Companion';
   const [etiquetteVisible, setEtiquetteVisible] = useState(true);
   
   // Timer State (in seconds)

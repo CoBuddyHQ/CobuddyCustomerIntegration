@@ -26,6 +26,7 @@ export const EditProfileScreen = () => {
       name: '',
       bio: '',
       city: '',
+      avatarUrl: user?.avatar || '',
       languages: [] as string[],
       langIds: [] as string[],
       interests: [] as { id: string; label: string; icon: string }[],
@@ -40,6 +41,7 @@ export const EditProfileScreen = () => {
           name: p.name || '',
           bio: p.bio || '',
           city: p.city || '',
+          avatarUrl: p.avatar || user?.avatar || '',
           languages: p.spokenLanguages || [],
           langIds: p.spokenLanguages || [],
           interests: (p.interests || []).map((id: string) => INTERESTS_DATA.find(d => d.id === id) || { id, label: id, icon: 'star' }),
@@ -119,7 +121,13 @@ export const EditProfileScreen = () => {
             
             <View style={styles.avatarSection}>
                 <View style={styles.avatarWrap}>
-                    <Image source={{uri: 'https://i.pravatar.cc/300?img=11'}} style={styles.avatar} />
+                    {form.avatarUrl ? (
+                      <Image source={{ uri: form.avatarUrl }} style={styles.avatar} />
+                    ) : (
+                      <View style={[styles.avatar, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.surface }]}>
+                        <Icon name="account" size={48} color={theme.colors.textSecondary} />
+                      </View>
+                    )}
                     <TouchableOpacity style={styles.editAvatarBtn} accessibilityRole="button" accessibilityLabel={t('a11yCamera', 'Camera')}>
                         <Icon name="camera" size={16} color={theme.colors.surface} />
                     </TouchableOpacity>

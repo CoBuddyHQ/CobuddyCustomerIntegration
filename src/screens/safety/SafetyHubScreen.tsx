@@ -84,7 +84,7 @@ export const SafetyHubScreen = () => {
                 <Text style={[styles.statusText, !isSessionActive && styles.statusTextInactive]}>{isSessionActive ? t('statusText', 'Live Protection Active') : t('statusInactive', 'Live Protection Inactive')}</Text>
             </View>
             {isSessionActive && lastKnownLocation && isFeatureEnabled('ENABLE_SOS_BACKGROUND_TRACKING') && (
-              <Text style={styles.locationText}>{t('mockGps', 'Mock GPS')}: {lastKnownLocation.lat.toFixed(4)}, {lastKnownLocation.lng.toFixed(4)}</Text>
+              <Text style={styles.locationText}>{t('gpsCoordinates', 'GPS')}: {lastKnownLocation.lat.toFixed(4)}, {lastKnownLocation.lng.toFixed(4)}</Text>
             )}
         </View>
 
@@ -165,8 +165,8 @@ export const SafetyHubScreen = () => {
                 <Icon name={isSessionActive ? "radar" : "radar-off"} size={24} color={isSessionActive ? theme.colors.success : theme.colors.textSecondary} />
             </View>
             <View style={styles.cardTextContent}>
-                <Text style={styles.cardTitle}>{isSessionActive ? t('stopLiveSession', 'Stop Live Session') : t('startLiveSession', 'Start Live Session (Mock)')}</Text>
-                <Text style={styles.cardDesc}>{t('safety.toggleLocationMock', 'Toggle background location service mocking.')}</Text>
+                <Text style={styles.cardTitle}>{isSessionActive ? t('stopLiveSession', 'Stop Live Session') : t('startLiveSession', 'Start Live Session')}</Text>
+                <Text style={styles.cardDesc}>{t('safety.toggleLocationLive', 'Toggle background location service during active sessions.')}</Text>
             </View>
             <Icon name="chevron-right" size={20} color={theme.colors.textSecondary} />
         </TouchableOpacity>

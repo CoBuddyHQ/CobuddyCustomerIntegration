@@ -14,14 +14,6 @@ import { useAuthStore } from '../../store/slices/authStore';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-// Mock Data
-const WALLET_DATA = {
-  balance: 4500,
-  pendingRefund: 500,
-  escrowHeld: 1200,
-  kycStatus: 'unverified',
-};
-
 
 
 export const WalletScreen = () => { 

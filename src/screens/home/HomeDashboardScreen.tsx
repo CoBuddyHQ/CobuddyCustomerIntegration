@@ -25,44 +25,7 @@ const DEFAULT_CATEGORIES: discoveryApi.HomeCategory[] = [
   { id: 'shopping', title: 'Shopping & Lifestyle', icon: 'shopping', color: '#8B5CF6' },
 ];
 
-const DEFAULT_FEATURED_LIST: CompanionCardType[] = [
-  {
-    id: 'c1',
-    name: 'Elena Vasquez',
-    age: 26,
-    initials: 'EV',
-    title: 'City guide & local experiences expert',
-    bio: "Hi! I love exploring new cafes in the city and talking about art, literature, and movies.",
-    trustScore: 98,
-    rating: 4.97,
-    reviews: 124,
-    sessions: 312,
-    rate: '₹500 /hr',
-    distance: '2.5 km away',
-    isOnline: true,
-    category: 'coffee',
-    gender: 'Female',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    id: 'c2',
-    name: 'Aisha Sharma',
-    age: 24,
-    initials: 'AS',
-    title: 'Shopping & lifestyle companion',
-    bio: 'Fashion lover, shopping enthusiast and great listener.',
-    trustScore: 97,
-    rating: 5.0,
-    reviews: 76,
-    sessions: 150,
-    rate: '₹400 /hr',
-    distance: '3.0 km away',
-    isOnline: true,
-    category: 'shopping',
-    gender: 'Female',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
-  },
-];
+const DEFAULT_FEATURED_LIST: CompanionCardType[] = [];
 
 export const HomeDashboardScreen = () => {
   const { t } = useTranslation('home.dashboard');
@@ -111,7 +74,7 @@ export const HomeDashboardScreen = () => {
         if (homeData.categories && homeData.categories.length > 0) {
           setCategories(homeData.categories);
         }
-        if (homeData.featuredCompanions && homeData.featuredCompanions.length > 0) {
+        if (Array.isArray(homeData.featuredCompanions)) {
           setFeaturedList(homeData.featuredCompanions);
         }
         setNotificationCount(homeData.quickAccess?.notificationCount || 0);
