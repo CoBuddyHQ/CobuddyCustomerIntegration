@@ -14,6 +14,9 @@
  */
 
 import { Platform } from 'react-native';
+
+declare const process: { env?: Record<string, string | undefined> } | undefined;
+
 import {
   USE_AZURE_CUSTOMER_API as envUseAzureCustomer,
   USE_AZURE_CAMPAIGN_API as envUseAzureCampaign,
@@ -155,7 +158,7 @@ export function resolveServiceUrl(
  * Factory for creating verified configuration from an arbitrary env object.
  */
 export function createApiConfig(
-  source: Record<string, string | undefined> = rawEnv,
+  source: Record<string, string | undefined> = getRuntimeEnv(),
   platformOs: string = Platform.OS
 ): DualApiConfig {
   const appEnv = (source.APP_ENV || 'development').trim().toLowerCase();
