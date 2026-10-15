@@ -37,6 +37,7 @@ export const HomeDashboardScreen = () => {
 
   const [categories, setCategories] = useState<discoveryApi.HomeCategory[]>(DEFAULT_CATEGORIES);
   const [featuredList, setFeaturedList] = useState<CompanionCardType[]>(DEFAULT_FEATURED_LIST);
+  const [campaigns, setCampaigns] = useState<discoveryApi.Campaign[]>([]);
   const [notificationCount, setNotificationCount] = useState(0);
   const [bookingCount, setBookingCount] = useState(0);
   const [activeBooking, setActiveBooking] = useState<any | null>(null);
@@ -76,6 +77,9 @@ export const HomeDashboardScreen = () => {
         }
         if (Array.isArray(homeData.featuredCompanions)) {
           setFeaturedList(homeData.featuredCompanions);
+        }
+        if (Array.isArray(homeData.campaigns)) {
+          setCampaigns(homeData.campaigns);
         }
         setNotificationCount(homeData.quickAccess?.notificationCount || 0);
         setBookingCount(homeData.quickAccess?.bookingCount || 0);
@@ -168,6 +172,24 @@ export const HomeDashboardScreen = () => {
             </TouchableOpacity>
           </View>
         ) : null}
+
+        {/* Dynamic Marketing Campaign Banners */}
+        {campaigns.length > 0 && (
+          <View style={styles.campaignsContainer}>
+            <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={styles.campaignsScroll}>
+              {campaigns.map((camp) => (
+                <View key={camp.id} style={styles.campaignCard}>
+                  <View style={styles.campaignBadge}>
+                    <Icon name="tag" size={12} color="#D4AF37" />
+                    <Text style={styles.campaignBadgeText}>{camp.category || 'SPECIAL OFFER'}</Text>
+                  </View>
+                  <Text style={styles.campaignTitle}>{camp.title}</Text>
+                  <Text style={styles.campaignMessage} numberOfLines={2}>{camp.message}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {hasActiveBooking ? (
           <>
@@ -754,5 +776,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.primary,
     fontWeight: 'bold',
+  },
+  campaignsContainer: {
+    marginVertical: 12,
+  },
+  campaignsScroll: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  campaignCard: {
+    width: 300,
+    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.25)',
+  },
+  campaignBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  campaignBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D4AF37',
+    letterSpacing: 0.8,
+  },
+  campaignTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  campaignMessage: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
   },
 });

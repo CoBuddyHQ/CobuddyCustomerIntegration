@@ -153,6 +153,18 @@ export interface HomeCategory {
   color: string;
 }
 
+export interface Campaign {
+  id: string;
+  title: string;
+  message: string;
+  category?: string;
+  targetAudience?: string;
+  bannerUrl?: string | null;
+  actionUrl?: string | null;
+  publishedAt?: string;
+  expiresAt?: string | null;
+}
+
 export interface HomeDashboardResponse {
   success: boolean;
   data: {
@@ -166,6 +178,7 @@ export interface HomeDashboardResponse {
     } | null;
     categories: HomeCategory[];
     featuredCompanions: CompanionCard[];
+    campaigns?: Campaign[];
     quickAccess: {
       notificationCount: number;
       bookingCount: number;
@@ -186,12 +199,25 @@ export const getHomeDashboardData = async (): Promise<HomeDashboardResponse['dat
     console.log('[API RESPONSE] 200 GET /discovery/home', {
       categoriesCount: data?.categories?.length ?? 0,
       featuredCount: data?.featuredCompanions?.length ?? 0,
+      campaignsCount: data?.campaigns?.length ?? 0,
       notificationCount: data?.quickAccess?.notificationCount ?? 0,
     });
     return data;
   } catch (err: any) {
     console.error('[API ERROR] GET /discovery/home', err?.message || err);
     throw err;
+  }
+};
+
+// ─── Get Active Marketing Campaigns ──────────────────────────────────────────
+export const getCampaigns = async (): Promise<Campaign[]> => {
+  console.log('[API REQUEST] GET /discovery/campaigns');
+  try {
+    const res = await apiClient.get<any>('/discovery/campaigns');
+    return res.data?.campaigns || [];
+  } catch (err: any) {
+    console.error('[API ERROR] GET /discovery/campaigns', err?.message || err);
+    return [];
   }
 };
 
