@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -15,8 +16,7 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { useBookingStore } from '../../store/slices/bookingStore';
 import { useAuthStore } from '../../store/slices/authStore';
-import { bookingApi } from '../../services/api';
-import { adminValues } from '../../config/adminValues';
+import { bookingApi, BookingPriceQuote } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { showApiError } from '../../utils/errorHandler';
@@ -27,7 +27,7 @@ export const BookingSummaryScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'BookingSummaryScreen'>>();
-  const { draftBooking, requestBooking } = useBookingStore();
+  const { draftBooking } = useBookingStore();
 
   React.useEffect(() => {
     FlowTracker.saveActiveScreen('BookingSummaryScreen');
@@ -35,25 +35,58 @@ export const BookingSummaryScreen = () => {
 
   
   const { activity, venue, date, time, duration = 1, companionId } = route.params || {};
+  const activityId = activity?.id;
+  const activityTitle = draftBooking?.activity || activity?.defaultTitle;
+  const venueInfo = draftBooking?.venue || (typeof venue === 'object' ? venue : undefined);
+  const venueName = venueInfo?.name || (typeof venue === 'string' ? venue : undefined);
+  const venueAddress = venueInfo && 'address' in venueInfo ? venueInfo.address : undefined;
 
-  const parsedDate = date ? new Date(date) : new Date();
-  const dayName = parsedDate.toLocaleDateString('en-US', { weekday: 'short' });
-  const dayNumber = parsedDate.getDate().toString();
+  const parsedDate = date ? new Date(date) : null;
+  const dayName = parsedDate && Number.isFinite(parsedDate.getTime())
+    ? parsedDate.toLocaleDateString('en-US', { weekday: 'short' })
+    : 'Unavailable';
+  const dayNumber = parsedDate && Number.isFinite(parsedDate.getTime())
+    ? parsedDate.getDate().toString()
+    : '';
 
   const { kycStatus, user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [priceQuote, setPriceQuote] = useState<BookingPriceQuote | null>(null);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(true);
+  const [quoteFailed, setQuoteFailed] = useState(false);
+  const [quoteRefresh, setQuoteRefresh] = useState(0);
   
   // User Input State
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [agreedToSafety, setAgreedToSafety] = useState(false);
 
-  // Pricing calculations
-  const hourlyRate = 500;
-  const baseRate = Math.round(hourlyRate * ((activity as any)?.multiplier || 1.0));
-  const baseTotal = baseRate * duration;
-  const serviceFee = adminValues.commission.serviceFee;
-  const totalAmount = baseTotal + serviceFee;
+  React.useEffect(() => {
+    let active = true;
+    if (!companionId || !activityId) {
+      setPriceQuote(null);
+      setQuoteFailed(true);
+      setIsLoadingQuote(false);
+      return () => { active = false; };
+    }
+    setIsLoadingQuote(true);
+    setQuoteFailed(false);
+    bookingApi.getBookingPriceQuote({
+      companionId,
+      activityId,
+      durationHours: duration,
+    }).then((quote) => {
+      if (active) setPriceQuote(quote);
+    }).catch(() => {
+      if (active) {
+        setPriceQuote(null);
+        setQuoteFailed(true);
+      }
+    }).finally(() => {
+      if (active) setIsLoadingQuote(false);
+    });
+    return () => { active = false; };
+  }, [companionId, activityId, duration, quoteRefresh]);
 
   const handleSendRequest = async () => {
     setSubmitError('');
@@ -69,52 +102,48 @@ export const BookingSummaryScreen = () => {
       return;
     }
 
+    if (!companionId || !activityId || !activityTitle || !venueName || !date || !time || !priceQuote) {
+      setSubmitError('A server quote and complete booking details are required. No booking was submitted.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const actTitle = draftBooking?.activity || activity?.defaultTitle || 'Coffee Meetup';
-      const venueObj = draftBooking?.venue || {
-        venueId: (venue as any)?.id || 'v-1',
-        name: (venue as any)?.name || 'Public Cafe',
-        area: (venue as any)?.area || 'Central',
-        city: (venue as any)?.city || 'Mumbai',
-        isApproved: true,
-        venueType: (venue as any)?.type || 'cafe',
-        meetingPoint: (venue as any)?.name || 'Main Entrance',
-        landmark: (venue as any)?.address || 'Public Area',
-      };
-      const slotStart = draftBooking?.scheduledStart || time || new Date().toISOString();
-      const slotEnd = draftBooking?.scheduledEnd || time || new Date(Date.now() + duration * 3600000).toISOString();
-
       const resBooking = await bookingApi.createBooking({
-        companionId: companionId || 'c1',
-        companionName: route.params?.companionName || 'Companion',
-        activity: actTitle,
-        venue: venueObj.name,
-        date: date || new Date().toISOString().split('T')[0],
-        time: typeof slotStart === 'string' ? slotStart : '18:00',
-        duration,
-        notes: specialInstructions,
+        companionId,
+        companionName: route.params?.companionName,
+        activityId,
+        activityName: activityTitle,
+        activityIcon: activity?.icon,
+        venueName,
+        venueAddress,
+        date,
+        time,
+        safetyAcknowledged: agreedToSafety,
+        durationHours: duration,
+        specialInstructions: specialInstructions.trim() || undefined,
       });
-
-      requestBooking({
-        companionId: companionId || 'c1',
-        activity: actTitle,
-        venue: venueObj,
-        scheduledStart: slotStart,
-        scheduledEnd: slotEnd,
-        sessionPassCode: '1234',
+      if (!resBooking?.id) {
+        throw new Error('The Customer Backend did not return a booking identifier.');
+      }
+      const formattedDateStr = new Date(date).toLocaleDateString('en-US', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
       });
-
-      const formattedDateStr = date ? new Date(date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short' }) : 'Today';
-      const formattedAmountStr = `₹${(resBooking as any)?.pricing?.totalAmount || (resBooking as any)?.totalAmount || totalAmount}`;
+      const serverTotal = resBooking.pricing?.totalAmount ?? resBooking.totalAmount;
+      const formattedAmountStr = typeof serverTotal === 'number'
+        ? '₹' + serverTotal.toLocaleString('en-IN')
+        : 'Unavailable';
 
       navigation.navigate('BookingRequestSentScreen', {
         bookingId: resBooking?.id || '',
         companionName: route.params?.companionName || (resBooking as any)?.companionName || 'Companion',
         date: formattedDateStr,
-        time: typeof slotStart === 'string' ? slotStart : '18:00',
-        venue: venueObj.name,
+        time,
+        venue: venueName,
         amount: formattedAmountStr,
+        companionRequestStatus: resBooking.companionRequestStatus,
       });
     } catch (err: any) {
       showApiError(err, {
@@ -153,9 +182,11 @@ export const BookingSummaryScreen = () => {
             </View>
             <View style={styles.summaryContent}>
               <Text style={styles.summaryLabel}>{t('summaryLabelActivity', 'Activity')}</Text>
-              <Text style={styles.summaryValue}>{activity?.defaultTitle || t('defaultActivity', 'Coffee Meetup')}</Text>
+              <Text style={styles.summaryValue}>{activityTitle || t('activityUnavailable', 'Activity unavailable')}</Text>
             </View>
-            <Text style={styles.priceValue}>{activity?.price || t('defaultPrice', '₹500/hr')}</Text>
+            <Text style={styles.priceValue}>
+              {priceQuote ? '₹' + priceQuote.baseRate.toLocaleString('en-IN') + '/hr' : 'Unavailable'}
+            </Text>
           </View>
 
           <View style={styles.divider} />
@@ -166,8 +197,8 @@ export const BookingSummaryScreen = () => {
             </View>
             <View style={styles.summaryContent}>
               <Text style={styles.summaryLabel}>{t('summaryLabelVenue', 'Venue')}</Text>
-              <Text style={styles.summaryValue}>{venue?.name || t('defaultVenue', 'Custom Venue')}</Text>
-              <Text style={styles.summarySubValue}>{venue?.address || ''}</Text>
+              <Text style={styles.summaryValue}>{venueName || t('venueUnavailable', 'Venue unavailable')}</Text>
+              <Text style={styles.summarySubValue}>{venueAddress || ''}</Text>
             </View>
           </View>
 
@@ -179,8 +210,14 @@ export const BookingSummaryScreen = () => {
             </View>
             <View style={styles.summaryContent}>
               <Text style={styles.summaryLabel}>{t('summaryLabelDate', 'Date & Time')}</Text>
-              <Text style={styles.summaryValue}>{dayName}, {dayNumber}</Text>
-              <Text style={styles.summarySubValue}>{t('durationText', '{{time}} ({{duration}} {{hourText}})', { time, duration, hourText: duration === 1 ? t('units.hour', 'hour') : t('units.hours', 'hours') })}</Text>
+              <Text style={styles.summaryValue}>
+                {dayNumber ? dayName + ', ' + dayNumber : 'Date unavailable'}
+              </Text>
+              <Text style={styles.summarySubValue}>
+                {time
+                  ? t('durationText', '{{time}} ({{duration}} {{hourText}})', { time, duration, hourText: duration === 1 ? t('units.hour', 'hour') : t('units.hours', 'hours') })
+                  : 'Time unavailable'}
+              </Text>
             </View>
           </View>
         </View>
@@ -198,21 +235,44 @@ export const BookingSummaryScreen = () => {
 
         <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('paymentSummary', 'Payment Summary')}</Text>
         <View style={styles.pricingBox}>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('baseFare', 'Base Fare (₹{{baseRate}} x {{duration}} hr)', { baseRate, duration })}</Text>
-            <Text style={styles.priceAmount}>₹{baseTotal}</Text>
-          </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('serviceFee', 'Safety & Service Fee')}</Text>
-            <Text style={styles.priceAmount}>₹{serviceFee}</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.priceRow}>
-            <Text style={styles.totalLabel}>{t('estimatedTotal', 'Estimated Total')}</Text>
-            <Text style={styles.totalValue}>₹{totalAmount}</Text>
-          </View>
+          {isLoadingQuote ? (
+            <ActivityIndicator color={theme.colors.primary} />
+          ) : priceQuote ? (
+            <>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>
+                  {t('baseFare', 'Base Fare (₹{{baseRate}} x {{duration}} hr)', {
+                    baseRate: priceQuote.baseRate,
+                    duration: priceQuote.durationHours,
+                  })}
+                </Text>
+                <Text style={styles.priceAmount}>₹{priceQuote.baseTotal.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>{t('serviceFee', 'Platform fee')}</Text>
+                <Text style={styles.priceAmount}>₹{priceQuote.platformFee.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Tax</Text>
+                <Text style={styles.priceAmount}>₹{priceQuote.taxAmount.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.priceRow}>
+                <Text style={styles.totalLabel}>{t('estimatedTotal', 'Server quote')}</Text>
+                <Text style={styles.totalValue}>₹{priceQuote.totalAmount.toLocaleString('en-IN')}</Text>
+              </View>
+            </>
+          ) : (
+            <TouchableOpacity onPress={() => setQuoteRefresh((value) => value + 1)} accessibilityRole="button">
+              <Text style={styles.priceLabel}>
+                {quoteFailed ? 'Price quote unavailable. Tap to retry.' : 'Enter a valid companion and activity to request a price.'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
-        <Text style={styles.totalDisclaimer}>{t('totalDisclaimer', 'Payment is processed only after the companion accepts.')}</Text>
+        <Text style={styles.totalDisclaimer}>
+          The Customer Backend recalculates the final price when the request is submitted. Checkout is currently unavailable.
+        </Text>
 
         <TouchableOpacity 
           style={styles.safetyAgreementRow} 
@@ -234,8 +294,8 @@ export const BookingSummaryScreen = () => {
       <View style={styles.bottomBar}>
         {submitError ? <Text style={{ color: theme.colors.error, fontSize: 13, marginBottom: 8, textAlign: 'center' }}>{submitError}</Text> : null}
         <TouchableOpacity
-          style={[styles.nextBtn, isSubmitting && styles.nextBtnDisabled]}
-          disabled={isSubmitting}
+          style={[styles.nextBtn, (isSubmitting || isLoadingQuote || !priceQuote) && styles.nextBtnDisabled]}
+          disabled={isSubmitting || isLoadingQuote || !priceQuote}
           onPress={handleSendRequest}
           activeOpacity={0.8}
           accessibilityRole="button"

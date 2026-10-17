@@ -1,14 +1,12 @@
 /**
- * CoBuddy Customer — Centralized Environment & Dual-API Configuration
+ * CoBuddy Customer — Centralized Customer API Configuration
  *
- * Provides strongly-typed, independent target resolution for:
- * 1. Customer Backend API (USE_AZURE_CUSTOMER_API: Azure vs Local Docker)
- * 2. Campaign Backend API (USE_AZURE_CAMPAIGN_API: Azure vs Local Docker)
+ * The app talks to the Customer Backend. Cross-service campaign reads are
+ * mediated by that backend and never target a second app-configured API.
  *
  * Rules:
  * - True selects configured Azure URL; False selects configured Local Docker URL.
- * - Changing one flag NEVER affects the target of the other service.
- * - Local failure NEVER silently falls back to Azure, and vice-versa.
+ * - Local failure NEVER silently falls back to a deployed URL, or vice-versa.
  * - Android emulator auto-resolves 'localhost'/'127.0.0.1' -> '10.0.2.2'.
  * - Production builds validate Azure endpoints use HTTPS.
  */
@@ -19,11 +17,8 @@ declare const process: { env?: Record<string, string | undefined> } | undefined;
 
 import {
   USE_AZURE_CUSTOMER_API as envUseAzureCustomer,
-  USE_AZURE_CAMPAIGN_API as envUseAzureCampaign,
   AZURE_CUSTOMER_API_URL as envAzureCustomerUrl,
   LOCAL_CUSTOMER_API_URL as envLocalCustomerUrl,
-  AZURE_CAMPAIGN_API_URL as envAzureCampaignUrl,
-  LOCAL_CAMPAIGN_API_URL as envLocalCampaignUrl,
   APP_ENV as envAppEnv,
   ENABLE_LOGGING as envEnableLogging,
   DEFAULT_LANGUAGE as envDefaultLanguage,
@@ -35,11 +30,8 @@ import {
 export const getRuntimeEnv = (): Record<string, string | undefined> => {
   return {
     USE_AZURE_CUSTOMER_API: envUseAzureCustomer ?? (typeof process !== 'undefined' ? process.env?.USE_AZURE_CUSTOMER_API : undefined),
-    USE_AZURE_CAMPAIGN_API: envUseAzureCampaign ?? (typeof process !== 'undefined' ? process.env?.USE_AZURE_CAMPAIGN_API : undefined),
     AZURE_CUSTOMER_API_URL: envAzureCustomerUrl ?? (typeof process !== 'undefined' ? process.env?.AZURE_CUSTOMER_API_URL : undefined),
     LOCAL_CUSTOMER_API_URL: envLocalCustomerUrl ?? (typeof process !== 'undefined' ? process.env?.LOCAL_CUSTOMER_API_URL : undefined),
-    AZURE_CAMPAIGN_API_URL: envAzureCampaignUrl ?? (typeof process !== 'undefined' ? process.env?.AZURE_CAMPAIGN_API_URL : undefined),
-    LOCAL_CAMPAIGN_API_URL: envLocalCampaignUrl ?? (typeof process !== 'undefined' ? process.env?.LOCAL_CAMPAIGN_API_URL : undefined),
     APP_ENV: envAppEnv ?? (typeof process !== 'undefined' ? process.env?.APP_ENV : undefined),
     ENABLE_LOGGING: envEnableLogging ?? (typeof process !== 'undefined' ? process.env?.ENABLE_LOGGING : undefined),
     DEFAULT_LANGUAGE: envDefaultLanguage ?? (typeof process !== 'undefined' ? process.env?.DEFAULT_LANGUAGE : undefined),
@@ -92,9 +84,8 @@ export interface ServiceTargetConfig {
   targetMode: 'AZURE' | 'LOCAL';
 }
 
-export interface DualApiConfig {
+export interface CustomerApiConfig {
   customer: ServiceTargetConfig;
-  campaign: ServiceTargetConfig;
   appEnv: string;
   isDev: boolean;
   enableLogging: boolean;
@@ -109,7 +100,7 @@ export interface DualApiConfig {
  * Throws an explicit error if the selected target URL is missing or invalid.
  */
 export function resolveServiceUrl(
-  serviceName: 'Customer' | 'Campaign',
+  serviceName: 'Customer',
   useAzure: boolean,
   azureUrlRaw?: string,
   localUrlRaw?: string,
@@ -125,7 +116,7 @@ export function resolveServiceUrl(
         `[ConfigurationError] USE_AZURE_${serviceName.toUpperCase()}_API is 'true', but AZURE_${serviceName.toUpperCase()}_API_URL is missing or empty.`
       );
     }
-    if (isProductionBuild && !azureUrl.startsWith('https://')) {
+    if (isProductionBuild && !isHttpsUrl(azureUrl)) {
       throw new Error(
         `[SecurityError] In production builds, AZURE_${serviceName.toUpperCase()}_API_URL must use HTTPS protocol: ${azureUrl}`
       );
@@ -144,6 +135,11 @@ export function resolveServiceUrl(
       );
     }
     const resolvedLocal = resolveUrlForPlatform(localUrl, platformOs);
+    if (isProductionBuild && !isHttpsUrl(resolvedLocal)) {
+      throw new Error(
+        `[SecurityError] In production builds, the selected ${serviceName.toLowerCase()} API URL must use HTTPS.`
+      );
+    }
     return {
       useAzure: false,
       azureUrl,
@@ -154,20 +150,33 @@ export function resolveServiceUrl(
   }
 }
 
+function isHttpsUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Factory for creating verified configuration from an arbitrary env object.
  */
 export function createApiConfig(
   source: Record<string, string | undefined> = getRuntimeEnv(),
   platformOs: string = Platform.OS
-): DualApiConfig {
+): CustomerApiConfig {
   const appEnv = (source.APP_ENV || 'development').trim().toLowerCase();
-  const isDev = appEnv !== 'production';
-  const isProductionBuild = !isDev;
+  if (!['development', 'test', 'staging', 'production'].includes(appEnv)) {
+    throw new Error('[ConfigurationError] APP_ENV must be development, test, staging, or production.');
+  }
+  const isProductionBuild = appEnv === 'production' || appEnv === 'staging';
+  const isDev = !isProductionBuild;
 
   const useAzureCustomer = parseBooleanFlag(source.USE_AZURE_CUSTOMER_API, false);
-  const useAzureCampaign = parseBooleanFlag(source.USE_AZURE_CAMPAIGN_API, false);
-
+  if (isProductionBuild && !useAzureCustomer) {
+    throw new Error('[SecurityError] Production builds must select the deployed Customer Backend URL.');
+  }
   const customer = resolveServiceUrl(
     'Customer',
     useAzureCustomer,
@@ -177,48 +186,39 @@ export function createApiConfig(
     isProductionBuild
   );
 
-  const campaign = resolveServiceUrl(
-    'Campaign',
-    useAzureCampaign,
-    source.AZURE_CAMPAIGN_API_URL,
-    source.LOCAL_CAMPAIGN_API_URL,
-    platformOs,
-    isProductionBuild
-  );
+  const requestTimeoutMs = Number(source.REQUEST_TIMEOUT_MS || '15000');
+  if (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
+    throw new Error('[ConfigurationError] REQUEST_TIMEOUT_MS must be a positive number.');
+  }
 
   return {
     customer,
-    campaign,
     appEnv,
     isDev,
-    enableLogging: parseBooleanFlag(source.ENABLE_LOGGING, true),
+    enableLogging: parseBooleanFlag(source.ENABLE_LOGGING, false),
     defaultLanguage: source.DEFAULT_LANGUAGE || 'en',
-    requestTimeoutMs: parseInt(source.REQUEST_TIMEOUT_MS || '15000', 10),
+    requestTimeoutMs,
     googleMapsApiKey: source.GOOGLE_MAPS_API_KEY || '',
     razorpayKeyId: source.RAZORPAY_KEY_ID || '',
   };
 }
 
 // ── Default Singleton Instance for App Runtime ────────────────────────────────
-export const ENV: DualApiConfig = createApiConfig(getRuntimeEnv());
+export const ENV: CustomerApiConfig = createApiConfig(getRuntimeEnv());
 
 /**
  * Diagnostic helper that exposes sanitized runtime target information
  * (Safe for development logs; never reveals credentials, tokens, or PII)
  */
-export function getApiConfigDiagnostics(config: DualApiConfig = ENV): {
+export function getApiConfigDiagnostics(config: CustomerApiConfig = ENV): {
   customerTarget: string;
   customerBaseUrl: string;
-  campaignTarget: string;
-  campaignBaseUrl: string;
   matrixMode: string;
 } {
-  const matrixMode = `Customer: ${config.customer.targetMode} | Campaign: ${config.campaign.targetMode}`;
+  const matrixMode = `Customer: ${config.customer.targetMode}`;
   return {
     customerTarget: config.customer.targetMode,
     customerBaseUrl: config.customer.resolvedBaseUrl,
-    campaignTarget: config.campaign.targetMode,
-    campaignBaseUrl: config.campaign.resolvedBaseUrl,
     matrixMode,
   };
 }
@@ -228,5 +228,4 @@ if (typeof __DEV__ !== 'undefined' && __DEV__) {
   const diag = getApiConfigDiagnostics(ENV);
   console.log('[CoBuddy Config] Active Backend Matrix:', diag.matrixMode);
   console.log(`[CoBuddy Config] Customer API [${diag.customerTarget}]: ${diag.customerBaseUrl}`);
-  console.log(`[CoBuddy Config] Campaign API [${diag.campaignTarget}]: ${diag.campaignBaseUrl}`);
 }

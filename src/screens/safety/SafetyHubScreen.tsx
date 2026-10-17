@@ -45,21 +45,6 @@ export const SafetyHubScreen = () => {
   const resolveSOS = useSafetyStore(selectResolveSOS);
   const isSessionActive = useSafetyStore(selectIsSessionActive);
   const lastKnownLocation = useSafetyStore(selectLastKnownLocation);
-  const setSessionActive = useSafetyStore((state) => state.setSessionActive);
-  const updateLocation = useSafetyStore((state) => state.updateLocation);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isSessionActive) {
-      interval = setInterval(() => {
-        const lat = 37.7749 + (Math.random() - 0.5) * 0.01;
-        const lng = -122.4194 + (Math.random() - 0.5) * 0.01;
-        updateLocation(lat, lng);
-      }, 5000);
-    }
-    return () => clearInterval(interval);
-  }, [isSessionActive, updateLocation]);
-
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
@@ -107,12 +92,16 @@ export const SafetyHubScreen = () => {
                                   text: t('yesSafe', 'Yes, I am safe'), 
                                   onPress: async () => {
                                     const sosId = activeSosId;
-                                    resolveSOS();
                                     try {
-                                      if (sosId) {
-                                        await safetyApi.resolveSOS(sosId);
-                                      }
-                                    } catch {}
+                                      if (!sosId) throw new Error('SOS identifier is unavailable');
+                                      await safetyApi.resolveSOS(sosId);
+                                      resolveSOS();
+                                    } catch {
+                                      Alert.alert(
+                                        'Could not resolve SOS',
+                                        'The server did not confirm that this SOS event was resolved.',
+                                      );
+                                    }
                                   } 
                                 }
                             ]);
@@ -131,10 +120,16 @@ export const SafetyHubScreen = () => {
                                         lastKnownLocation?.lng,
                                       );
                                       triggerSOS((res as any)?.sosId || (res as any)?.id);
+                                      Alert.alert(
+                                        'SOS event recorded',
+                                        'The event was saved, but no emergency contact or dispatch provider is connected.',
+                                      );
                                     } catch {
-                                      triggerSOS();
+                                      Alert.alert(
+                                        'SOS not confirmed',
+                                        'The server did not confirm the SOS request. No success was reported.',
+                                      );
                                     }
-                                    Alert.alert(t('alertTitleSOSActivated', 'SOS Activated'), t('alertMsgHelpisonthewayYourli', 'Help is on the way. Your live location is now being shared.'));
                                   }
                                 }
                               ]
@@ -159,7 +154,10 @@ export const SafetyHubScreen = () => {
         <TouchableOpacity 
             style={styles.premiumCard} 
             activeOpacity={0.7}
-            onPress={() => setSessionActive(!isSessionActive)} accessibilityRole="button" accessibilityLabel={t('a11yToggle', 'Toggle')}
+            onPress={() => Alert.alert(
+              'Live location unavailable',
+              'This app build does not have a location-tracking provider. No location is being shared.',
+            )} accessibilityRole="button" accessibilityLabel={t('a11yToggle', 'Toggle')}
         >
             <View style={[styles.cardIconBox, { backgroundColor: isSessionActive ? 'rgba(34, 197, 94, 0.1)' : 'rgba(156, 163, 175, 0.1)' }]}>
                 <Icon name={isSessionActive ? "radar" : "radar-off"} size={24} color={isSessionActive ? theme.colors.success : theme.colors.textSecondary} />

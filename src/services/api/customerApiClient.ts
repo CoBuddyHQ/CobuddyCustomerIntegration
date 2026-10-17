@@ -91,10 +91,7 @@ customerApiClient.interceptors.request.use(
       delete config.headers['Content-Type'];
     }
     if (ENV.enableLogging && typeof __DEV__ !== 'undefined' && __DEV__) {
-      console.log(
-        `[Customer API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`,
-        config.data instanceof FormData ? '[FormData]' : (config.data ?? '')
-      );
+      console.log(`[Customer API] ${config.method?.toUpperCase()} request`);
     }
     return config;
   },
@@ -102,17 +99,26 @@ customerApiClient.interceptors.request.use(
 );
 
 let _isRefreshing = false;
-let _refreshQueue: Array<(token: string) => void> = [];
+type RefreshWaiter = {
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+};
+let _refreshQueue: RefreshWaiter[] = [];
 
-const processRefreshQueue = (newToken: string) => {
-  _refreshQueue.forEach((cb) => cb(newToken));
+const processRefreshQueue = (newToken?: string, error?: unknown) => {
+  const queued = _refreshQueue;
   _refreshQueue = [];
+  queued.forEach((waiter) => {
+    if (error !== undefined) waiter.reject(error);
+    else if (newToken) waiter.resolve(newToken);
+    else waiter.reject(new Error('Token refresh did not return an access token.'));
+  });
 };
 
 customerApiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     if (ENV.enableLogging && typeof __DEV__ !== 'undefined' && __DEV__) {
-      console.log(`[Customer API] ✅ ${response.config.url}`, response.data);
+      console.log(`[Customer API] response ${response.status}`);
     }
     if (
       response.data &&
@@ -129,12 +135,15 @@ customerApiClient.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (_isRefreshing) {
-        return new Promise((resolve) => {
-          _refreshQueue.push((token: string) => {
-            if (originalRequest.headers) {
-              (originalRequest.headers as Record<string, string>).Authorization = `Bearer ${token}`;
-            }
-            resolve(customerApiClient(originalRequest));
+        return new Promise((resolve, reject) => {
+          _refreshQueue.push({
+            resolve: (token: string) => {
+              if (originalRequest.headers) {
+                (originalRequest.headers as Record<string, string>).Authorization = `Bearer ${token}`;
+              }
+              resolve(customerApiClient(originalRequest));
+            },
+            reject,
           });
         });
       }
@@ -157,8 +166,8 @@ customerApiClient.interceptors.response.use(
           (originalRequest.headers as Record<string, string>).Authorization = `Bearer ${accessToken}`;
         }
         return customerApiClient(originalRequest);
-      } catch {
-        _refreshQueue = [];
+      } catch (refreshError) {
+        processRefreshQueue(undefined, refreshError);
         await TokenStorage.clearAll();
         _logoutListener?.();
         return Promise.reject(error);
@@ -168,10 +177,7 @@ customerApiClient.interceptors.response.use(
     }
 
     if (ENV.enableLogging && typeof __DEV__ !== 'undefined' && __DEV__) {
-      console.warn(
-        `[Customer API] ❌ ${error.config?.baseURL}${error.config?.url}`,
-        error.response?.data ?? error.message
-      );
+      console.warn(`[Customer API] request failed with status ${error.response?.status ?? 'network'}`);
     }
 
     return Promise.reject(error);

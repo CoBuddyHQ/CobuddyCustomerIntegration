@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { kycApi } from '../../services/api';
-import { showApiError } from '../../utils/errorHandler';
 import { FlowTracker } from '../../services/flowTracker';
-import { RootStackParamList } from '../../types/navigation';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type DocType = 'AADHAAR' | 'PAN' | 'PASSPORT' | 'DRIVING_LICENSE' | 'VOTER_ID';
-
-type UploadState = 'idle' | 'selected' | 'uploaded';
 
 export const DocumentVerificationScreen = () => { 
   const { t } = useTranslation('verify.document');
@@ -33,14 +26,10 @@ export const DocumentVerificationScreen = () => {
     {icon: 'blur-off',            label: t('docVerify.noBlurry', 'No blurry or cropped images')},
   ];
 
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const [selectedDoc, setSelectedDoc] = useState<DocType>('AADHAAR');
   const [docNumber, setDocNumber] = useState('');
   const [legalName, setLegalName] = useState('');
-  const [frontState, setFrontState] = useState<UploadState>('idle');
-  const [backState, setBackState]   = useState<UploadState>('idle');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     FlowTracker.saveActiveScreen('DocumentVerificationScreen');
@@ -75,24 +64,11 @@ export const DocumentVerificationScreen = () => {
     }
   };
 
-  const canSubmit = () => {
-    if (frontState !== 'uploaded') return false;
-    if (selectedDoc !== 'PAN' && selectedDoc !== 'PASSPORT' && backState !== 'uploaded') return false;
-    if (selectedDoc === 'AADHAAR' && docNumber.length < 14) return false;
-    if (selectedDoc === 'PAN' && docNumber.length < 10) return false;
-    if (docNumber.length < 5) return false;
-    if (legalName.trim().length < 3) return false;
-    return true;
-  };
-
-  const handleMockUpload = (side: 'front' | 'back') => {
-    if (side === 'front') {
-      setFrontState('selected');
-      setTimeout(() => setFrontState('uploaded'), 600);
-    } else {
-      setBackState('selected');
-      setTimeout(() => setBackState('uploaded'), 600);
-    }
+  const handleSelectFile = () => {
+    Alert.alert(
+      'Document upload unavailable',
+      'A secure document picker is not installed in this app build. No document was selected or submitted.',
+    );
   };
 
   return (
@@ -125,8 +101,6 @@ export const DocumentVerificationScreen = () => {
                     onPress={() => {
                       setSelectedDoc(doc.id);
                       setDocNumber('');
-                      setFrontState('idle');
-                      setBackState('idle');
                     }}
                     activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={doc.label}>
                     <Icon name={doc.icon} size={24} color={selected ? theme.colors.primary : theme.colors.textSecondary} />
@@ -170,53 +144,51 @@ export const DocumentVerificationScreen = () => {
 
           <View style={styles.card}>
             <Text style={styles.sectionLabel}>{t('uploadDoc', 'UPLOAD DOCUMENT')}</Text>
-            <Text style={styles.uploadHint}>{t('clearAndReadableImagesWork', 'Clear and readable images work best. Max 5MB (JPG, PNG).')}</Text>
+            <Text style={styles.uploadHint}>
+              {t('doc.filePickerUnavailable', 'Secure document capture is unavailable in this app build. No document has been uploaded.')}
+            </Text>
 
             <TouchableOpacity
-              style={[styles.uploadSlot, frontState === 'uploaded' && styles.uploadSlotDone]}
-              onPress={() => handleMockUpload('front')}
+              style={styles.uploadSlot}
+              onPress={handleSelectFile}
               activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11yConfirm', 'Confirm')}>
               <Icon
-                name={frontState === 'uploaded' ? 'check-circle' : frontState === 'selected' ? 'timer-sand' : 'cloud-upload'}
+                name="cloud-upload"
                 size={28}
-                color={frontState === 'uploaded' ? theme.colors.success : theme.colors.primary}
+                color={theme.colors.primary}
               />
               <View style={styles.uploadSlotMeta}>
                 <Text style={styles.uploadSlotTitle}>
-                  {frontState === 'uploaded' ? t('doc.frontUploaded', 'Front Side Uploaded') : frontState === 'selected' ? t('doc.processing', 'Processing...') : t('doc.uploadFront', 'Upload Front Side')}
+                  {t('doc.uploadFront', 'Upload Front Side')}
                 </Text>
                 <Text style={styles.uploadSlotSub}>
-                  {frontState === 'uploaded' ? t('doc.imageAccepted', 'Image accepted') : t('doc.tapToSelect', 'Tap to select image')}
+                  {t('doc.tapToSelect', 'Secure file picker unavailable')}
                 </Text>
               </View>
-              {frontState === 'idle' && (
-                <Icon name="plus-circle" size={20} color={theme.colors.primary} />
-              )}
+              <Icon name="plus-circle" size={20} color={theme.colors.primary} />
             </TouchableOpacity>
 
             {(selectedDoc === 'AADHAAR' || selectedDoc === 'DRIVING_LICENSE' || selectedDoc === 'VOTER_ID') && (
               <>
                 <View style={styles.uploadDivider} />
                 <TouchableOpacity
-                  style={[styles.uploadSlot, backState === 'uploaded' && styles.uploadSlotDone]}
-                  onPress={() => handleMockUpload('back')}
+                  style={styles.uploadSlot}
+                  onPress={handleSelectFile}
                   activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11yGoBack', 'Go back')}>
                   <Icon
-                    name={backState === 'uploaded' ? 'check-circle' : backState === 'selected' ? 'timer-sand' : 'image'}
+                    name="image"
                     size={28}
-                    color={backState === 'uploaded' ? theme.colors.success : theme.colors.textSecondary}
+                    color={theme.colors.textSecondary}
                   />
                   <View style={styles.uploadSlotMeta}>
                     <Text style={styles.uploadSlotTitle}>
-                      {backState === 'uploaded' ? t('doc.backUploaded', 'Back Side Uploaded') : backState === 'selected' ? t('doc.processing', 'Processing...') : t('doc.uploadBack', 'Upload Back Side')}
+                      {t('doc.uploadBack', 'Upload Back Side')}
                     </Text>
                     <Text style={styles.uploadSlotSub}>
-                      {backState === 'uploaded' ? t('doc.imageAccepted', 'Image accepted') : t('doc.tapToSelect', 'Tap to select image')}
+                      {t('doc.tapToSelect', 'Secure file picker unavailable')}
                     </Text>
                   </View>
-                  {backState === 'idle' && (
-                    <Icon name="plus-circle" size={20} color={theme.colors.textSecondary} />
-                  )}
+                  <Icon name="plus-circle" size={20} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               </>
             )}
@@ -236,42 +208,12 @@ export const DocumentVerificationScreen = () => {
           </View>
 
           <TouchableOpacity
-            style={[styles.ctaBtn, (!canSubmit() || isSubmitting) && styles.ctaBtnDisabled]}
-            disabled={!canSubmit() || isSubmitting}
-            onPress={async () => {
-              if (!canSubmit() || isSubmitting) return;
-              setIsSubmitting(true);
-              try {
-                await kycApi.submitKycDocument({
-                  documentType: selectedDoc,
-                  documentNumber: docNumber.trim(),
-                  legalName: legalName.trim(),
-                  frontDocUri: 'https://images.unsplash.com/photo-1544717305-2782549b5136',
-                  backDocUri: 'https://images.unsplash.com/photo-1544717305-2782549b5136',
-                });
-                setIsSubmitting(false);
-                navigation.navigate('SelfieCaptureScreen');
-              } catch (e: any) {
-                setIsSubmitting(false);
-                try {
-                  showApiError(e, { title: 'Document Upload Failed' });
-                } catch {
-                  Alert.alert(
-                    'Upload Failed',
-                    'Could not upload your document. Please check your connection and try again.',
-                    [{ text: 'OK' }]
-                  );
-                }
-              }
-            }}
+            style={[styles.ctaBtn, styles.ctaBtnDisabled]}
+            disabled
             activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yContinueVerification', 'Continue Verification')}>
-            {isSubmitting
-              ? <ActivityIndicator size="small" color={theme.colors.background} />
-              : <Icon name="upload" size={18} color={theme.colors.background} />}
+            <Icon name="upload" size={18} color={theme.colors.background} />
             <Text style={styles.ctaBtnText}>
-              {isSubmitting
-                ? t('uploading', 'Uploading...')
-                : t('continueVerify', 'Continue Verification')}
+              {t('continueVerify', 'Cannot continue without real documents')}
             </Text>
           </TouchableOpacity>
 

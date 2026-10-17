@@ -16,7 +16,7 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { bookingApi, paymentApi, walletApi, Booking as BookingApiType } from '../../services/api';
+import { bookingApi, walletApi, Booking as BookingApiType } from '../../services/api';
 import { FlowTracker } from '../../services/flowTracker';
 
 type PaymentScreenRouteProp = RouteProp<RootStackParamList, 'PaymentScreen'>;
@@ -27,13 +27,11 @@ export const PaymentScreen: React.FC = () => {
   const { smartGoBack } = useSmartNavigation();
 
   const bookingId = route.params?.bookingId;
-  const initialAmount = route.params?.amount;
 
   const [booking, setBooking] = useState<BookingApiType | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<'razorpay' | 'wallet' | 'upi'>('razorpay');
   const [isLoadingBooking, setIsLoadingBooking] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,7 +63,7 @@ export const PaymentScreen: React.FC = () => {
           setWalletBalance(balanceData.balance ?? 0);
         }
       } catch {
-        if (isMounted) setWalletBalance(0);
+        if (isMounted) setWalletBalance(null);
       } finally {
         if (isMounted) setIsLoadingBooking(false);
       }
@@ -78,97 +76,48 @@ export const PaymentScreen: React.FC = () => {
   }, [bookingId]);
 
   // Financial Calculations
-  const durationHours = booking?.durationHours || booking?.duration || 1;
-  const baseRate = booking?.pricing?.baseRate || 500;
-  const baseTotal = booking?.pricing?.baseTotal || (baseRate * durationHours);
-  const platformFee = booking?.pricing?.platformFee ?? Math.round(baseTotal * 0.15);
-  const taxes = booking?.pricing?.taxAmount ?? Math.round((baseTotal + platformFee) * 0.18);
-  const totalAmount = booking?.pricing?.totalAmount || booking?.totalAmount || (initialAmount ?? (baseTotal + platformFee + taxes));
+  const durationHours = booking?.pricing?.durationHours ?? booking?.durationHours ?? booking?.duration;
+  const baseRate = booking?.pricing?.baseRate;
+  const baseTotal = booking?.pricing?.baseTotal;
+  const platformFee = booking?.pricing?.platformFee;
+  const taxes = booking?.pricing?.taxAmount;
+  const totalAmount = booking?.pricing?.totalAmount ?? booking?.totalAmount;
+  const hasPrice = typeof totalAmount === 'number' && Number.isFinite(totalAmount) && totalAmount > 0;
+  const hasPriceBreakdown = [durationHours, baseRate, baseTotal, platformFee, taxes]
+    .every((value) => typeof value === 'number' && Number.isFinite(value));
 
-  const companionName = booking?.companionName || route.params?.companionName || 'Verified Companion';
-  const activityName = booking?.activityName || booking?.activity || route.params?.activityName || 'Experience Meetup';
-  const venueName = typeof booking?.venue === 'object' ? (booking?.venue?.name || 'Public Venue') : (booking?.venueName || booking?.venue || 'Public Venue');
-  const formattedDate = booking?.date ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Scheduled Date';
-  const timeSlot = booking?.time || '18:00';
+  const companionName = booking?.companionName || route.params?.companionName || 'Unavailable';
+  const activityName = booking?.activityName || booking?.activity || route.params?.activityName || 'Unavailable';
+  const venueName = typeof booking?.venue === 'object' ? (booking?.venue?.name || 'Unavailable') : (booking?.venueName || booking?.venue || 'Unavailable');
+  const formattedDate = booking?.date ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Unavailable';
+  const timeSlot = booking?.time || 'Unavailable';
 
-  const canUseWallet = walletBalance !== null && walletBalance >= totalAmount;
+  const canUseWallet = hasPrice && walletBalance !== null && walletBalance >= totalAmount;
 
-  // Process Payment via Backend API
+  // No Razorpay native checkout or wallet debit contract is configured in this app.
   const handleProceedPayment = async () => {
     if (!bookingId) {
       Alert.alert('Error', 'Missing booking identifier.');
       return;
     }
+    if (!hasPrice) {
+      const message = 'The Customer Backend did not provide a confirmed booking price. No payment was attempted.';
+      setErrorMessage(message);
+      Alert.alert('Price unavailable', message);
+      return;
+    }
 
-    setIsProcessing(true);
     setErrorMessage(null);
 
-    try {
-      if (selectedMethod === 'wallet') {
-        // Wallet-based payment
-        if (!canUseWallet) {
-          Alert.alert('Insufficient Balance', 'Your wallet balance is insufficient for this booking. Please top up or pay with Razorpay.');
-          setIsProcessing(false);
-          return;
-        }
-
-        // Create booking order and verify with wallet deduction
-        const order = await paymentApi.createBookingOrder(bookingId);
-        const verification = await paymentApi.verifyBookingPayment({
-          razorpay_order_id: order.orderId,
-          razorpay_payment_id: `wallet_pay_${Date.now()}`,
-          razorpay_signature: 'dev_bypass_signature',
-          bookingId,
-        });
-
-        if (verification && (verification.success || verification.message)) {
-          handlePaymentSuccess(order.orderId);
-        } else {
-          throw new Error('Payment verification unsuccessful.');
-        }
-      } else {
-        // Razorpay / UPI payment flow
-        const order = await paymentApi.createBookingOrder(bookingId);
-
-        // Verify order on backend (supports production keys or test environment bypass)
-        const verification = await paymentApi.verifyBookingPayment({
-          razorpay_order_id: order.orderId,
-          razorpay_payment_id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          razorpay_signature: 'dev_bypass_signature',
-          bookingId,
-        });
-
-        if (verification && (verification.success || verification.message)) {
-          handlePaymentSuccess(order.orderId);
-        } else {
-          throw new Error('Payment verification failed.');
-        }
-      }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Payment processing failed. Please try again.';
-      setErrorMessage(Array.isArray(msg) ? msg[0] : msg);
-      Alert.alert('Payment Failed', Array.isArray(msg) ? msg[0] : msg);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handlePaymentSuccess = (orderId: string) => {
-    Alert.alert(
-      'Payment Successful',
-      'Your payment has been safely placed in escrow. Your booking is confirmed!',
-      [
-        {
-          text: 'View Itinerary',
-          onPress: () => {
-            navigation.navigate('BookingsTab', {
-              screen: 'BookingDetailScreen',
-              params: { bookingId, status: 'accepted' },
-            });
-          },
-        },
-      ]
-    );
+    const message = selectedMethod === 'wallet'
+      ? (walletBalance === null
+          ? 'Wallet balance could not be verified. No payment was attempted.'
+          : !canUseWallet
+            ? 'Your wallet balance is insufficient. No payment was attempted.'
+            : 'Wallet booking payment is unavailable in this app version. No funds were deducted.')
+      : 'Razorpay checkout is unavailable in this app version. No payment was submitted.';
+    setErrorMessage(message);
+    Alert.alert('Payment unavailable', message);
   };
 
   if (isLoadingBooking) {
@@ -316,22 +265,26 @@ export const PaymentScreen: React.FC = () => {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Price Breakdown</Text>
 
+          {hasPriceBreakdown ? <>
           <View style={styles.feeRow}>
             <Text style={styles.feeLabel}>Experience Rate ({durationHours} hr × ₹{baseRate})</Text>
-            <Text style={styles.feeValue}>₹{baseTotal.toLocaleString('en-IN')}</Text>
+            <Text style={styles.feeValue}>₹{baseTotal!.toLocaleString('en-IN')}</Text>
           </View>
 
           <View style={styles.feeRow}>
             <View style={styles.labelWithBadge}>
               <Text style={styles.feeLabel}>Safety & Platform Fee (15%)</Text>
             </View>
-            <Text style={styles.feeValue}>₹{platformFee.toLocaleString('en-IN')}</Text>
+            <Text style={styles.feeValue}>₹{platformFee!.toLocaleString('en-IN')}</Text>
           </View>
 
           <View style={styles.feeRow}>
             <Text style={styles.feeLabel}>GST & Service Taxes (18%)</Text>
-            <Text style={styles.feeValue}>₹{taxes.toLocaleString('en-IN')}</Text>
+            <Text style={styles.feeValue}>₹{taxes!.toLocaleString('en-IN')}</Text>
           </View>
+          </> : (
+            <Text style={styles.feeLabel}>Server price breakdown unavailable.</Text>
+          )}
 
           <View style={styles.divider} />
 
@@ -340,7 +293,7 @@ export const PaymentScreen: React.FC = () => {
               <Text style={styles.totalLabel}>Total Escrow Amount</Text>
               <Text style={styles.totalSubtext}>Includes all taxes & safety coverage</Text>
             </View>
-            <Text style={styles.totalValue}>₹{totalAmount.toLocaleString('en-IN')}</Text>
+              <Text style={styles.totalValue}>{hasPrice ? '₹' + totalAmount.toLocaleString('en-IN') : 'Unavailable'}</Text>
           </View>
         </View>
 
@@ -357,25 +310,19 @@ export const PaymentScreen: React.FC = () => {
       <View style={styles.bottomBar}>
         <View style={styles.bottomTotalWrap}>
           <Text style={styles.bottomTotalLabel}>Total to pay</Text>
-          <Text style={styles.bottomTotalAmount}>₹{totalAmount.toLocaleString('en-IN')}</Text>
+          <Text style={styles.bottomTotalAmount}>{hasPrice ? '₹' + totalAmount.toLocaleString('en-IN') : 'Unavailable'}</Text>
         </View>
 
         <TouchableOpacity
-          style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
+          style={[styles.payButton, !hasPrice && styles.payButtonDisabled]}
           onPress={handleProceedPayment}
-          disabled={isProcessing}
+          disabled={!hasPrice}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel={`Pay rupees ${totalAmount} now`}
+          accessibilityLabel={hasPrice ? 'Pay rupees ' + totalAmount + ' now' : 'Payment unavailable'}
         >
-          {isProcessing ? (
-            <ActivityIndicator size="small" color={theme.colors.background} />
-          ) : (
-            <>
-              <Icon name="lock" size={18} color={theme.colors.background} />
-              <Text style={styles.payButtonText}>Pay ₹{totalAmount.toLocaleString('en-IN')} Securely</Text>
-            </>
-          )}
+          <Icon name="lock" size={18} color={theme.colors.background} />
+          <Text style={styles.payButtonText}>Continue to payment</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

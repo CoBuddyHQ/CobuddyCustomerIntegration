@@ -30,22 +30,10 @@ export const NotificationPermissionScreen = () => {
   }, []);
 
   const handleEnableNotifications = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      await notificationsApi.updateNotificationPermission({
-        enabled: true,
-        skipped: false,
-      });
-      navigation.navigate('BasicProfileSetupScreen');
-    } catch (e: any) {
-      showApiError(e, {
-        title: 'Notification Setup Failed',
-        onRetry: handleEnableNotifications,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    Alert.alert(
+      'Notifications unavailable',
+      'Native notification permission and device-token registration are not configured in this app build. No notifications were enabled.',
+    );
   };
 
   const handleSkipNotifications = async () => {

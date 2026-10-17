@@ -14,12 +14,12 @@ export const ArrivalCheckInScreen = () => {
   const { t } = useTranslation('session.arrival');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
-  const [hasArrived, setHasArrived] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
-  const [passCode, setPassCode] = useState('8294');
-
   const route = useRoute<any>();
   const { companionId, companionName, bookingId } = route.params || {};
+  const [hasArrived, setHasArrived] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [passCode, setPassCode] = useState('');
+  const [venueName, setVenueName] = useState<string>(route?.params?.venueName || '');
 
   React.useEffect(() => {
     sessionApi.getCurrentSession().then((sess) => {
@@ -33,21 +33,28 @@ export const ArrivalCheckInScreen = () => {
         if (b?.sessionPassCode) {
           setPassCode(b.sessionPassCode);
         }
+        setVenueName(b?.venueName || b?.venue?.name || 'Venue details unavailable');
       }).catch(() => {});
     }
   }, [bookingId]);
 
-  const handleSimulateArrival = async () => {
+  const handleCheckIn = async () => {
+    if (!bookingId) {
+      Alert.alert('Check-in unavailable', 'A booking identifier is required. No arrival was recorded.');
+      return;
+    }
+    if (!passCode) {
+      Alert.alert('Check-in unavailable', 'A server-issued session pass is not available. No arrival was recorded.');
+      return;
+    }
     setIsLocating(true);
     try {
-      if (bookingId) {
-        await sessionApi.checkIn(bookingId, passCode);
-      }
+      await sessionApi.checkIn(bookingId, passCode);
+      setHasArrived(true);
     } catch {
-      // Graceful fallback
+      Alert.alert('Check-in failed', 'The server did not confirm your arrival. Please retry.');
     } finally {
       setIsLocating(false);
-      setHasArrived(true);
     }
   };
 
@@ -68,7 +75,7 @@ export const ArrivalCheckInScreen = () => {
         
         <View style={styles.venueInfo}>
           <Icon name="map-marker" size={16} color={theme.colors.textSecondary} />
-          <Text style={styles.venueText}>{t('venuePrefix', 'Meeting at ')}<Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>{t('venueName', 'Starbucks, Connaught Place')}</Text></Text>
+          <Text style={styles.venueText}>{t('venuePrefix', 'Meeting at ')}<Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>{venueName || t('venue.unavailable', 'Venue details unavailable')}</Text></Text>
         </View>
 
         {!hasArrived ? (
@@ -76,14 +83,14 @@ export const ArrivalCheckInScreen = () => {
           <View style={styles.preArrivalCard}>
             <View style={styles.mapPlaceholder}>
               <Icon name="map-marker-radius" size={48} color={theme.colors.primary} />
-              <Text style={{color: theme.colors.textSecondary, marginTop: 12}}>{t('gpsActive', 'GPS Tracking Active')}</Text>
+              <Text style={{color: theme.colors.textSecondary, marginTop: 12}}>{t('gpsUnavailable', 'Live location is not shared by this build')}</Text>
             </View>
             <Text style={styles.otpTitle}>{t('otpTitle1', 'Are you at the venue?')}</Text>
             <Text style={styles.otpDesc}>{t('otpDesc1', 'Please confirm you have physically arrived at the meeting location to unlock your Escrow OTP.')}</Text>
             
             <TouchableOpacity 
               style={[styles.primaryBtn, { width: '100%' }, isLocating && { opacity: 0.7 }]} 
-              onPress={handleSimulateArrival}
+              onPress={handleCheckIn}
               disabled={isLocating} accessibilityRole="button" accessibilityLabel={t('a11yShareLocation', 'Share live location')}
             >
               {isLocating ? (

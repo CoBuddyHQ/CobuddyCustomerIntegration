@@ -107,6 +107,30 @@ export const updateNotificationPreferences = async (data: Partial<NotificationPr
   return res.data;
 };
 
+export const requestMobileChangeOtps = async (data: {
+  oldPhone: string;
+  newPhone: string;
+}): Promise<{ success: boolean; message: string }> => {
+  const res = await apiClient.post<{ success: boolean; message: string }>(
+    '/account/change-mobile/request-otp',
+    data,
+  );
+  return res.data;
+};
+
+export const verifyMobileChangeOtps = async (data: {
+  oldPhone: string;
+  newPhone: string;
+  oldOtp: string;
+  newOtp: string;
+}): Promise<{ success: boolean; message: string; newPhone: string }> => {
+  const res = await apiClient.post<{ success: boolean; message: string; newPhone: string }>(
+    '/account/change-mobile/verify',
+    data,
+  );
+  return res.data;
+};
+
 // ─── Get languages ────────────────────────────────────────────────────────────
 export const getLanguages = async (): Promise<{ appLanguage: string; spokenLanguages: string[] }> => {
   const res = await apiClient.get<{ appLanguage: string; spokenLanguages: string[] }>('/account/languages');

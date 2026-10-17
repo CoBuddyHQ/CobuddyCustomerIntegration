@@ -3,7 +3,7 @@
  * Maps to backend: src/modules/discovery/discovery.controller.ts
  */
 
-import { customerApiClient, campaignApiClient } from './apiClient';
+import { customerApiClient } from './apiClient';
 
 export interface CompanionCard {
   id: string;
@@ -158,9 +158,6 @@ export interface Campaign {
   title: string;
   message: string;
   category?: string;
-  targetAudience?: string;
-  bannerUrl?: string | null;
-  actionUrl?: string | null;
   publishedAt?: string;
   expiresAt?: string | null;
 }
@@ -179,6 +176,7 @@ export interface HomeDashboardResponse {
     categories: HomeCategory[];
     featuredCompanions: CompanionCard[];
     campaigns?: Campaign[];
+    campaignsAvailable?: boolean;
     quickAccess: {
       notificationCount: number;
       bookingCount: number;
@@ -209,31 +207,21 @@ export const getHomeDashboardData = async (): Promise<HomeDashboardResponse['dat
   }
 };
 
-// ─── Get Active Marketing Campaigns (Routed via campaignApiClient) ─────────────
+// ─── Get active campaigns through the Customer Backend ────────────────────────
 export const getCampaigns = async (): Promise<Campaign[]> => {
-  console.log('[API REQUEST] [Campaign API] GET /campaigns');
+  console.log('[API REQUEST] [Customer API] GET /discovery/campaigns');
   try {
-    let res: any;
-    try {
-      res = await campaignApiClient.get<any>('/campaigns');
-    } catch (primaryErr: any) {
-      if (primaryErr?.response?.status === 404) {
-        // Fallback for campaign servers exposing under discovery prefix
-        res = await campaignApiClient.get<any>('/discovery/campaigns');
-      } else {
-        throw primaryErr;
-      }
-    }
+    const res: any = await customerApiClient.get<any>('/discovery/campaigns');
     const raw = res?.data;
     if (Array.isArray(raw)) return raw;
     if (raw && typeof raw === 'object') {
       if (Array.isArray(raw.campaigns)) return raw.campaigns;
       if (Array.isArray(raw.data)) return raw.data;
     }
-    return [];
+    throw new Error('Customer backend returned an invalid campaign response.');
   } catch (err: any) {
-    console.error('[API ERROR] [Campaign API] GET /campaigns', err?.message || err);
-    return [];
+    console.error('[API ERROR] [Customer API] GET /discovery/campaigns', err?.message || err);
+    throw err;
   }
 };
 

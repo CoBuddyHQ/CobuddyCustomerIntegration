@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -31,13 +31,14 @@ export const HomeDashboardScreen = () => {
   const { t } = useTranslation('home.dashboard');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<discoveryApi.HomeCategory[]>(DEFAULT_CATEGORIES);
   const [featuredList, setFeaturedList] = useState<CompanionCardType[]>(DEFAULT_FEATURED_LIST);
   const [campaigns, setCampaigns] = useState<discoveryApi.Campaign[]>([]);
+  const [campaignsAvailable, setCampaignsAvailable] = useState(true);
   const [notificationCount, setNotificationCount] = useState(0);
   const [bookingCount, setBookingCount] = useState(0);
   const [activeBooking, setActiveBooking] = useState<any | null>(null);
@@ -67,6 +68,7 @@ export const HomeDashboardScreen = () => {
   }, [selectedInterests, categories]);
 
   const loadHomeData = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
       const homeData = await discoveryApi.getHomeDashboardData();
@@ -81,6 +83,7 @@ export const HomeDashboardScreen = () => {
         if (Array.isArray(homeData.campaigns)) {
           setCampaigns(homeData.campaigns);
         }
+        setCampaignsAvailable(homeData.campaignsAvailable !== false);
         setNotificationCount(homeData.quickAccess?.notificationCount || 0);
         setBookingCount(homeData.quickAccess?.bookingCount || 0);
         setActiveBooking(homeData.activeBooking || null);
@@ -102,11 +105,6 @@ export const HomeDashboardScreen = () => {
       setRefreshing(false);
     }
   }, [updateUser]);
-
-  useEffect(() => {
-    loadHomeData();
-  }, [loadHomeData]);
-  
 
   useFocusEffect(
     useCallback(() => {
@@ -185,9 +183,21 @@ export const HomeDashboardScreen = () => {
                   </View>
                   <Text style={styles.campaignTitle}>{camp.title}</Text>
                   <Text style={styles.campaignMessage} numberOfLines={2}>{camp.message}</Text>
+                  {camp.expiresAt ? (
+                    <Text style={styles.campaignValidity}>
+                      Valid until {new Date(camp.expiresAt).toLocaleDateString()}
+                    </Text>
+                  ) : null}
                 </View>
               ))}
             </ScrollView>
+          </View>
+        )}
+        {campaigns.length === 0 && !campaignsAvailable && (
+          <View style={styles.campaignsContainer}>
+            <Text style={styles.campaignMessage}>
+              {t('campaignsUnavailable', 'Offers are temporarily unavailable. Try again later.')}
+            </Text>
           </View>
         )}
 
@@ -814,5 +824,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.textSecondary,
     lineHeight: 18,
+  },
+  campaignValidity: {
+    marginTop: 8,
+    color: theme.colors.textSecondary,
+    fontSize: 11,
   },
 });

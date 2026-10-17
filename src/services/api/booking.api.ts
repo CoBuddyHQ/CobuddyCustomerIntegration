@@ -22,6 +22,8 @@ export interface Booking {
   durationHours?: number;
   status: BookingStatus;
   totalAmount?: number;
+  matchScore?: number | null;
+  companionRequestStatus?: 'sent' | 'unavailable';
   pricing?: {
     baseRate?: number;
     durationHours?: number;
@@ -55,11 +57,23 @@ export interface CreateBookingRequest {
   venueAddress?: string;
   date?: string;
   time?: string;
+  scheduledStart?: string;
   duration?: number;
   durationHours?: number;
+  safetyAcknowledged: boolean;
   notes?: string;
   specialInstructions?: string;
-  baseRate?: number;
+}
+
+export interface BookingPriceQuote {
+  currency: string;
+  durationHours: number;
+  multiplier: number;
+  baseRate: number;
+  baseTotal: number;
+  platformFee: number;
+  taxAmount: number;
+  totalAmount: number;
 }
 
 export interface CancelBookingRequest {
@@ -85,24 +99,83 @@ export interface CounterOfferResponseRequest {
   action: 'accept' | 'decline';
 }
 
+export const getBookingPriceQuote = async (data: {
+  companionId: string;
+  activityId?: string;
+  durationHours: number;
+}): Promise<BookingPriceQuote> => {
+  const res = await apiClient.post<BookingPriceQuote>('/bookings/quote', data);
+  return res.data;
+};
+
 // ─── Create booking ───────────────────────────────────────────────────────────
 export const createBooking = async (data: CreateBookingRequest): Promise<Booking> => {
+  const activityName = data.activityName || data.activity;
+  const venueName = data.venueName || data.venue;
+  const durationHours = Number(data.durationHours ?? data.duration);
+  if (!data.companionId || !data.activityId || !activityName || !venueName || !data.date || !data.time) {
+    throw new Error('Companion, activity, venue, date, and time are required to create a booking.');
+  }
+  if (!Number.isFinite(durationHours) || durationHours < 1 || durationHours > 8) {
+    throw new Error('Booking duration must be between 1 and 8 hours.');
+  }
+  if (data.safetyAcknowledged !== true) {
+    throw new Error('Safety agreement must be acknowledged before creating a booking.');
+  }
+  const scheduledStart = data.scheduledStart || createScheduledStart(data.date, data.time);
+  if (!Number.isFinite(new Date(scheduledStart).getTime())) {
+    throw new Error('A valid scheduled start time is required to create a booking.');
+  }
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!timeZone) throw new Error('The device time zone is unavailable; booking time cannot be verified.');
   const payload = {
     companionId: data.companionId,
     companionName: data.companionName,
-    activityName: data.activityName || data.activity || 'Coffee Meetup',
+    activityName,
     activityId: data.activityId,
     activityIcon: data.activityIcon,
-    venueName: data.venueName || data.venue || 'Public Cafe',
+    venueName,
     venueAddress: data.venueAddress,
-    date: (data.date && data.date.includes('T')) ? data.date : `${data.date || new Date().toISOString().split('T')[0]}T00:00:00.000Z`,
-    time: data.time || '18:00',
-    durationHours: Number(data.durationHours || data.duration || 2),
+    date: data.date,
+    time: data.time,
+    timeZone,
+    scheduledStart,
+    durationHours,
+    safetyAcknowledged: data.safetyAcknowledged,
     specialInstructions: data.specialInstructions || data.notes,
-    baseRate: Number(data.baseRate || 500),
   };
   const res = await apiClient.post<Booking>('/bookings', payload);
   return res.data;
+};
+
+const createScheduledStart = (date: string, time: string): string => {
+  const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const timeMatch = time.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+  if (!dateMatch || !timeMatch) {
+    throw new Error('Booking date and time must use a supported date and time format.');
+  }
+  const [, yearText, monthText, dayText] = dateMatch;
+  const [, hourText, minuteText, meridiem] = timeMatch;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  let hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || minute > 59) {
+    throw new Error('Booking date and time are invalid.');
+  }
+  if (meridiem) {
+    if (hour < 1 || hour > 12) throw new Error('Booking time is invalid.');
+    if (meridiem.toUpperCase() === 'AM') hour = hour === 12 ? 0 : hour;
+    else hour = hour === 12 ? 12 : hour + 12;
+  } else if (hour > 23) {
+    throw new Error('Booking time is invalid.');
+  }
+  const localStart = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (localStart.getFullYear() !== year || localStart.getMonth() !== month - 1 || localStart.getDate() !== day) {
+    throw new Error('Booking date is invalid.');
+  }
+  return localStart.toISOString();
 };
 
 // ─── List bookings ────────────────────────────────────────────────────────────

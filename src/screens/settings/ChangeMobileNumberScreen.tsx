@@ -5,34 +5,53 @@ import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { authApi } from '../../services/api';
+import { requestMobileChangeOtps, verifyMobileChangeOtps } from '../../services/api/account.api';
+import { showApiError } from '../../utils/errorHandler';
 
 export const ChangeMobileNumberScreen = () => {
   const { t } = useTranslation('settings.changeMobile');
   const { smartGoBack } = useSmartNavigation();
   const [oldPhone, setOldPhone] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [oldOtp, setOldOtp] = useState('');
+  const [newOtp, setNewOtp] = useState('');
+  const [otpRequested, setOtpRequested] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!oldPhone.trim() || !newPhone.trim()) {
+    if (!otpRequested && (!oldPhone.trim() || !newPhone.trim())) {
       Alert.alert(t('errorTitle', 'Error'), t('errorMsg', 'Please enter both old and new mobile numbers.'));
+      return;
+    }
+    if (otpRequested && (!oldOtp.trim() || !newOtp.trim())) {
+      Alert.alert('OTP required', 'Enter the verification codes for both mobile numbers.');
       return;
     }
     
     setIsLoading(true);
     try {
-      // Trigger OTP verification for mobile number change
-      await authApi.sendOtp({ phone: newPhone.trim().replace(/\D/g, '') });
-    } catch {
-      // Fallback
+      if (!otpRequested) {
+        const result = await requestMobileChangeOtps({
+          oldPhone: oldPhone.trim(),
+          newPhone: newPhone.trim(),
+        });
+        setOtpRequested(true);
+        Alert.alert('Verification prepared', result.message);
+        return;
+      }
+      const result = await verifyMobileChangeOtps({
+        oldPhone: oldPhone.trim(),
+        newPhone: newPhone.trim(),
+        oldOtp: oldOtp.trim(),
+        newOtp: newOtp.trim(),
+      });
+      Alert.alert('Number updated', result.message, [{ text: 'OK', onPress: () => smartGoBack() }]);
+    } catch (error) {
+      showApiError(error, {
+        title: otpRequested ? 'Number change failed' : 'OTP request failed',
+      });
     } finally {
       setIsLoading(false);
-      Alert.alert(
-        t('successTitle', 'OTP Sent'),
-        t('successMsg', 'An OTP has been sent to your new mobile number for verification.'),
-        [{ text: 'OK', onPress: () => smartGoBack() }]
-      );
     }
   };
 
@@ -64,6 +83,7 @@ export const ChangeMobileNumberScreen = () => {
                 placeholderTextColor={theme.colors.textSecondary}
                 keyboardType="phone-pad"
                 value={oldPhone}
+                editable={!otpRequested}
                 onChangeText={setOldPhone}
               />
             </View>
@@ -79,17 +99,51 @@ export const ChangeMobileNumberScreen = () => {
                 placeholderTextColor={theme.colors.textSecondary}
                 keyboardType="phone-pad"
                 value={newPhone}
+                editable={!otpRequested}
                 onChangeText={setNewPhone}
               />
             </View>
           </View>
+
+          {otpRequested && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Verification code for current number</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter current-number code"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    keyboardType="number-pad"
+                    value={oldOtp}
+                    onChangeText={setOldOtp}
+                  />
+                </View>
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Verification code for new number</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter new-number code"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    keyboardType="number-pad"
+                    value={newOtp}
+                    onChangeText={setNewOtp}
+                  />
+                </View>
+              </View>
+            </>
+          )}
 
         </ScrollView>
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={isLoading}>
-          <Text style={styles.submitBtnText}>{t('submitBtn', 'Send OTPs')}</Text>
+          <Text style={styles.submitBtnText}>
+            {otpRequested ? 'Verify numbers' : t('submitBtn', 'Request OTPs')}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

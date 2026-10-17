@@ -1,216 +1,62 @@
-﻿import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, Alert, Switch } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { RootStackParamList } from '../../types/navigation';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-export const AddPaymentMethodScreen = () => { 
+export const AddPaymentMethodScreen = () => {
   const { t } = useTranslation('wallet.addPaymentMethod');
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
-  const [cardHolder, setCardHolder] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [isDefault, setIsDefault] = useState(false);
-
-  const formatCard = (v: string) => {
-    const digits = v.replace(/\D/g, '').slice(0, 16);
-    return digits.replace(/(.{4})/g, '$1 ').trim();
-  };
-
-  const formatExpiry = (v: string) => {
-    const digits = v.replace(/\D/g, '').slice(0, 4);
-    if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2);
-    return digits;
-  };
-
-  const maskedDisplay = () => {
-    const raw = cardNumber.replace(/\s/g, '');
-    if (raw.length <= 4) return cardNumber;
-    return raw.slice(0, 4).replace(/./g, '*') + ' **** **** ' + raw.slice(-4).padStart(4, '*');
-  };
-
-  const handleSave = () => {
-    if (cardNumber.length < 16) {
-        Alert.alert(t('alertTitleError', 'Error'), t('alertMsgPleaseenteravalid16d', 'Please enter a valid 16-digit card number.'));
-        return;
-    }
-    
-    // Create new card object to pass back
-    const raw = cardNumber.replace(/\s/g, '');
-    const newCard = {
-        id: 'pm_card_' + Date.now(),
-        icon: 'credit-card-outline',
-        title: t('card.endingIn', 'Card ending in {{last4}}', { last4: raw.slice(-4) }),
-    sub: t('card.expires', 'Expires {{date}}', { date: expiry || '12/29' }),
-        isDefault: isDefault
-    };
-
-    Alert.alert(t('alertTitleSuccess', 'Success'), t('alertMsgYourcardhasbeensecur', 'Your card has been securely added to your wallet.'), [
-        { text: t('okBtn', 'OK'), onPress: () => {
-            navigation.navigate('PaymentMethodsScreen' as any, { newMethod: newCard as any });
-        }}
-    ]);
-  };
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
-
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => smartGoBack()} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11yGoBack', 'Go back')}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => smartGoBack()}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11yGoBack', 'Go back')}
+        >
           <Icon name="arrow-left" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('headerTitle', 'Add New Card')}</Text>
-        <View style={styles.backBtn} />
+        <View style={styles.backButton} />
       </View>
-
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            
-            <View style={styles.cardPreview}>
-                <View style={styles.cardPreviewTop}>
-                    <Icon name="credit-card-chip-outline" size={32} color={theme.colors.textPrimary} />
-                    <Icon name="contactless-payment" size={24} color={theme.colors.textPrimary} style={{opacity: 0.8}} />
-                </View>
-                <Text style={styles.cardNumberText}>
-                    {cardNumber.trim() ? maskedDisplay() : '**** **** **** ****'}
-                </Text>
-                <View style={styles.cardPreviewBottom}>
-                    <View>
-                        <Text style={styles.cardPreviewLabel}>{t('cardholderUpper', 'CARDHOLDER')}</Text>
-                        <Text style={styles.cardPreviewValue}>{cardHolder.trim() || t('card.yourName', 'YOUR NAME')}</Text>
-                    </View>
-                    <View>
-                        <Text style={styles.cardPreviewLabel}>{t('expiryUpper', 'EXPIRY')}</Text>
-                        <Text style={styles.cardPreviewValue}>{expiry || t('card.mmYy', 'MM/YY')}</Text>
-                    </View>
-                </View>
-            </View>
-
-            <View style={styles.formSection}>
-                <Text style={styles.sectionTitle}>{t('sectionTitle', 'CARD DETAILS')}</Text>
-                
-                <View style={styles.inputBlock}>
-                    <Text style={styles.inputLabel}>{t('cardholderName', 'Cardholder Name')}</Text>
-                    <TextInput 
-                        style={styles.input}
-                        value={cardHolder}
-                        onChangeText={setCardHolder}
-                        placeholder={t('placeholder.NameAsItAppears', 'Name as it appears on card')}
-                        placeholderTextColor={theme.colors.textSecondary}
-                        autoCapitalize="words"
-                    />
-                </View>
-
-                <View style={styles.inputBlock}>
-                    <Text style={styles.inputLabel}>{t('inputCardNum', 'Card Number')}</Text>
-                    <View style={styles.inputIconWrapper}>
-                        <TextInput 
-                            style={[styles.input, { paddingRight: 40 }]}
-                            value={cardNumber}
-                            onChangeText={v => setCardNumber(formatCard(v))}
-                            placeholder={t('placeholder.000000000000000', '0000 0000 0000 0000')}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            keyboardType="number-pad"
-                            maxLength={19}
-                        />
-                        <Icon name="lock" size={18} color={theme.colors.textSecondary} style={styles.inputInnerIcon} />
-                    </View>
-                </View>
-
-                <View style={styles.rowInputs}>
-                    <View style={[styles.inputBlock, { flex: 1 }]}>
-                        <Text style={styles.inputLabel}>{t('expiry', 'Expiry')}</Text>
-                        <TextInput 
-                            style={styles.input}
-                            value={expiry}
-                            onChangeText={v => setExpiry(formatExpiry(v))}
-                            placeholder={t('placeholder.MMYY', 'MM/YY')}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            keyboardType="number-pad"
-                            maxLength={5}
-                        />
-                    </View>
-                    <View style={[styles.inputBlock, { flex: 1 }]}>
-                        <Text style={styles.inputLabel}>{t('inputCvv', 'CVV')}</Text>
-                        <TextInput 
-                            style={styles.input}
-                            value={cvv}
-                            onChangeText={v => setCvv(v.replace(/\D/g, '').slice(0, 4))}
-                            placeholder={t('placeholder.123', '123')}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            keyboardType="number-pad"
-                            secureTextEntry
-                            maxLength={4}
-                        />
-                    </View>
-                </View>
-            </View>
-
-            <View style={styles.formSection}>
-                <View style={styles.defaultRow}>
-                    <View style={styles.defaultMeta}>
-                        <Text style={styles.defaultTitle}>{t('setDefault', 'Set as Default Card')}</Text>
-                        <Text style={styles.defaultSub}>{t('setDefaultSub', 'Use this card automatically for session bookings')}</Text>
-                    </View>
-                    <Switch
-                        value={isDefault}
-                        onValueChange={setIsDefault}
-                        trackColor={{ false: theme.colors.surface, true: 'rgba(212, 175, 55, 0.4)' }}
-                        thumbColor={isDefault ? theme.colors.primary : theme.colors.textSecondary}
-                    />
-                </View>
-            </View>
-
-            <View style={styles.pciNote}>
-                <Icon name="security" size={16} color={theme.colors.primary} />
-                <Text style={styles.pciNoteText}>{t('securityNote', 'Card data is never stored on our servers. Information is tokenised by our PCI-DSS Level 1 payment partner.')}</Text>
-            </View>
-
-            <TouchableOpacity style={styles.saveBtn} activeOpacity={0.8} onPress={handleSave} accessibilityRole="button" accessibilityLabel={t('a11ySaveCardSecurely', 'Save Card Securely')}>
-                <Icon name="lock-check" size={20} color={theme.colors.surface} />
-                <Text style={styles.saveBtnText}>{t('saveCard', 'Save Card Securely')}</Text>
-            </TouchableOpacity>
-
-        </ScrollView>
-      </KeyboardAvoidingView>
+      <View style={styles.content}>
+        <Icon name="credit-card-off-outline" size={56} color={theme.colors.textSecondary} />
+        <Text style={styles.title}>Card tokenization unavailable</Text>
+        <Text style={styles.message}>
+          A PCI-compliant payment provider is not connected in this app build. Do not enter card details.
+          No card was collected or saved.
+        </Text>
+      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 60, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary },
-  scrollContent: { padding: 20, paddingBottom: 40 },
-  cardPreview: { backgroundColor: 'rgba(212, 175, 55, 0.1)', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.3)', marginBottom: 24, minHeight: 200, justifyContent: 'space-between' },
-  cardPreviewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardNumberText: { fontSize: 22, fontWeight: 'bold', color: theme.colors.textPrimary, letterSpacing: 4, marginTop: 24 },
-  cardPreviewBottom: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 },
-  cardPreviewLabel: { fontSize: 9, color: theme.colors.textSecondary, letterSpacing: 1.5, marginBottom: 4 },
-  cardPreviewValue: { fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary, textTransform: 'uppercase' },
-  formSection: { marginBottom: 24 },
-  sectionTitle: { fontSize: 11, fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 1, marginBottom: 16 },
-  inputBlock: { marginBottom: 16 },
-  inputLabel: { fontSize: 12, fontWeight: '500', color: theme.colors.textSecondary, marginBottom: 8 },
-  input: { backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: theme.colors.textPrimary },
-  inputIconWrapper: { position: 'relative' },
-  inputInnerIcon: { position: 'absolute', right: 16, top: 16 },
-  rowInputs: { flexDirection: 'row', gap: 16 },
-  defaultRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surface, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border },
-  defaultMeta: { flex: 1, paddingRight: 16 },
-  defaultTitle: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 4 },
-  defaultSub: { fontSize: 12, color: theme.colors.textSecondary },
-  pciNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 16, backgroundColor: 'rgba(16, 185, 129, 0.05)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)', marginBottom: 24 },
-  pciNoteText: { flex: 1, fontSize: 11, color: theme.colors.textSecondary, lineHeight: 16 },
-  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.colors.primary, paddingVertical: 16, borderRadius: 16 },
-  saveBtnText: { fontSize: 15, fontWeight: 'bold', color: theme.colors.surface },
+  header: {
+    minHeight: 60,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  backButton: { width: 40, paddingVertical: 8 },
+  headerTitle: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '700' },
+  content: {
+    flex: 1,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  title: { color: theme.colors.textPrimary, fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  message: { color: theme.colors.textSecondary, fontSize: 15, lineHeight: 22, textAlign: 'center' },
 });

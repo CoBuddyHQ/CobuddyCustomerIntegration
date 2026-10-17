@@ -1,62 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { kycApi } from '../../services/api';
-import { showApiError } from '../../utils/errorHandler';
 import { FlowTracker } from '../../services/flowTracker';
-import { RootStackParamList } from '../../types/navigation';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const { width } = Dimensions.get('window');
 
 export const SelfieCaptureScreen = () => { 
   const { t } = useTranslation('verify.selfie');
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
-  const [hasPermission, setHasPermission] = useState(false);
+  const hasPermission = false;
   const [photoCaptured, setPhotoCaptured] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     FlowTracker.saveActiveScreen('SelfieCaptureScreen');
-    // Simulate camera permission check
-    const timer = setTimeout(() => {
-      setHasPermission(true);
-    }, 800);
-    return () => clearTimeout(timer);
   }, []);
 
   const handleCapture = () => {
-    setPhotoCaptured(true);
+    Alert.alert(
+      'Camera unavailable',
+      'Native camera support is not installed in this app build. No selfie was captured.',
+    );
   };
 
   const handleRetake = () => {
     setPhotoCaptured(false);
   };
 
-  const handleNext = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      await kycApi.submitKycSelfie('https://images.unsplash.com/photo-1534528741775-53994a69daeb');
-      navigation.navigate('LivenessDetectionScreen');
-    } catch (e: any) {
-      try {
-        showApiError(e, {
-          title: 'Selfie Upload Failed',
-          onRetry: handleNext,
-        });
-      } catch {
-        Alert.alert('Upload Failed', 'Could not upload selfie. Please try again.');
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleNext = () => {
+    Alert.alert('Selfie unavailable', 'No real selfie was captured or submitted.');
   };
 
   return (
@@ -74,9 +49,9 @@ export const SelfieCaptureScreen = () => {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>{t('selfieVerify', 'Selfie Verification')}</Text>
         <Text style={styles.subtitle}>
-          {photoCaptured 
+          {photoCaptured
             ? t('selfie.faceVisible', "Ensure your face is clearly visible and not blurry.") 
-            : t('selfie.removeGlasses', "Please remove any glasses or hats, and ensure you are in a well-lit area.")}
+            : t('selfie.removeGlasses', 'Selfie capture is unavailable because native camera support is not installed.')}
         </Text>
 
         <View style={styles.cameraContainer}>
@@ -108,20 +83,13 @@ export const SelfieCaptureScreen = () => {
                 <Text style={styles.retakeBtnText}>{t('retakeBtn', 'Retake')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.confirmBtn, isSubmitting && { opacity: 0.7 }]}
+                style={styles.confirmBtn}
                 onPress={handleNext}
-                disabled={isSubmitting}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel={t('a11yConfirm', 'Confirm')}>
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color={theme.colors.background} />
-                ) : (
-                  <>
-                    <Text style={styles.confirmBtnText}>{t('confirmBtn', 'Confirm')}</Text>
-                    <Icon name="check" size={20} color={theme.colors.background} />
-                  </>
-                )}
+                <Text style={styles.confirmBtnText}>{t('confirmBtn', 'Confirm')}</Text>
+                <Icon name="check" size={20} color={theme.colors.background} />
               </TouchableOpacity>
             </View>
           ) : (

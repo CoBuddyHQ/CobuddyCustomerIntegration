@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Modal, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -8,46 +8,40 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
-const INITIAL_METHODS = [
-  { id: 'pm_upi', icon: 'qrcode', title: 'UPI / GPay', sub: 'shlok@okicici', isDefault: true },
-  { id: 'pm_card1', icon: 'credit-card-outline', title: 'Visa ending in 4242', sub: 'Expires 12/26', isDefault: false },
-];
+import { walletApi, PaymentMethod } from '../../services/api';
 
 export const PaymentMethodsScreen = () => { 
   const { t } = useTranslation('wallet.paymentMethods');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'PaymentMethodsScreen'>>();
-  const [methods, setMethods] = useState(INITIAL_METHODS);
-  const [upiModalVisible, setUpiModalVisible] = useState(false);
-  const [newUpiId, setNewUpiId] = useState('');
+  const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const isSelectionMode = route.params?.mode === 'select';
 
-  useEffect(() => {
-    if (route.params?.newMethod) {
-      const newMethod = route.params.newMethod;
-      setMethods(prevMethods => {
-        let updatedMethods = [...prevMethods];
-        if (newMethod.isDefault) {
-          updatedMethods = updatedMethods.map(m => ({ ...m, isDefault: false }));
-        }
-        updatedMethods.unshift(newMethod as any);
-        return updatedMethods;
-      });
-      navigation.setParams({ newMethod: undefined });
+  const loadMethods = useCallback(async () => {
+    setIsLoading(true);
+    setLoadFailed(false);
+    try {
+      setMethods(await walletApi.getPaymentMethods());
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setIsLoading(false);
     }
-  }, [route.params?.newMethod, navigation]);
+  }, []);
+
+  useEffect(() => {
+    void loadMethods();
+  }, [loadMethods]);
 
   const handleMethodPress = (method: any) => {
     if (isSelectionMode) {
       navigation.navigate('AddMoneyScreen', { selectedMethod: method });
     } else {
-      setMethods(prev => prev.map(m => ({
-        ...m,
-        isDefault: m.id === method.id
-      })));
+      Alert.alert('Default method unavailable', 'Changing the default payment method is not configured. No change was made.');
     }
   };
 
@@ -55,27 +49,20 @@ export const PaymentMethodsScreen = () => {
     Alert.alert(t('alertTitleRemovePaymentMe', 'Remove Payment Method'), t('alertMsgRemoveConfirm', 'Are you sure you want to remove {{title}} from your saved methods?', { title }),
         [
             { text: t('cancelBtn', 'Cancel'), style: 'cancel' },
-            { text: t('removeBtn', 'Remove'), style: 'destructive', onPress: () => {
-                setMethods(prev => prev.filter(m => m.id !== id));
+            { text: t('removeBtn', 'Remove'), style: 'destructive', onPress: async () => {
+                try {
+                  await walletApi.deletePaymentMethod(id);
+                  setMethods(prev => prev.filter(m => m.id !== id));
+                } catch {
+                  Alert.alert('Could not remove method', 'The server did not confirm the payment method removal.');
+                }
             }}
         ]
     );
   };
 
   const handleAddUpi = () => {
-    if (!newUpiId.includes('@') || newUpiId.length < 5) return;
-    const upiMethod = {
-        id: 'pm_upi_' + Date.now(),
-        icon: 'qrcode',
-        title: t('upi.title', 'UPI ID'),
-        sub: newUpiId.toLowerCase(),
-        isDefault: true
-    };
-    let updatedMethods = methods.map(m => ({ ...m, isDefault: false }));
-    updatedMethods.unshift(upiMethod);
-    setMethods(updatedMethods);
-    setNewUpiId('');
-    setUpiModalVisible(false);
+    Alert.alert('UPI verification unavailable', 'No UPI verification provider is configured. No UPI ID was saved.');
   };
 
   return (
@@ -98,16 +85,28 @@ export const PaymentMethodsScreen = () => {
                     <Icon name="shield-lock-outline" size={24} color={theme.colors.primary} />
                 </View>
                 <View style={styles.securityMeta}>
-                    <Text style={styles.securityTitle}>{t('secureTitle', 'Secure & Encrypted')}</Text>
-                    <Text style={styles.securitySub}>{t('secureDesc', 'We don\'t store your full card details. All transactions are PCI-DSS compliant.')}</Text>
+                    <Text style={styles.securityTitle}>{t('secureTitle', 'Secure payment provider unavailable')}</Text>
+                    <Text style={styles.securitySub}>{t('secureDesc', 'No card tokenization provider is connected. Do not enter payment credentials.')}</Text>
                 </View>
             </View>
         ) : null}
 
         <View style={styles.card}>
             <Text style={styles.sectionTitle}>{t('sectionTitle', 'SAVED PAYMENT METHODS')}</Text>
+
+            {isLoading ? (
+              <ActivityIndicator color={theme.colors.primary} />
+            ) : loadFailed ? (
+              <TouchableOpacity onPress={() => void loadMethods()} accessibilityRole="button">
+                <Text style={styles.methodSub}>Could not load saved methods. Tap to retry.</Text>
+              </TouchableOpacity>
+            ) : methods.length === 0 ? (
+              <Text style={styles.methodSub}>
+                No verified payment methods are available. Secure tokenization is not configured.
+              </Text>
+            ) : null}
             
-            {methods.map((pm, index) => {
+            {!isLoading && !loadFailed && methods.map((pm, index) => {
                 const isSelected = isSelectionMode ? route.params?.currentId === pm.id : pm.isDefault;
                 return (
                     <TouchableOpacity 
@@ -160,7 +159,7 @@ export const PaymentMethodsScreen = () => {
                 <TouchableOpacity 
                     style={[styles.addMethodRow, { borderTopWidth: 0, paddingTop: 12, marginTop: 4 }]} 
                     activeOpacity={0.7}
-                    onPress={() => setUpiModalVisible(true)} accessibilityRole="button" accessibilityLabel={t('a11yAddUpiId', 'Add UPI ID')}
+                    onPress={handleAddUpi} accessibilityRole="button" accessibilityLabel={t('a11yAddUpiId', 'Add UPI ID')}
                 >
                     <View style={styles.addIconWrap}>
                         <Icon name="at" size={22} color={theme.colors.primary} />
@@ -173,45 +172,10 @@ export const PaymentMethodsScreen = () => {
 
         <View style={styles.trustFooter}>
             <Icon name="lock" size={14} color={theme.colors.textSecondary} />
-            <Text style={styles.trustText}>{t('trustText', 'End-to-end encrypted with AES-256')}</Text>
+            <Text style={styles.trustText}>{t('trustText', 'No payment details are stored by this app.')}</Text>
         </View>
 
       </ScrollView>
-
-      <Modal visible={upiModalVisible} transparent animationType="slide" onRequestClose={() => setUpiModalVisible(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>{t('modalTitle', 'Add UPI ID')}</Text>
-                    <TouchableOpacity onPress={() => setUpiModalVisible(false)} hitSlop={{top:10, bottom:10, left:10, right:10}} accessibilityRole="button" accessibilityLabel={t('a11yClose', 'Close')}>
-                        <Icon name="close" size={24} color={theme.colors.textSecondary} />
-                    </TouchableOpacity>
-                </View>
-
-                <Text style={styles.modalLabel}>{t('modalLabel', 'Enter your UPI ID')}</Text>
-                <View style={styles.inputWrap}>
-                    <TextInput 
-                        style={styles.upiInput}
-                        placeholder={t('placeholder.eGNameOkhdfcban', 'e.g. name@okhdfcbank')}
-                        placeholderTextColor={theme.colors.textSecondary}
-                        value={newUpiId}
-                        onChangeText={setNewUpiId}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                    />
-                    <Icon name="check-decagram" size={20} color={newUpiId.includes('@') && newUpiId.length > 4 ? theme.colors.success : theme.colors.border} style={{position: 'absolute', right: 16}} />
-                </View>
-
-                <TouchableOpacity 
-                    style={[styles.verifyBtn, (!newUpiId.includes('@') || newUpiId.length < 5) ? {opacity: 0.5} : null]}
-                    activeOpacity={0.8}
-                    onPress={handleAddUpi} accessibilityRole="button" accessibilityLabel={t('a11yVerifyAdd', 'Verify & Add')}
-                >
-                    <Text style={styles.verifyBtnText}>{t('modalVerify', 'Verify & Add')}</Text>
-                </TouchableOpacity>
-            </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
     </SafeAreaView>
   );
