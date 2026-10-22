@@ -46,8 +46,8 @@ export const getSessionHistory = async (): Promise<Session[]> => {
 };
 
 // ─── Check in ─────────────────────────────────────────────────────────────────
-export const checkIn = async (bookingId: string, passCode?: string): Promise<Session> => {
-  const res = await apiClient.post<Session>('/sessions/check-in', { bookingId, passCode });
+export const checkIn = async (bookingId: string): Promise<Session> => {
+  const res = await apiClient.post<Session>('/sessions/check-in', { bookingId });
   return res.data;
 };
 

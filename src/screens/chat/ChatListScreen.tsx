@@ -109,7 +109,7 @@ export const ChatListScreen = () => {
             </View>
 
             <Text style={styles.liveCardTitle}>{t('liveCardTitle', 'CoBuddy Concierge')}</Text>
-            <Text style={styles.liveCardSub}>{t('connectWithADedicatedSpecialist', 'Connect with a dedicated specialist for immediate 24/7 assistance.')}</Text>
+            <Text style={styles.liveCardSub}>{t('connectWithADedicatedSpecialist', 'Start a support conversation. Response timing is not guaranteed.')}</Text>
 
             <TouchableOpacity
               style={styles.startBtn}

@@ -144,13 +144,6 @@ export const OTPVerificationScreen = () => {
           )}
         </View>
 
-        {/* Dev hint — only in __DEV__ */}
-        {__DEV__ && (
-          <View style={styles.devHint}>
-            <Text style={styles.devText}>{t('otp.dev_hint')}</Text>
-          </View>
-        )}
-
         <View style={styles.trustNote}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
             <Icon name="lock-outline" size={16} color={theme.colors.textSecondary} />
@@ -201,14 +194,6 @@ const styles = StyleSheet.create({
   timerText: { fontSize: 13, color: theme.colors.textSecondary },
   timerValue: { color: theme.colors.primary, fontWeight: '600' },
   resendBtn: { fontSize: 14, color: theme.colors.primary, fontWeight: '500' },
-
-  devHint: {
-    backgroundColor: 'rgba(212,175,55,0.08)',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 16,
-  },
-  devText: { fontSize: 11, color: theme.colors.primary, textAlign: 'center', fontStyle: 'italic' },
 
   trustNote: {
     backgroundColor: theme.colors.surface,

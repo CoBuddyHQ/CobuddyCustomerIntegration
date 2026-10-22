@@ -26,19 +26,19 @@ export const HelpCenterScreen = () => {
 
   const FAQS = [
   // Bookings & Meetups
-  { id: 'f1', categoryId: '1', question: t('faq.f1.q', 'How do I cancel a booking?'), answer: t('faq.f1.a', 'Go to your booking details and tap "Cancel Booking". Cancellations made 24 hours prior are fully refunded.') },
-  { id: 'f2', categoryId: '1', question: t('faq.f2.q', "What if a companion doesn't show up?"), answer: t('faq.f2.a', "If a companion is a no-show, please report it immediately. You will receive a full refund, and the companion's profile will be penalized.") },
-  { id: 'f3', categoryId: '1', question: t('faq.f3.q', 'Can I reschedule my meetup?'), answer: t('faq.f3.a', 'Yes, you can modify your booking time up to 12 hours before the meetup, provided the companion accepts the new schedule.') },
-  { id: 'f4', categoryId: '1', question: t('faq.f4.q', 'Are there extra charges for overtime?'), answer: t('faq.f4.a', 'Yes, if your session exceeds the booked time, you can negotiate an extension directly in the app and pay the difference.') },
+  { id: 'f1', categoryId: '1', question: t('faq.f1.q', 'How do I cancel a booking?'), answer: t('faq.f1.a', 'Use booking details to request cancellation. The Customer Backend reports whether it was accepted. Provider refunds are unavailable in this app build.') },
+  { id: 'f2', categoryId: '1', question: t('faq.f2.q', "What if a companion doesn't show up?"), answer: t('faq.f2.a', "Submit an incident report and contact local emergency services if there is immediate danger. A refund or profile action is not guaranteed by this app build.") },
+  { id: 'f3', categoryId: '1', question: t('faq.f3.q', 'Can I reschedule my meetup?'), answer: t('faq.f3.a', 'Schedule changes are available for pending booking requests. The Customer Backend must confirm the Companion Backend accepted the update.') },
+  { id: 'f4', categoryId: '1', question: t('faq.f4.q', 'Are there extra charges for overtime?'), answer: t('faq.f4.a', 'Session extensions are unavailable in this app build because companion approval and payment processing are not connected.') },
 
   // Payments & Refunds
-  { id: 'f5', categoryId: '2', question: t('faq.f5.q', 'How is my payment secured?'), answer: t('faq.f5.a', 'We use bank-level AES-256 encryption. Your money is held securely in escrow until the session is successfully completed.') },
-  { id: 'f6', categoryId: '2', question: t('faq.f6.q', 'When will I get my refund?'), answer: t('faq.f6.a', 'Refunds are processed immediately by our system but may take 3-5 business days to reflect in your bank account depending on your bank.') },
-  { id: 'f7', categoryId: '2', question: t('faq.f7.q', 'What payment methods do you accept?'), answer: t('faq.f7.a', 'We accept all major Credit/Debit Cards, UPI, Net Banking, and popular mobile wallets.') },
+  { id: 'f5', categoryId: '2', question: t('faq.f5.q', 'How is my payment secured?'), answer: t('faq.f5.a', 'Booking checkout is unavailable in this app build. No booking payment is submitted and no escrow funds are held by this screen.') },
+  { id: 'f6', categoryId: '2', question: t('faq.f6.q', 'When will I get my refund?'), answer: t('faq.f6.a', 'Refund transfers are not configured in this app build. If a paid cancellation requires a refund, the Customer Backend keeps the booking active and reports that it could not cancel it.') },
+  { id: 'f7', categoryId: '2', question: t('faq.f7.q', 'What payment methods do you accept?'), answer: t('faq.f7.a', 'Card tokenization and booking checkout are unavailable in this app build. Do not enter payment credentials here.') },
 
   // Trust & Safety
-  { id: 'f8', categoryId: '3', question: t('faq.f8.q', 'How does the SOS feature work?'), answer: t('faq.f8.a', 'Tapping SOS immediately alerts your Trusted Contacts with your live location and notifies our 24/7 internal security team.') },
-  { id: 'f9', categoryId: '3', question: t('faq.f9.q', 'Are the companions identity-verified?'), answer: t('faq.f9.a', 'Yes! Look for the blue tick badge. This means they have completed a strict KYC process including Govt ID verification.') },
+  { id: 'f8', categoryId: '3', question: t('faq.f8.q', 'How does the SOS feature work?'), answer: t('faq.f8.a', 'SOS records an event with the Customer Backend. This app build does not notify trusted contacts, share live location, or dispatch emergency services. Contact local authorities if you are in immediate danger.') },
+  { id: 'f9', categoryId: '3', question: t('faq.f9.q', 'Are the companions identity-verified?'), answer: t('faq.f9.a', 'A profile may show a verification state reported by the service. Do not treat a badge as a guarantee; meet in public and use your judgment.') },
   { id: 'f10', categoryId: '3', question: t('faq.f10.q', 'Can I hide my profile?'), answer: t('faq.f10.a', 'Yes, go to Safety Settings and enable "Incognito Mode". Your profile will only be visible to people you message.') },
 
   // Account Settings
@@ -181,7 +181,7 @@ export const HelpCenterScreen = () => {
             <View style={styles.contactCard}>
                 <View style={styles.contactMeta}>
                     <Text style={styles.contactTitle}>{t('stillNeedHelp', 'Still need help?')}</Text>
-                    <Text style={styles.contactSub}>{t('contactSub', 'Our 24/7 concierge team is here for you.')}</Text>
+                    <Text style={styles.contactSub}>{t('contactSub', 'Create a support ticket in the app. Response timing is not guaranteed.')}</Text>
                 </View>
                 <TouchableOpacity 
                     style={styles.chatBtn}

@@ -12,10 +12,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore';
 import { selectInterests } from '../../store/selectors/userPreferencesSelectors';
 import { INTEREST_MAPPING } from '../../services/mock/interestMapping';
-import { useBookingStore } from '../../store/slices/bookingStore';
-import { selectActiveBooking } from '../../store/selectors/bookingSelectors';
 import { useAuthStore } from '../../store/slices/authStore';
-import { discoveryApi, bookingApi, profileApi, notificationsApi, CompanionCard as CompanionCardType } from '../../services/api';
+import { discoveryApi, CompanionCard as CompanionCardType } from '../../services/api';
 
 const DEFAULT_CATEGORIES: discoveryApi.HomeCategory[] = [
   { id: 'coffee', title: 'Coffee Meetups', icon: 'coffee', color: '#D4AF37' },

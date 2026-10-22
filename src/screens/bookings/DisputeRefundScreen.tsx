@@ -32,26 +32,29 @@ export const DisputeRefundScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleBack = () => smartGoBack();
   
   const handleSubmit = async () => {
     if (!isFormValid || !bookingId) return;
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      await bookingApi.disputeBooking(bookingId, {
+      const response = await bookingApi.disputeBooking(bookingId, {
         reason: selectedCategory || 'other',
         description,
       });
+      if (!response?.message) throw new Error('The Customer Backend did not confirm the report.');
+      Alert.alert(
+        t('alertTitleSubmitted', 'Dispute recorded'),
+        response.message,
+        [{ text: 'OK', onPress: () => navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' }) }],
+      );
     } catch {
-      // Graceful fallback
+      setSubmitError(t('submitError', 'The Customer Backend did not confirm the report. It has not been marked as submitted. Try again later.'));
     } finally {
       setIsSubmitting(false);
-      Alert.alert(
-        t('alertTitleSubmitted', 'Dispute Submitted'),
-        t('alertMsgSubmitted', 'Your dispute has been logged and the escrow payment is frozen. Our trust team will contact you within 24 hours.'),
-        [{ text: 'OK', onPress: () => navigation.navigate('MainTabNavigator', { screen: 'BookingsTab' }) }]
-      );
     }
   };
 
@@ -81,7 +84,7 @@ export const DisputeRefundScreen = () => {
           </View>
           <View style={styles.summaryRow}>
             <Icon name="calendar-check" size={16} color={theme.colors.textSecondary} />
-            <Text style={styles.summaryText}>{t('labelSessionDate', 'Session Date:')} {booking?.date || t('fallback.date2', 'Fri, 24 Oct 2026')}</Text>
+          <Text style={styles.summaryText}>{t('labelSessionDate', 'Session Date:')} {booking?.date || t('fallback.date2', 'Unavailable')}</Text>
           </View>
         </View>
 
@@ -89,8 +92,8 @@ export const DisputeRefundScreen = () => {
         <View style={styles.infoCard}>
           <Icon name="shield-alert-outline" size={24} color={theme.colors.warning} />
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.infoTitle}>{t('infoTitle', 'Escrow Frozen')}</Text>
-            <Text style={styles.infoDesc}>{t('infoDesc', 'Submitting a dispute will freeze the escrow payment. Our safety team will review your claim within 24 hours.')}</Text>
+            <Text style={styles.infoTitle}>{t('infoTitle', 'Dispute review')}</Text>
+            <Text style={styles.infoDesc}>{t('infoDesc', 'Your report is saved with the booking. This app build does not freeze or hold payments. The Customer Backend states the review target is 24–48 hours.')}</Text>
           </View>
         </View>
 
@@ -130,6 +133,7 @@ export const DisputeRefundScreen = () => {
 
       {/* Sticky Footer */}
       <View style={styles.bottomBar}>
+        {submitError ? <Text style={styles.submitError}>{submitError}</Text> : null}
         <TouchableOpacity 
           style={[styles.submitBtn, (!isFormValid || isSubmitting) && styles.submitBtnDisabled]} 
           onPress={handleSubmit}
@@ -138,7 +142,7 @@ export const DisputeRefundScreen = () => {
           accessibilityRole="button"
           accessibilityLabel={t('a11ySubmitDispute', 'Submit Dispute')}
         >
-          <Text style={styles.submitBtnText}>{isSubmitting ? 'Submitting...' : t('btn.submitDispute', 'Submit Dispute & Freeze Escrow')}</Text>
+          <Text style={styles.submitBtnText}>{isSubmitting ? 'Submitting...' : t('btn.submitDispute', 'Submit dispute')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -174,6 +178,7 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
+  submitError: { color: theme.colors.error, fontSize: 13, textAlign: 'center', marginBottom: 10 },
   summaryCard: {
     backgroundColor: theme.colors.surface,
     padding: 16,

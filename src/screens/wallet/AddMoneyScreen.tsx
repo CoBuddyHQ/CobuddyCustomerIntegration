@@ -116,11 +116,11 @@ export const AddMoneyScreen = () => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.trustBanner}>
-                    <Icon name="shield-check" size={16} color={theme.colors.success} />
+            <View style={styles.trustBanner}>
+                    <Icon name="alert-circle-outline" size={16} color={theme.colors.warning} />
                     <View>
-                        <Text style={styles.trustTitle}>{t('trustTitle', '100% Safe & Secure')}</Text>
-                        <Text style={styles.trustSub}>{t('trustSub', 'PCI-DSS compliant encrypted payments')}</Text>
+                <Text style={styles.trustTitle}>{t('trustTitle', 'Checkout unavailable')}</Text>
+                <Text style={styles.trustSub}>{t('trustSub', 'No payment provider is configured. No amount will be submitted.')}</Text>
                     </View>
                 </View>
             </View>
@@ -136,7 +136,7 @@ export const AddMoneyScreen = () => {
               onPress={handleProceed} accessibilityRole="button" accessibilityLabel={t('a11yProceedToPay', 'Proceed to pay')}
           >
               <Text style={styles.proceedText}>
-                {t('proceedToPay', 'Continue to payment ₹{{amount}}', { amount: amount || '0' })}
+                {t('proceedToPay', 'Checkout unavailable')}
               </Text>
           </TouchableOpacity>
       </View>
@@ -170,8 +170,8 @@ const styles = StyleSheet.create({
   paymentSub: { fontSize: 12, color: theme.colors.textSecondary },
   changeBtn: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, borderWidth: 1, borderColor: theme.colors.border },
   changeText: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textPrimary },
-  trustBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(16, 185, 129, 0.05)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)' },
-  trustTitle: { fontSize: 12, fontWeight: 'bold', color: theme.colors.success, marginBottom: 2 },
+  trustBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(245, 158, 11, 0.05)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.2)' },
+  trustTitle: { fontSize: 12, fontWeight: 'bold', color: theme.colors.warning, marginBottom: 2 },
   trustSub: { fontSize: 10, color: theme.colors.textSecondary },
   footer: { padding: 20, paddingBottom: Platform.OS === 'ios' ? 34 : 20, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background },
   proceedBtn: { backgroundColor: theme.colors.primary, paddingVertical: 18, borderRadius: 16, alignItems: 'center' },

@@ -24,8 +24,8 @@ export const ProfileScreen = () => {
   const authKyc = useAuthStore(state => state.kycStatus);
 
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
-  const [completionPercentage, setCompletionPercentage] = useState(85);
-  const [walletBal, setWalletBal] = useState('₹4,500');
+  const [completionPercentage, setCompletionPercentage] = useState<number | null>(null);
+  const [walletBal, setWalletBal] = useState<string | null>(null);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -34,7 +34,7 @@ export const ProfileScreen = () => {
     }).catch(() => {});
 
     profileApi.getProfileCompletion().then(c => {
-      if (isMounted && c?.percentage) setCompletionPercentage(c.percentage);
+      if (isMounted && typeof c?.percentage === 'number') setCompletionPercentage(c.percentage);
     }).catch(() => {});
 
     walletApi.getWalletBalance().then(wb => {
@@ -45,34 +45,24 @@ export const ProfileScreen = () => {
   }, []);
 
   const user = {
-    name: profile?.name || authUser?.name || 'Shlok Sharma',
-    age: profile?.age ?? 28,
-    bio: profile?.bio || 'Foodie & Explorer. Looking for great conversations and meeting new people across the city.',
-    location: profile?.city ? `${profile.city}, India` : 'New Delhi, India',
-    languages: profile?.spokenLanguages?.join(', ') || 'English, Hindi',
-    memberSince: profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : 'Oct 2026',
-    phone: authUser?.phone || profile?.phone || '+91 98****1234',
-    email: 'user@cobuddy.app',
+    name: profile?.name || authUser?.name || t('member', 'Member'),
+    age: profile?.age ?? null,
+    bio: profile?.bio || null,
+    location: profile?.city ? `${profile.city}, India` : null,
+    languages: profile?.spokenLanguages ?? [],
+    memberSince: profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : null,
+    phone: authUser?.phone || profile?.phone || null,
+    email: profile?.email || null,
     profileCompleteness: completionPercentage,
-    trustScore: profile?.trustScore ?? 98,
+    trustScore: typeof profile?.trustScore === 'number' ? profile.trustScore : null,
     kycStatus: authKyc || profile?.kycStatus || 'unverified',
     walletBalance: walletBal,
-    reviewsCount: 12,
-    totalMeetups: profile?.totalSessions ?? 15,
+    reviewsCount: null,
+    totalMeetups: typeof profile?.totalSessions === 'number' ? profile.totalSessions : null,
     hasActiveBooking: false,
   };
 
-  // State for inline safety toggles
-  const [toggles, setToggles] = useState<Record<string, boolean>>({
-    contact_share: true,
-    live_monitor: true,
-  });
-
   const [isBioExpanded, setIsBioExpanded] = useState(false);
-
-  const handleToggle = (id: string) => {
-    setToggles(prev => ({ ...prev, [id]: !prev[id] }));
-  };
 
   const handleShareProfile = async () => {
     try {
@@ -160,7 +150,7 @@ export const ProfileScreen = () => {
 
             {/* Bottom Overlay Content */}
             <View style={styles.heroBottom}>
-              <Text style={styles.heroName}>{user.name}, {user.age}</Text>
+              <Text style={styles.heroName}>{user.age ? `${user.name}, ${user.age}` : user.name}</Text>
               
               <View style={styles.heroBadgesRow}>
                 {user.kycStatus === 'verified' && (
@@ -171,28 +161,33 @@ export const ProfileScreen = () => {
                 )}
                 <View style={styles.locationBadge}>
                   <Icon name="map-marker" size={12} color={theme.colors.textSecondary} />
-                  <Text style={styles.locationText}>{user.location}</Text>
+                  <Text style={styles.locationText}>{user.location || t('locationUnavailable', 'Location not set')}</Text>
                 </View>
               </View>
 
-              <View style={styles.langTagsRow}>
-                  <View style={styles.langTag}>
-                    <Text style={styles.langTagText}>{t('langEnglish', 'English')}</Text>
-                  </View>
-                  <View style={styles.langTag}>
-                    <Text style={styles.langTagText}>{t('langHindi', 'Hindi')}</Text>
+              {user.languages.length > 0 ? (
+                <View style={styles.langTagsRow}>
+                  {user.languages.map((language) => (
+                    <View key={language} style={styles.langTag}>
+                      <Text style={styles.langTagText}>{language}</Text>
+                    </View>
+                  ))}
                 </View>
-              </View>
+              ) : null}
               
               {/* Added Bio in Hero Banner */}
-              <View style={{ marginTop: 8 }}>
-                <Text style={styles.heroBio} numberOfLines={isBioExpanded ? undefined : 1}>
-                  {user.bio}
-                </Text>
-                <TouchableOpacity activeOpacity={0.7} onPress={() => setIsBioExpanded(!isBioExpanded)} accessibilityRole="button" accessibilityLabel={isBioExpanded ? t('actions.showLess', 'Show less') : t('actions.showMore', 'Show more')}>
-                  <Text style={styles.readMoreText}>{isBioExpanded ? t('actions.showLess', 'Show less') : t('actions.readMore', 'Read more')}</Text>
-                </TouchableOpacity>
-              </View>
+              {user.bio ? (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={styles.heroBio} numberOfLines={isBioExpanded ? undefined : 1}>
+                    {user.bio}
+                  </Text>
+                  {user.bio.length > 42 ? (
+                    <TouchableOpacity activeOpacity={0.7} onPress={() => setIsBioExpanded(!isBioExpanded)} accessibilityRole="button" accessibilityLabel={isBioExpanded ? t('actions.showLess', 'Show less') : t('actions.showMore', 'Show more')}>
+                      <Text style={styles.readMoreText}>{isBioExpanded ? t('actions.showLess', 'Show less') : t('actions.readMore', 'Read more')}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           </View>
         </View>
@@ -204,30 +199,14 @@ export const ProfileScreen = () => {
             <Text style={styles.cardTitle}>{t('trustScoreTitle', 'Trust Score')}</Text>
             <Icon name="shield-star" size={20} color={theme.colors.primary} />
           </View>
-
-          <View style={styles.circleWrapper}>
-            <View style={styles.cssRingBase}>
-               <View style={styles.cssRingProgress} />
-            </View>
+          {user.trustScore !== null ? (
             <View style={styles.scoreTextWrapper}>
               <Text style={styles.scoreNumber}>{user.trustScore}</Text>
               <Text style={styles.scoreMax}>/100</Text>
             </View>
-          </View>
-
-          <View style={styles.trustStats}>
-            <View style={styles.trustStatRow}>
-              <Text style={styles.trustStatLabel}>{t('sessionCompletion', 'Session Completion')}</Text>
-              <Text style={styles.trustStatValue}>100%</Text>
-            </View>
-            <View style={[styles.trustStatRow, { borderBottomWidth: 0 }]}>
-              <Text style={styles.trustStatLabel}>{t('safetyRating', 'Safety Rating')}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={styles.trustStatValue}>4.9</Text>
-                <Icon name="star" size={13} color={theme.colors.primary} />
-              </View>
-            </View>
-          </View>
+          ) : (
+            <Text style={styles.trustStatLabel}>{t('trustScoreUnavailable', 'Trust score is not available from the service.')}</Text>
+          )}
         </View>
 
         {/* ── Identity & Contact Card (KYC Checklist) ── */}
@@ -235,7 +214,7 @@ export const ProfileScreen = () => {
           <Text style={styles.cardTitle}>{t('identityContactTitle', 'Identity & Contact')}</Text>
           
           {/* Completeness Bar */}
-          <View style={styles.completenessBox}>
+          {user.profileCompleteness !== null ? <View style={styles.completenessBox}>
             <View style={styles.completenessHeader}>
               <Text style={styles.completenessTitle}>{t('profileCompleteness', 'Profile Completeness')}</Text>
               <Text style={styles.completenessValue}>{user.profileCompleteness}%</Text>
@@ -243,25 +222,22 @@ export const ProfileScreen = () => {
             <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, { width: `${user.profileCompleteness}%` }]} />
             </View>
-          </View>
+          </View> : <Text style={styles.contactEmailText}>{t('profileCompletenessUnavailable', 'Profile completeness is not available.')}</Text>}
 
           {/* Contact Details Overview */}
           <View style={styles.contactInfoBox}>
-            <Text style={styles.memberSinceText}>{t('memberSince', 'Member since')} {user.memberSince}</Text>
-            <TouchableOpacity 
+            {user.memberSince ? <Text style={styles.memberSinceText}>{t('memberSince', 'Member since')} {user.memberSince}</Text> : null}
+            {user.email ? <View
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-              onPress={() => navigation.navigate('EditProfileScreen')}
-              activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11yEmail', 'Email: {{email}}', { email: user.email })}
             >
               <Text style={styles.contactEmailText}>{user.email}</Text>
-              <Icon name="pencil" size={14} color={theme.colors.primary} />
-            </TouchableOpacity>
+            </View> : null}
           </View>
 
           {/* KYC Checklist Flow */}
           <View style={styles.checklistContainer}>
             {/* Phone (Always Verified) */}
-            <View style={styles.verifyItem}>
+            {user.phone ? <View style={styles.verifyItem}>
               <View style={styles.verifyIconBox}>
                 <Icon name="check" size={16} color={theme.colors.primary} />
               </View>
@@ -269,7 +245,7 @@ export const ProfileScreen = () => {
                 <Text style={styles.verifyTitle}>{t('phoneNumber', 'Phone Number')}</Text>
                 <Text style={styles.verifySub}>{user.phone} • {t('statusVerified', 'Verified')}</Text>
               </View>
-            </View>
+            </View> : null}
 
             {/* Govt ID (Conditional) */}
             <View style={[styles.verifyItem, user.kycStatus !== 'verified' && { borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
@@ -283,27 +259,11 @@ export const ProfileScreen = () => {
               <View style={styles.verifyMeta}>
                 <Text style={styles.verifyTitle}>{t('govId', 'Government ID')}</Text>
                 <Text style={[styles.verifySub, user.kycStatus !== 'verified' && {color: theme.colors.error}]}>
-                  {user.kycStatus === 'verified' ? t('kycAadhaarVerified', 'Aadhaar Verified') : t('kycPending', 'Pending - Required for booking')}
+                  {user.kycStatus === 'verified' ? t('kycDocumentsReviewed', 'Verification status confirmed by CoBuddy') : t('kycPending', 'Not verified yet')}
                 </Text>
               </View>
             </View>
 
-            {/* Liveness/Selfie (Conditional) */}
-            <View style={[styles.verifyItem, user.kycStatus !== 'verified' && { borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
-              <View style={[styles.verifyIconBox, user.kycStatus !== 'verified' && { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
-                <Icon 
-                  name={user.kycStatus === 'verified' ? "face-recognition" : "alert-circle-outline"} 
-                  size={18} 
-                  color={user.kycStatus === 'verified' ? theme.colors.primary : theme.colors.error} 
-                />
-              </View>
-              <View style={styles.verifyMeta}>
-                <Text style={styles.verifyTitle}>{t('liveSelfie', 'Live Selfie')}</Text>
-                <Text style={[styles.verifySub, user.kycStatus !== 'verified' && {color: theme.colors.error}]}>
-                  {user.kycStatus === 'verified' ? t('kycBiometricMatched', 'Biometric matched') : t('kycPending', 'Pending - Required for booking')}
-                </Text>
-              </View>
-            </View>
           </View>
 
           {/* KYC Contextual CTA */}
@@ -332,8 +292,8 @@ export const ProfileScreen = () => {
         <View style={styles.infoCard}>
           <Text style={styles.cardTitle}>{t('walletActivityTitle', 'Wallet & Activity')}</Text>
           {[
-            { id: 'wallet', icon: 'wallet-outline', label: t('stats.myWallet', 'My Wallet'), sub: t('walletBalance', 'Balance: {{balance}}', { balance: user.walletBalance }), action: () => navigation.navigate('WalletScreen') },
-            { id: 'reviews', icon: 'star-circle-outline', label: t('stats.myReviews', 'My Reviews'), sub: t('ratingsReceived', '{{count}} Ratings received', { count: user.reviewsCount }), action: () => navigation.navigate('MyReviewsScreen') },
+            { id: 'wallet', icon: 'wallet-outline', label: t('stats.myWallet', 'My Wallet'), sub: t('walletBalance', 'Balance: {{balance}}', { balance: user.walletBalance ?? t('valueUnavailable', 'Unavailable') }), action: () => navigation.navigate('WalletScreen') },
+            { id: 'reviews', icon: 'star-circle-outline', label: t('stats.myReviews', 'My Reviews'), sub: t('ratingsUnavailable', 'Review summary unavailable'), action: () => navigation.navigate('MyReviewsScreen') },
             { id: 'saved', icon: 'bookmark-outline', label: t('stats.savedChecklists', 'Saved Checklists'), sub: t('stats.savedChecklistsSub', 'Your favorite companions'), action: () => navigation.navigate('SavedProfilesScreen') },
             { id: 'refer', icon: 'account-multiple-plus-outline', label: t('stats.referAFriend', 'Refer a Friend'), sub: t('stats.referAFriendSub', 'Invite trusted members'), action: () => navigation.navigate('ReferFriendScreen') },
           ].map((item, i, arr) => (
@@ -353,24 +313,9 @@ export const ProfileScreen = () => {
         {/* ── Safety Settings Inline Toggles ── */}
         <View style={styles.infoCard}>
           <Text style={styles.cardTitle}>{t('safetySettingsTitle', 'Safety Settings')}</Text>
-          {[
-            { id: 'contact_share', title: t('safety.trustedContact', 'Trusted Contact Sharing'), sub: t('safety.trustedContactSub', 'Auto-share session details.') },
-            { id: 'live_monitor', title: t('safety.liveSafety', 'Live Safety Monitoring'), sub: t('safety.liveSafetySub', 'Active tracking during sessions.') }
-          ].map((s, i) => (
-            <View key={s.id} style={[styles.safetyRow, i === 0 && styles.linkRowBorder]}>
-              <View style={styles.safetyMeta}>
-                <Text style={styles.safetyTitle}>{s.title}</Text>
-                <Text style={styles.safetySub}>{s.sub}</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => handleToggle(s.id)}
-                style={[styles.toggleTrack, toggles[s.id] && styles.toggleTrackOn]}
-                activeOpacity={0.9} accessibilityRole="button" accessibilityLabel={t('a11yToggleSafetySetting', 'Toggle {{title}}', { title: s.title })}
-              >
-                <View style={[styles.toggleThumb, toggles[s.id] && styles.toggleThumbOn]} />
-              </TouchableOpacity>
-            </View>
-          ))}
+          <Text style={styles.linkSub}>
+            {t('safety.integrationsUnavailable', 'Live location monitoring and trusted-contact notifications are not available in this app build. SOS records are saved for review only.')}
+          </Text>
           
           <TouchableOpacity 
             style={styles.hubBtn}
@@ -416,7 +361,7 @@ export const ProfileScreen = () => {
           <Text style={styles.logoutText}>{t('logOut', 'Log Out')}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.versionText}>{t('cobuddyV100Build42', 'CoBuddy v1.0.0 (Build 42)')}</Text>
+        <Text style={styles.versionText}>{t('appName', 'CoBuddy')}</Text>
 
       </ScrollView>
     </View>

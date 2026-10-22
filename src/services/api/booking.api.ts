@@ -16,11 +16,14 @@ export interface Booking {
   activityName?: string;
   venue: string | any;
   venueName?: string;
+  venueAddress?: string;
+  meetingPoint?: string;
   date: string;
   time: string;
   duration: number;
   durationHours?: number;
   status: BookingStatus;
+  requestStatus?: string;
   totalAmount?: number;
   matchScore?: number | null;
   companionRequestStatus?: 'sent' | 'unavailable';
@@ -34,7 +37,10 @@ export interface Booking {
     formatted?: any;
   };
   notes?: string;
+  specialInstructions?: string;
   cancellationReason?: string;
+  declineReason?: string;
+  paymentStatus?: string;
   counterOffer?: {
     proposedDate?: string;
     proposedTime?: string;
@@ -42,6 +48,7 @@ export interface Booking {
     message?: string;
   };
   createdAt?: string;
+  acceptedAt?: string;
   updatedAt?: string;
 }
 
@@ -83,6 +90,8 @@ export interface CancelBookingRequest {
 export interface ModifyBookingRequest {
   date?: string;
   time?: string;
+  timeZone?: string;
+  scheduledStart?: string;
   venue?: string;
   venueName?: string;
   duration?: number;
@@ -201,6 +210,8 @@ export const modifyBooking = async (id: string, data: ModifyBookingRequest): Pro
   const payload: Record<string, any> = {};
   if (data.date) payload.date = data.date;
   if (data.time) payload.time = data.time;
+  if (data.timeZone) payload.timeZone = data.timeZone;
+  if (data.scheduledStart) payload.scheduledStart = data.scheduledStart;
   if (data.venueName) payload.venueName = data.venueName;
   if (data.durationHours ?? data.duration) payload.durationHours = data.durationHours ?? data.duration;
   if (data.notes) payload.specialInstructions = data.notes;

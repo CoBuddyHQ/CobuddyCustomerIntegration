@@ -13,6 +13,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, profileApi, TokenStorage, setLogoutListener } from '../../services/api';
 import type { CustomerFromAuth } from '../../services/api';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
@@ -159,9 +160,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const res = await authApi.sendOtp({ phone });
         return { devOtp: res.devOtp };
       } catch (e: any) {
-        const msg = e?.response?.data?.message ?? 'Failed to send OTP.';
-        const errMsg = Array.isArray(msg) ? msg[0] : msg;
-        set({ error: errMsg });
+        set({ error: extractErrorMessage(e) });
         throw e;
       } finally {
         set({ isLoading: false });
@@ -212,8 +211,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       try {
         await authApi.resendOtp(phone);
       } catch (e: any) {
-        const msg = e?.response?.data?.message ?? 'Failed to resend OTP.';
-        set({ error: Array.isArray(msg) ? msg[0] : msg });
+        set({ error: extractErrorMessage(e) });
         throw e;
       } finally {
         set({ isLoading: false });

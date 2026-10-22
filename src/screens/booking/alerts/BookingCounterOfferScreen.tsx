@@ -22,6 +22,7 @@ export const BookingCounterOfferScreen = ({ route }: { route: any }) => {
   const [booking, setBooking] = useState<BookingApiType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -33,34 +34,36 @@ export const BookingCounterOfferScreen = ({ route }: { route: any }) => {
             setBooking(res);
           }
         })
-        .catch((err) => {
-          console.warn('[BookingCounterOfferScreen] Failed to load booking:', err?.message || err);
+        .catch(() => {
+          if (isMounted) setLoadFailed(true);
         })
         .finally(() => {
           if (isMounted) setIsLoading(false);
         });
     } else {
       setIsLoading(false);
+      setLoadFailed(true);
     }
     return () => { isMounted = false; };
   }, [bookingId]);
 
+  const canRespond = booking?.requestStatus === 'counter_proposed' && !loadFailed;
   const bookingData = {
-    bookingId: booking?.id || bookingId || '',
-    companionName: booking?.companionName || route?.params?.companionName || 'Companion',
-    companionId: booking?.companionId || route?.params?.companionId || 'c1',
-    activity: booking?.activityName || booking?.activity || 'Meetup Experience',
-    venue: typeof booking?.venue === 'object' ? (booking?.venue?.name || 'Public Venue') : (booking?.venueName || booking?.venue || 'Public Venue'),
-    date: booking?.date ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Scheduled Date',
-    originalTime: booking?.time || '18:00',
-    newTime: (booking as any)?.counterOffer?.time || (booking as any)?.counterTime || (booking as any)?.time || '19:00',
-    originalAmount: (booking?.pricing?.totalAmount || booking?.totalAmount) ? `₹${booking?.pricing?.totalAmount || booking?.totalAmount}` : '₹1,000',
+    bookingId: booking?.id || '',
+    companionName: booking?.companionName || 'Unavailable',
+    companionId: booking?.companionId || '',
+    activity: booking?.activityName || booking?.activity || 'Unavailable',
+    venue: typeof booking?.venue === 'object' ? (booking?.venue?.name || 'Unavailable') : (booking?.venueName || booking?.venue || 'Unavailable'),
+    date: booking?.date ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Unavailable',
+    originalTime: booking?.time || 'Unavailable',
+    newTime: (booking as any)?.counterOffer?.time || (booking as any)?.counterTime || 'Unavailable',
+    originalAmount: booking?.pricing?.totalAmount || booking?.totalAmount ? `₹${booking?.pricing?.totalAmount || booking?.totalAmount}` : 'Unavailable',
     newAmount: (booking as any)?.counterOffer?.totalAmount ? `₹${(booking as any).counterOffer.totalAmount}` : (booking as any)?.counterTotalAmount ? `₹${(booking as any).counterTotalAmount}` : undefined,
     message: (booking as any)?.counterOffer?.message || (booking as any)?.counterMessage || t('defaultMessage', 'The companion proposed an adjusted time/details for this meetup.'),
   };
 
   const handleAccept = async () => {
-    if (!bookingData.bookingId) return;
+    if (!canRespond || !bookingData.bookingId) return;
     setIsProcessing(true);
     try {
       await bookingApi.respondToCounterOffer(bookingData.bookingId, { action: 'accept' });
@@ -97,7 +100,7 @@ export const BookingCounterOfferScreen = ({ route }: { route: any }) => {
   };
 
   const handleDecline = async () => {
-    if (!bookingData.bookingId) {
+    if (!canRespond || !bookingData.bookingId) {
       smartGoBack();
       return;
     }
@@ -232,7 +235,13 @@ export const BookingCounterOfferScreen = ({ route }: { route: any }) => {
                 <Text style={styles.newText}>{bookingData.newTime}</Text>
               </View>
             </View>
-          )}
+        )}
+
+        {loadFailed || !canRespond ? (
+          <Text accessibilityRole="alert" style={styles.messageText}>
+            This counter offer is unavailable or has already changed. Refresh your bookings before responding.
+          </Text>
+        ) : null}
 
           {bookingData.newAmount && bookingData.originalAmount !== bookingData.newAmount && (
             <View style={styles.changeRow}>
@@ -263,16 +272,16 @@ export const BookingCounterOfferScreen = ({ route }: { route: any }) => {
       {/* Action Buttons */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomBarHandle} />
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleAccept} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yAcceptNewOffer', 'Accept New Offer')}>
+        <TouchableOpacity style={[styles.primaryBtn, (!canRespond || isProcessing) && styles.disabledBtn]} onPress={handleAccept} disabled={!canRespond || isProcessing} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yAcceptNewOffer', 'Accept New Offer')}>
           <Icon name="check-circle" size={20} color={theme.colors.background} />
-          <Text style={styles.primaryBtnText}>{t('primaryBtnText', 'Accept New Offer')}</Text>
+          <Text style={styles.primaryBtnText}>{isProcessing ? 'Please wait…' : t('primaryBtnText', 'Accept New Offer')}</Text>
         </TouchableOpacity>
         
         <View style={styles.splitBtns}>
           <TouchableOpacity style={styles.secondaryBtn} onPress={handleMessageBack} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yMessageBack', 'Message Back')}>
             <Text style={styles.secondaryBtnText}>{t('secondaryBtnText', 'Message Back')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.ghostBtn} onPress={handleDecline} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yDeclineBooking', 'Decline Booking')}>
+          <TouchableOpacity style={[styles.ghostBtn, (!canRespond || isProcessing) && styles.disabledBtn]} onPress={handleDecline} disabled={!canRespond || isProcessing} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yDeclineBooking', 'Decline Booking')}>
             <Text style={styles.ghostBtnText}>{t('ghostBtnText', 'Decline Booking')}</Text>
           </TouchableOpacity>
         </View>
@@ -347,6 +356,7 @@ const styles = StyleSheet.create({
     marginTop: -8
   },
   primaryBtn: { backgroundColor: theme.colors.warning, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, shadowColor: theme.colors.warning, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  disabledBtn: { opacity: 0.5 },
   primaryBtnText: { color: theme.colors.background, fontSize: 16, fontWeight: 'bold' },
   
   splitBtns: { flexDirection: 'row', gap: 12 },

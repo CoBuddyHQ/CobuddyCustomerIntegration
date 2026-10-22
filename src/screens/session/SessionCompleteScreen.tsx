@@ -13,6 +13,7 @@ export const SessionCompleteScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<any>();
   const { companionId, companionName } = route.params || {};
+  const isSessionComplete = route.params?.sessionStatus === 'completed';
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
@@ -31,39 +32,26 @@ export const SessionCompleteScreen = () => {
         
         <View style={styles.mainArea}>
           <View style={styles.iconCircle}>
-            <Icon name="check-decagram" size={64} color={theme.colors.success} />
+            <Icon name={isSessionComplete ? 'check-decagram' : 'alert-circle-outline'} size={64} color={isSessionComplete ? theme.colors.success : theme.colors.warning} />
           </View>
 
-          <Text style={styles.title}>{t('title', 'Session Complete!')}</Text>
-          <Text style={styles.subtitle}>{t('subtitle', 'We hope you had a fantastic time with {{name}}.', { name: companionName || 'Elena' })}</Text>
+          <Text style={styles.title}>
+            {isSessionComplete ? t('title', 'Session end recorded') : t('statusUnavailable', 'Session completion not confirmed')}
+          </Text>
+          <Text style={styles.subtitle}>
+            {isSessionComplete
+              ? t('subtitle', 'The Customer Backend recorded the session as completed with {{name}}.', { name: companionName || 'your companion' })
+              : t('statusMessage', 'The Customer Backend did not confirm session completion.')}
+          </Text>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t('cardTitle', 'FINAL RECEIPT')}</Text>
-            
+            <Text style={styles.cardTitle}>{t('cardTitle', 'SESSION STATUS')}</Text>
             <View style={styles.row}>
-              <Text style={styles.label}>{t('labelBase', 'Base Session (2 Hrs)')}</Text>
-              <Text style={styles.value}>₹3,000</Text>
+              <Text style={styles.label}>{t('sessionRecord', 'Customer Backend record')}</Text>
+              <Text style={styles.value}>{isSessionComplete ? 'Completed' : 'Not confirmed'}</Text>
             </View>
-            
-            <View style={styles.row}>
-              <Text style={styles.label}>{t('labelPlatform', 'Platform Fee (5%)')}</Text>
-              <Text style={styles.value}>₹150</Text>
-            </View>
-
-            <View style={styles.row}>
-              <Text style={styles.label}>{t('labelTaxes', 'Taxes (18% GST)')}</Text>
-              <Text style={styles.value}>₹54</Text>
-            </View>
-            
-            <View style={styles.divider} />
-            
-            <View style={styles.row}>
-              <Text style={[styles.label, { color: theme.colors.textPrimary, fontWeight: 'bold' }]}>{t('labelEscrow', 'Escrow Released')}</Text>
-              <Text style={[styles.value, { color: theme.colors.success }]}>₹3,204</Text>
-            </View>
-
             <Text style={styles.invoiceNote}>
-              <Icon name="email-check-outline" size={14} color={theme.colors.textSecondary} /> {t('invoiceNotice', 'An official invoice has been sent to your registered email.')}
+              <Icon name="information-outline" size={14} color={theme.colors.textSecondary} /> {t('financialNotice', 'This screen does not release funds, issue a refund, or send an invoice. The Companion Backend is not updated by this customer action.')}
             </Text>
           </View>
         </View>
@@ -71,9 +59,13 @@ export const SessionCompleteScreen = () => {
         <View style={styles.footer}>
           <TouchableOpacity 
             style={styles.primaryBtn} 
-            onPress={() => navigation.navigate('PostSessionFeedbackScreen', { companionId, companionName })} accessibilityRole="button" accessibilityLabel={t('a11yContinueToFeedback', 'Continue to Feedback')}
+            onPress={() => isSessionComplete
+              ? navigation.navigate('PostSessionFeedbackScreen', { companionId, companionName, sessionId: route.params?.sessionId })
+              : navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11yContinueToFeedback', isSessionComplete ? 'Continue to Feedback' : 'Back to session')}
           >
-            <Text style={styles.primaryBtnText}>{t('primaryBtnText', 'Continue to Feedback')}</Text>
+            <Text style={styles.primaryBtnText}>{isSessionComplete ? t('primaryBtnText', 'Continue to Feedback') : 'Back to session'}</Text>
           </TouchableOpacity>
         </View>
 

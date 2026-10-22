@@ -66,7 +66,7 @@ export const SafetyHubScreen = () => {
         <View style={styles.statusWrapper}>
             <View style={[styles.statusPill, !isSessionActive && styles.statusPillInactive]}>
                 <View style={[styles.statusDot, !isSessionActive && styles.statusDotInactive]} />
-                <Text style={[styles.statusText, !isSessionActive && styles.statusTextInactive]}>{isSessionActive ? t('statusText', 'Live Protection Active') : t('statusInactive', 'Live Protection Inactive')}</Text>
+                <Text style={[styles.statusText, !isSessionActive && styles.statusTextInactive]}>{isSessionActive ? t('statusText', 'Session Active') : t('statusInactive', 'No Active Session')}</Text>
             </View>
             {isSessionActive && lastKnownLocation && isFeatureEnabled('ENABLE_SOS_BACKGROUND_TRACKING') && (
               <Text style={styles.locationText}>{t('gpsCoordinates', 'GPS')}: {lastKnownLocation.lat.toFixed(4)}, {lastKnownLocation.lng.toFixed(4)}</Text>
@@ -106,7 +106,7 @@ export const SafetyHubScreen = () => {
                                 }
                             ]);
                         } else {
-                            Alert.alert(t('alertTitleEMERGENCYSOS', '🚨 EMERGENCY SOS'), t('alertMsgAreyouindangerThiswi', 'Are you in danger? This will instantly share your live location with your trusted contacts and alert the CoBuddy Safety Team.'),
+                            Alert.alert(t('alertTitleEMERGENCYSOS', '🚨 EMERGENCY SOS'), t('alertMsgAreyouindangerThiswi', 'Are you in danger? This records an SOS with your last known location when available. It does not contact trusted contacts or emergency services.'),
                               [
                                 { text: t('cancel', 'Cancel'), style: 'cancel' },
                                 { 
@@ -179,7 +179,7 @@ export const SafetyHubScreen = () => {
             </View>
             <View style={styles.cardTextContent}>
                 <Text style={styles.cardTitle}>{t('trustedContacts', 'Trusted Contacts')}</Text>
-                <Text style={styles.cardDesc}>{t('trustedContactsSub', 'Manage who receives your live location and emergency alerts.')}</Text>
+                <Text style={styles.cardDesc}>{t('trustedContactsSub', 'Manage saved contacts. This app build does not send them location or emergency alerts.')}</Text>
             </View>
             <Icon name="chevron-right" size={20} color={theme.colors.textSecondary} />
         </TouchableOpacity>
@@ -222,7 +222,7 @@ export const SafetyHubScreen = () => {
                     <Icon name="headset" size={20} color={theme.colors.textPrimary} />
                 </View>
                 <View style={styles.menuTextContent}>
-                    <Text style={styles.menuTitle}>{t('support247', '24/7 Safety Support')}</Text>
+                    <Text style={styles.menuTitle}>{t('support247', 'Safety Help Center')}</Text>
                 </View>
                 <Icon name="chevron-right" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>

@@ -18,7 +18,7 @@
       "sub": "Emergency alerts and safety check-ins during sessions"
     }
   },
-  "bookingConfirmed": "Booking Confirmed!",
+  "bookingConfirmed": "Booking Alerts",
   "alertTitleEnableNotificat": "Enable Notifications",
   "alertMsgNotificationpermissi": "Notification permission will be requested on your device.",
   "cancelBtn": "Cancel",

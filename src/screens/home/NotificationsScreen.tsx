@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -47,8 +47,10 @@ export const NotificationsScreen = () => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
+    setLoadError(false);
     try {
       const list = await notificationsApi.listNotifications();
       if (list && Array.isArray(list)) {
@@ -66,7 +68,7 @@ export const NotificationsScreen = () => {
         })));
       }
     } catch {
-      // Ignored
+      setLoadError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -180,7 +182,15 @@ export const NotificationsScreen = () => {
           />
         }
       >
-        {filteredNotifications.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator color={theme.colors.primary} />
+          </View>
+        ) : loadError ? (
+          <View style={styles.emptyState}>
+            <Text accessibilityRole="alert" style={styles.emptyTitle}>Notifications are unavailable. Pull to retry.</Text>
+          </View>
+        ) : filteredNotifications.length === 0 ? (
           <View style={styles.emptyState}>
             <Icon name="bell-sleep-outline" size={64} color="rgba(255,255,255,0.1)" />
             <Text style={styles.emptyTitle}>{t('emptyTitle', 'All Caught Up!')}</Text>

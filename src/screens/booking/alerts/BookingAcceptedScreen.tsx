@@ -9,6 +9,7 @@ import { RootStackParamList } from '../../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { bookingApi } from '../../../services/api';
+import { formatBookingAmount, normalizePaymentState } from '../../../utils/bookingPresentation';
 
 export const BookingAcceptedScreen = ({ route }: { route: any }) => { 
   const { t } = useTranslation('booking.accepted');
@@ -16,6 +17,7 @@ export const BookingAcceptedScreen = ({ route }: { route: any }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
   const [booking, setBooking] = React.useState<any>(null);
+  const [bookingLoadError, setBookingLoadError] = React.useState(false);
   const routeBookingId = route?.params?.bookingId;
 
   useEffect(() => {
@@ -24,24 +26,39 @@ export const BookingAcceptedScreen = ({ route }: { route: any }) => {
       bookingApi.getBooking(routeBookingId)
         .then((res) => {
           if (res) setBooking(res);
+          else setBookingLoadError(true);
         })
-        .catch(() => {});
+        .catch(() => setBookingLoadError(true));
+    } else {
+      setBookingLoadError(true);
     }
   }, [scaleAnim, routeBookingId]);
 
   const bookingData = {
-    bookingId: routeBookingId || booking?.id || '',
-    companionName: route?.params?.companionName || booking?.companionName || 'Companion',
-    companionId: route?.params?.companionId || booking?.companionId || 'c1',
-    activity: route?.params?.activity || booking?.activityName || booking?.activity || 'Experience Meetup',
-    date: route?.params?.date || (booking?.date ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Upcoming Date'),
-    time: route?.params?.time || booking?.time || '18:00',
-    venue: route?.params?.venue || (typeof booking?.venue === 'object' ? booking?.venue?.name : booking?.venueName || booking?.venue) || 'Public Venue',
-    address: route?.params?.address || booking?.venueAddress || 'Public Area',
-    amount: route?.params?.amount || (booking?.pricing?.totalAmount || booking?.totalAmount ? `₹${booking?.pricing?.totalAmount || booking?.totalAmount}` : '₹1,000'),
+    bookingId: booking?.id || routeBookingId || '',
+    companionName: booking?.companionName || 'Unavailable',
+    companionId: booking?.companionId || '',
+    activity: booking?.activityName || booking?.activity || 'Unavailable',
+    date: booking?.date && Number.isFinite(new Date(booking.date).getTime())
+      ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+      : 'Unavailable',
+    time: booking?.time || 'Unavailable',
+    venue: typeof booking?.venue === 'object' ? booking?.venue?.name || 'Unavailable' : booking?.venueName || booking?.venue || 'Unavailable',
+    address: booking?.venueAddress || 'Unavailable',
+    amount: formatBookingAmount(booking?.pricing?.totalAmount ?? booking?.totalAmount),
+    isAccepted: booking?.status === 'accepted' || booking?.status === 'confirmed',
+    paymentStatus: normalizePaymentState(booking?.paymentStatus),
   };
+  const paymentStatusLabel = {
+    pending: 'No completed payment is confirmed',
+    completed: 'Payment recorded by the Customer Backend',
+    failed: 'Payment failed according to the Customer Backend',
+    refunded: 'Refund reported by the Customer Backend',
+    unknown: 'Payment status unavailable',
+  }[bookingData.paymentStatus];
 
   const handleMessage = () => {
+    if (!bookingData.companionId || !bookingData.bookingId) return;
     const parent = navigation.getParent();
     const target = {
       screen: 'ChatTab',
@@ -59,6 +76,7 @@ export const BookingAcceptedScreen = ({ route }: { route: any }) => {
   };
 
   const handleViewItinerary = () => {
+    if (!bookingData.bookingId) return;
     const parent = navigation.getParent();
     const target = {
       screen: 'BookingsTab',
@@ -82,17 +100,31 @@ export const BookingAcceptedScreen = ({ route }: { route: any }) => {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.iconContainer, { transform: [{ scale: scaleAnim }] }]}>
           <View style={styles.glow} />
-          <Icon name="check-decagram" size={100} color={theme.colors.success} />
+          <Icon
+            name={bookingData.isAccepted ? 'check-decagram' : bookingLoadError ? 'alert-circle-outline' : 'clock-outline'}
+            size={100}
+            color={bookingData.isAccepted ? theme.colors.success : bookingLoadError ? theme.colors.warning : theme.colors.textSecondary}
+          />
         </Animated.View>
 
-        <Text style={styles.title}>{t('title', 'Booking Confirmed!')}</Text>
+        <Text style={styles.title}>
+          {bookingData.isAccepted
+            ? t('title', 'Booking accepted')
+            : bookingLoadError
+              ? t('statusUnavailable', 'Booking status unavailable')
+              : t('checkingStatus', 'Checking booking status…')}
+        </Text>
         <Text style={styles.subtitle}>
-          {t('acceptedMsg1', 'Get ready! ')}<Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>{bookingData.companionName}</Text>{t('acceptedMsg2', ' has accepted your request. Your payment is securely held in escrow.')}
+          {bookingData.isAccepted
+            ? t('acceptedMsg2', 'The Customer Backend confirmed that the companion accepted this booking.')
+            : bookingLoadError
+              ? t('statusLoadError', 'The booking service could not confirm the current status. Check booking details before continuing.')
+              : t('statusLoading', 'Loading the latest booking status from the Customer Backend.')}
         </Text>
 
         <View style={styles.card}>
           <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
-            <Text style={styles.cardHeader}>{t('cardHeader', 'CONFIRMED ITINERARY')}</Text>
+            <Text style={styles.cardHeader}>{t('cardHeader', 'BOOKING DETAILS')}</Text>
             <Text style={styles.bookingId}>#{bookingData.bookingId}</Text>
           </View>
           
@@ -134,8 +166,10 @@ export const BookingAcceptedScreen = ({ route }: { route: any }) => {
           
           <View style={[styles.detailRow, { marginBottom: 0, justifyContent: 'space-between', alignItems: 'center' }]}>
             <View>
-              <Text style={styles.detailLabel}>{t('detailLabelTotal', 'Total Secured')}</Text>
-              <Text style={styles.escrowNote}>{t('escrowNote', 'Protected by Escrow')}</Text>
+              <Text style={styles.detailLabel}>{t('detailLabelTotal', 'Booking amount')}</Text>
+              <Text style={styles.paymentNote}>
+                {t('escrowNote', 'Checkout is unavailable. {{status}}. This screen does not hold funds.', { status: paymentStatusLabel })}
+              </Text>
             </View>
             <Text style={styles.amountText}>{bookingData.amount}</Text>
           </View>
@@ -145,11 +179,11 @@ export const BookingAcceptedScreen = ({ route }: { route: any }) => {
       {/* Floating Luxury Bottom Bar */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomBarHandle} />
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleMessage} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yChat', 'Chat')}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleMessage} disabled={!bookingData.companionId} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yChat', 'Chat')}>
           <Icon name="chat" size={20} color={theme.colors.background} />
           <Text style={styles.primaryBtnText}>{t('messageCompanion', 'Message {{name}}', { name: bookingData.companionName })}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={handleViewItinerary} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yViewBookingDetails', 'View Booking Details')}>
+        <TouchableOpacity style={styles.secondaryBtn} onPress={handleViewItinerary} disabled={!bookingData.bookingId} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('a11yViewBookingDetails', 'View Booking Details')}>
           <Text style={styles.secondaryBtnText}>{t('secondaryBtnText', 'View Booking Details')}</Text>
         </TouchableOpacity>
       </View>
@@ -178,7 +212,7 @@ const styles = StyleSheet.create({
   subText: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 2 },
   
   amountText: { fontSize: 24, color: theme.colors.success, fontWeight: '900' },
-  escrowNote: { fontSize: 11, color: theme.colors.success, marginTop: 4, fontWeight: 'bold' },
+  paymentNote: { fontSize: 11, color: theme.colors.warning, marginTop: 4, fontWeight: '600' },
   divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: 8, marginBottom: 20 },
   
   bottomBar: { 

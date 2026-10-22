@@ -8,15 +8,15 @@
   "slides": {
     "verified": {
       "title": "Verified Members",
-      "body": "Our community is built on trust. Every member undergoes a rigorous identity verification process to ensure a secure and friendly environment for everyone."
+      "body": "Profiles may be reviewed, but automated identity and liveness verification are not configured in this app build. Check the verification status shown by the service."
     },
     "public": {
       "title": "Public-Only Meetups",
-      "body": "For your safety, all meetups must take place in public places such as Cafes, Restaurants, Malls, or Parks. Meetups at hotels or private residences are strictly prohibited."
+      "body": "For your safety, choose public places such as cafes, restaurants, malls, or parks. This build does not provide a verified venue catalog or enforce venue type."
     },
     "live": {
       "title": "Safety Features",
-      "body": "Use our in-app safety tools to share your live location and meetup details with trusted friends or family members while you hang out."
+      "body": "You can save trusted contacts, but this build does not send them live location or emergency alerts. Keep someone you trust informed about your plans."
     },
     "community": {
       "title": "Respectful Community",
@@ -27,11 +27,11 @@
     "title": "Safety Guidelines",
     "btn_understood": "UNDERSTOOD",
     "identity_label": "IDENTITY VERIFICATION",
-    "identity_text": "All members are required to complete a profile verification step to keep our platform authentic and secure.",
+    "identity_text": "Verification status is provided by the service. Automated identity and liveness verification are not configured in this build.",
     "contacts_label": "TRUSTED CONTACTS",
-    "contacts_text": "You can easily share your session details and live location with your personal emergency contacts directly through the app.",
+    "contacts_text": "Trusted contacts can be saved in your profile. External location sharing and emergency messages are not configured in this build.",
     "verified_label": "PUBLIC DESTINATIONS",
-    "verified_text": "We strictly enforce a public-places-only rule. Meetups must always happen in visible, high-traffic areas like cafes or malls to ensure everyone's comfort."
+    "verified_text": "For safety, choose a public destination. A verified venue catalog and venue-type enforcement are not configured in this build."
   },
   "verifiedVenue": "VERIFIED VENUE",
   "a11yNext": "Go to next step",

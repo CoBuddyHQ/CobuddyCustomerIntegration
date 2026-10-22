@@ -9,6 +9,7 @@ import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { bookingApi, Booking as BookingApiType } from '../../services/api';
+import { formatBookingAmount, normalizePaymentState } from '../../utils/bookingPresentation';
 
 export const BookingDetailScreen = () => { 
   const { t } = useTranslation('bookings.detail');
@@ -19,28 +20,40 @@ export const BookingDetailScreen = () => {
   const bookingId = route.params?.bookingId;
   const [apiBooking, setApiBooking] = useState<BookingApiType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     if (!bookingId) {
       setIsLoading(false);
+      setNotFound(true);
       return;
     }
     let isMounted = true;
     setIsLoading(true);
+    setLoadError(false);
+    setNotFound(false);
+    setApiBooking(null);
     bookingApi.getBooking(bookingId)
       .then(res => {
         if (isMounted && res) {
           setApiBooking(res);
+        } else if (isMounted) {
+          setLoadError(true);
         }
       })
-      .catch(err => {
-        console.warn('[BookingDetailScreen] Failed to fetch booking detail from API:', err?.message || err);
+      .catch(error => {
+        if (!isMounted) return;
+        const status = (error as { response?: { status?: number } })?.response?.status;
+        setNotFound(status === 404);
+        setLoadError(status !== 404);
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
       });
     return () => { isMounted = false; };
-  }, [bookingId]);
+  }, [bookingId, loadAttempt]);
 
   const rawStatus = apiBooking?.status || route.params?.status || 'pending';
   const displayStatus = rawStatus === 'accepted' ? 'Accepted' 
@@ -53,28 +66,32 @@ export const BookingDetailScreen = () => {
   const data = apiBooking
     ? {
         id: apiBooking.id,
-        bookingRef: (apiBooking as any).bookingRef || (apiBooking.id?.length > 12 ? 'CB-' + apiBooking.id.slice(0, 8).toUpperCase() : apiBooking.id),
-        companionName: apiBooking.companionName || 'Companion',
-        companionTitle: 'Verified Companion',
-        companionId: apiBooking.companionId || 'c1',
-        companionRating: (apiBooking as any).companionRating || '5.0',
-        companionReviews: (apiBooking as any).companionReviews || 124,
-        activity: apiBooking.activityName || apiBooking.activity || 'Experience Meetup',
-        date: apiBooking.date ? new Date(apiBooking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Scheduled Date',
-        time: apiBooking.time || '18:00',
-        duration: `${apiBooking.durationHours || apiBooking.duration || 1} hours`,
-        venue: typeof apiBooking.venue === 'object' ? (apiBooking.venue?.name || 'Public Venue') : (apiBooking.venueName || apiBooking.venue || 'Public Venue'),
-        address: (apiBooking as any).venueAddress || 'Public Area',
-        meetingPoint: (apiBooking as any).meetingPoint || (typeof apiBooking.venue === 'object' ? apiBooking.venue?.meetingPoint : undefined) || 'Main Entrance',
+        companionName: apiBooking.companionName || t('unavailable', 'Unavailable'),
+        companionId: apiBooking.companionId,
+        activity: apiBooking.activityName || apiBooking.activity || t('unavailable', 'Unavailable'),
+        date: apiBooking.date && Number.isFinite(new Date(apiBooking.date).getTime())
+          ? new Date(apiBooking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+          : t('unavailable', 'Unavailable'),
+        time: apiBooking.time || t('unavailable', 'Unavailable'),
+        duration: Number.isFinite(apiBooking.durationHours ?? apiBooking.duration)
+          ? `${apiBooking.durationHours ?? apiBooking.duration} hours`
+          : t('unavailable', 'Unavailable'),
+        venue: typeof apiBooking.venue === 'object' ? (apiBooking.venue?.name || t('unavailable', 'Unavailable')) : (apiBooking.venueName || apiBooking.venue || t('unavailable', 'Unavailable')),
+        address: apiBooking.venueAddress || t('unavailable', 'Unavailable'),
         status: displayStatus,
-        notes: (apiBooking as any).specialInstructions || apiBooking.notes || '',
-        sessionRate: `₹${apiBooking.pricing?.baseTotal || (apiBooking.pricing?.baseRate ? apiBooking.pricing.baseRate * (apiBooking.durationHours || 1) : 500)}`,
-        platformFee: `₹${apiBooking.pricing?.platformFee ?? 150}`,
-        taxes: `₹${apiBooking.pricing?.taxAmount ?? 180}`,
-        total: `₹${apiBooking.pricing?.totalAmount || apiBooking.totalAmount || 1330}`,
-        createdAt: (apiBooking as any).createdAt ? new Date((apiBooking as any).createdAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Recently',
-        acceptedAt: (apiBooking as any).acceptedAt ? new Date((apiBooking as any).acceptedAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : null,
-        declineReason: (apiBooking as any).declineReason || 'Schedule conflict',
+        notes: apiBooking.specialInstructions || apiBooking.notes || '',
+        sessionRate: formatBookingAmount(apiBooking.pricing?.baseTotal),
+        platformFee: formatBookingAmount(apiBooking.pricing?.platformFee),
+        taxes: formatBookingAmount(apiBooking.pricing?.taxAmount),
+        total: formatBookingAmount(apiBooking.pricing?.totalAmount ?? apiBooking.totalAmount),
+        paymentStatus: normalizePaymentState(apiBooking.paymentStatus),
+        createdAt: apiBooking.createdAt && Number.isFinite(new Date(apiBooking.createdAt).getTime())
+          ? new Date(apiBooking.createdAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+          : t('unavailable', 'Unavailable'),
+        acceptedAt: apiBooking.acceptedAt && Number.isFinite(new Date(apiBooking.acceptedAt).getTime())
+          ? new Date(apiBooking.acceptedAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+          : t('unavailable', 'Unavailable'),
+        declineReason: apiBooking.declineReason || t('reasonUnavailable', 'No reason was provided.'),
       }
     : null;
 
@@ -159,7 +176,7 @@ export const BookingDetailScreen = () => {
     }
     
     if (data.status === 'Accepted') {
-      const isPaid = (apiBooking as any)?.paymentStatus === 'completed' || (apiBooking as any)?.paymentStatus === 'paid';
+      const isPaid = data.paymentStatus === 'completed';
 
       return (
         <View style={styles.actionCol}>
@@ -169,18 +186,17 @@ export const BookingDetailScreen = () => {
                 style={styles.primaryBtn}
                 onPress={() => navigation.navigate('PaymentScreen', {
                   bookingId: data.id,
-                  amount: typeof data.total === 'string' ? parseInt(data.total.replace(/[^\d]/g, ''), 10) : data.total,
                   companionName: data.companionName,
                   activityName: data.activity,
                 })}
                 accessibilityRole="button"
-                accessibilityLabel="Proceed to Escrow Payment"
+                accessibilityLabel={t('a11yPaymentDetails', 'View payment details')}
               >
-                <Icon name="shield-check" size={18} color={theme.colors.background} />
-                <Text style={styles.primaryBtnText}>Proceed to Escrow Payment ({data.total})</Text>
+                <Icon name="receipt-text-outline" size={18} color={theme.colors.background} />
+                <Text style={styles.primaryBtnText}>{t('viewPaymentDetails', 'View payment details')}</Text>
               </TouchableOpacity>
               <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
-                Funds are held in secure escrow until session completion.
+                {t('checkoutUnavailable', 'Checkout is unavailable in this app build. No payment has been submitted.')}
               </Text>
             </View>
           ) : (
@@ -280,13 +296,24 @@ export const BookingDetailScreen = () => {
     return (
       <SafeAreaView style={[styles.root, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
         <Icon name="alert-circle-outline" size={60} color={theme.colors.textSecondary} style={{ marginBottom: 16 }} />
-        <Text style={[styles.headerTitle, { textAlign: 'center', marginBottom: 8 }]}>Booking Not Found</Text>
-        <Text style={{ color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
-          The requested booking details could not be loaded.
+        <Text style={[styles.headerTitle, { textAlign: 'center', marginBottom: 8 }]}>
+          {notFound ? t('bookingNotFound', 'Booking not found') : t('bookingUnavailable', 'Booking details unavailable')}
         </Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleBack}>
-          <Text style={styles.primaryBtnText}>Back to Bookings</Text>
-        </TouchableOpacity>
+        <Text style={{ color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+          {loadError
+            ? t('bookingLoadError', 'The booking service could not be reached. Try again before continuing.')
+            : t('bookingNotFoundMessage', 'The Customer Backend did not return this booking.')}
+        </Text>
+        <View style={{ width: '100%', gap: 12 }}>
+          {loadError ? (
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => setLoadAttempt((attempt) => attempt + 1)} accessibilityRole="button">
+              <Text style={styles.primaryBtnText}>{t('retry', 'Retry')}</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity style={styles.secondaryBtn} onPress={handleBack} accessibilityRole="button">
+            <Text style={styles.secondaryBtnText}>{t('backToBookings', 'Back to bookings')}</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -300,7 +327,7 @@ export const BookingDetailScreen = () => {
         <TouchableOpacity onPress={handleBack} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t('a11yGoBack', 'Go back')}>
           <Icon name="arrow-left" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('headerTitle', 'Booking ID: {{id}}', { id: data.bookingRef || data.id })}</Text>
+        <Text style={styles.headerTitle}>{t('headerTitle', 'Booking ID: {{id}}', { id: data.id })}</Text>
         <TouchableOpacity style={styles.helpBtn} onPress={() => navigation.navigate('SafetySupportStack', { screen: 'SafetyHubScreen' })} accessibilityRole="button" accessibilityLabel={t('a11ySos', 'SOS')}>
           <Icon name="shield-half-full" size={16} color={theme.colors.background} />
           <Text style={styles.helpBtnText}>{t('sos', 'SOS')}</Text>
@@ -328,12 +355,6 @@ export const BookingDetailScreen = () => {
             <View style={{ flex: 1, paddingLeft: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <Text style={styles.companionName}>{data.companionName}</Text>
-                <Icon name="check-decagram" size={16} color={theme.colors.primary} />
-              </View>
-              <View style={styles.ratingRow}>
-                <Icon name="star" size={14} color={theme.colors.primary} />
-                <Text style={styles.ratingText}>{data.companionRating}</Text>
-                <Text style={styles.reviewCount}>{t('reviewCount', '({{reviewCountVal}} reviews)', { reviewCountVal: data.companionReviews })}</Text>
               </View>
             </View>
             <View style={styles.viewProfileBadge}>
@@ -398,15 +419,15 @@ export const BookingDetailScreen = () => {
         <View style={styles.sectionCard}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t('paymentSummary', 'PAYMENT SUMMARY')}</Text>
-            {data.status === 'Declined' ? (
-               <Text style={[styles.escrowBadge, { backgroundColor: 'rgba(239, 68, 68, 0.15)', color: theme.colors.error }]}>{t('refunded', 'Refunded')}</Text>
-            ) : (
-               <Text style={styles.escrowBadge}>{t('protectedByEscrow', 'Protected by Escrow')}</Text>
-            )}
+            <Text style={styles.paymentStateBadge}>
+              {t(`paymentState.${data.paymentStatus}`, {
+                defaultValue: data.paymentStatus === 'completed' ? 'Payment recorded' : 'Payment status unavailable',
+              })}
+            </Text>
           </View>
           
           <View style={styles.paymentRow}>
-            <Text style={styles.paymentLabel}>{t('sessionRate', 'Session Rate ({{duration}})', { duration: data.duration })}</Text>
+            <Text style={styles.paymentLabel}>{t('sessionRate', 'Session amount ({{duration}})', { duration: data.duration })}</Text>
             <Text style={styles.paymentValue}>{data.sessionRate}</Text>
           </View>
           <View style={styles.paymentRow}>
@@ -414,7 +435,7 @@ export const BookingDetailScreen = () => {
             <Text style={styles.paymentValue}>{data.platformFee}</Text>
           </View>
           <View style={styles.paymentRow}>
-            <Text style={styles.paymentLabel}>{t('taxes', 'Taxes & Surcharges')}</Text>
+            <Text style={styles.paymentLabel}>{t('taxes', 'Taxes')}</Text>
             <Text style={styles.paymentValue}>{data.taxes}</Text>
           </View>
           
@@ -422,9 +443,9 @@ export const BookingDetailScreen = () => {
           
           <View style={styles.paymentTotalBox}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.paymentTotalLabel}>{data.status === 'Declined' ? t('totalReleased', 'Total Released') : t('totalSecured', 'Total Secured')}</Text>
+              <Text style={styles.paymentTotalLabel}>{t('bookingTotal', 'Booking total')}</Text>
               <Text style={styles.paymentSubtext}>
-                {data.status === 'Declined' ? t('escrow.released', 'The escrow hold has been fully released.') : t('escrow.held', 'Held safely until session ends.')}
+                {t('paymentNote', 'Amount reported by the Customer Backend. This app build does not provide checkout or escrow.')}
               </Text>
             </View>
             <Text style={styles.paymentTotalValue}>{data.total}</Text>
@@ -489,9 +510,6 @@ const styles = StyleSheet.create({
   avatarPlaceholder: { width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.colors.primary },
   avatarInitials: { color: theme.colors.primary, fontSize: 24, fontWeight: 'bold' },
   companionName: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary, flexShrink: 1 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ratingText: { fontSize: 14, color: theme.colors.textPrimary, fontWeight: 'bold' },
-  reviewCount: { fontSize: 12, color: theme.colors.textSecondary },
   viewProfileBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(212, 175, 55, 0.1)', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 20 },
   viewProfileText: { fontSize: 12, color: theme.colors.primary, fontWeight: 'bold', marginRight: 2 },
   
@@ -502,7 +520,7 @@ const styles = StyleSheet.create({
   detailValue: { fontSize: 15, color: theme.colors.textPrimary, fontWeight: '600', flexShrink: 1 },
   detailSubValue: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 4, lineHeight: 20, flexShrink: 1 },
   
-  escrowBadge: { backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, overflow: 'hidden', color: theme.colors.success, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
+  paymentStateBadge: { backgroundColor: 'rgba(255, 255, 255, 0.06)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, overflow: 'hidden', color: theme.colors.textSecondary, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
   paymentRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   paymentLabel: { fontSize: 15, color: theme.colors.textSecondary },
   paymentValue: { fontSize: 15, color: theme.colors.textPrimary, fontWeight: '600' },

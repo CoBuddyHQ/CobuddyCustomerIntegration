@@ -7,63 +7,50 @@ import {
   ScrollView,
   StatusBar,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { bookingApi, walletApi, Booking as BookingApiType } from '../../services/api';
+import { bookingApi, Booking as BookingApiType } from '../../services/api';
 import { FlowTracker } from '../../services/flowTracker';
+import { formatBookingAmount, normalizePaymentState } from '../../utils/bookingPresentation';
 
 type PaymentScreenRouteProp = RouteProp<RootStackParamList, 'PaymentScreen'>;
 
 export const PaymentScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<PaymentScreenRouteProp>();
   const { smartGoBack } = useSmartNavigation();
 
   const bookingId = route.params?.bookingId;
 
   const [booking, setBooking] = useState<BookingApiType | null>(null);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState<'razorpay' | 'wallet' | 'upi'>('razorpay');
   const [isLoadingBooking, setIsLoadingBooking] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     FlowTracker.saveActiveScreen('PaymentScreen');
   }, []);
 
-  // Fetch Booking Details & Wallet Balance
+  // Fetch authoritative booking and price data from the Customer Backend.
   useEffect(() => {
     let isMounted = true;
 
     const loadData = async () => {
       setIsLoadingBooking(true);
-      setErrorMessage(null);
-
+      setLoadError(false);
       try {
-        if (bookingId) {
-          const fetchedBooking = await bookingApi.getBooking(bookingId);
-          if (isMounted && fetchedBooking) {
-            setBooking(fetchedBooking);
-          }
-        }
-      } catch (err: any) {
-        console.warn('[PaymentScreen] Failed to load booking details:', err?.message || err);
-      }
-
-      try {
-        const balanceData = await walletApi.getWalletBalance();
-        if (isMounted && balanceData) {
-          setWalletBalance(balanceData.balance ?? 0);
+        if (!bookingId) throw new Error('Booking identifier unavailable.');
+        const fetchedBooking = await bookingApi.getBooking(bookingId);
+        if (isMounted && fetchedBooking) {
+          setBooking(fetchedBooking);
+        } else if (isMounted) {
+          setLoadError(true);
         }
       } catch {
-        if (isMounted) setWalletBalance(null);
+        if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoadingBooking(false);
       }
@@ -75,14 +62,13 @@ export const PaymentScreen: React.FC = () => {
     };
   }, [bookingId]);
 
-  // Financial Calculations
+  // Display only amounts returned by the Customer Backend.
   const durationHours = booking?.pricing?.durationHours ?? booking?.durationHours ?? booking?.duration;
   const baseRate = booking?.pricing?.baseRate;
   const baseTotal = booking?.pricing?.baseTotal;
   const platformFee = booking?.pricing?.platformFee;
   const taxes = booking?.pricing?.taxAmount;
   const totalAmount = booking?.pricing?.totalAmount ?? booking?.totalAmount;
-  const hasPrice = typeof totalAmount === 'number' && Number.isFinite(totalAmount) && totalAmount > 0;
   const hasPriceBreakdown = [durationHours, baseRate, baseTotal, platformFee, taxes]
     .every((value) => typeof value === 'number' && Number.isFinite(value));
 
@@ -92,33 +78,14 @@ export const PaymentScreen: React.FC = () => {
   const formattedDate = booking?.date ? new Date(booking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Unavailable';
   const timeSlot = booking?.time || 'Unavailable';
 
-  const canUseWallet = hasPrice && walletBalance !== null && walletBalance >= totalAmount;
-
-  // No Razorpay native checkout or wallet debit contract is configured in this app.
-  const handleProceedPayment = async () => {
-    if (!bookingId) {
-      Alert.alert('Error', 'Missing booking identifier.');
-      return;
-    }
-    if (!hasPrice) {
-      const message = 'The Customer Backend did not provide a confirmed booking price. No payment was attempted.';
-      setErrorMessage(message);
-      Alert.alert('Price unavailable', message);
-      return;
-    }
-
-    setErrorMessage(null);
-
-    const message = selectedMethod === 'wallet'
-      ? (walletBalance === null
-          ? 'Wallet balance could not be verified. No payment was attempted.'
-          : !canUseWallet
-            ? 'Your wallet balance is insufficient. No payment was attempted.'
-            : 'Wallet booking payment is unavailable in this app version. No funds were deducted.')
-      : 'Razorpay checkout is unavailable in this app version. No payment was submitted.';
-    setErrorMessage(message);
-    Alert.alert('Payment unavailable', message);
-  };
+  const paymentState = normalizePaymentState(booking?.paymentStatus);
+  const paymentStateText = {
+    pending: 'No completed payment is confirmed by the Customer Backend.',
+    completed: 'The Customer Backend reports this payment as complete.',
+    failed: 'The Customer Backend reports this payment as failed.',
+    refunded: 'The Customer Backend reports this payment as refunded.',
+    unknown: 'Payment status is unavailable from the Customer Backend.',
+  }[paymentState];
 
   if (isLoadingBooking) {
     return (
@@ -126,7 +93,7 @@ export const PaymentScreen: React.FC = () => {
         <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Securing booking details...</Text>
+          <Text style={styles.loadingText}>Loading booking details…</Text>
         </View>
       </SafeAreaView>
     );
@@ -147,13 +114,10 @@ export const PaymentScreen: React.FC = () => {
           <Icon name="arrow-left" size={22} color={theme.colors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerTitle}>Escrow Payment</Text>
-          <Text style={styles.headerSubtitle}>256-Bit SSL Encrypted</Text>
+          <Text style={styles.headerTitle}>Payment details</Text>
+          <Text style={styles.headerSubtitle}>Checkout unavailable in this app build</Text>
         </View>
-        <View style={styles.secureBadge}>
-          <Icon name="shield-check" size={16} color={theme.colors.success} />
-          <Text style={styles.secureBadgeText}>Escrow</Text>
-        </View>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -178,87 +142,15 @@ export const PaymentScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Escrow Trust Guarantee */}
-        <View style={styles.escrowCard}>
-          <View style={styles.escrowIconBox}>
-            <Icon name="shield-lock-outline" size={28} color={theme.colors.primary} />
-          </View>
+        <View style={styles.checkoutUnavailableCard}>
+          <Icon name="alert-circle-outline" size={24} color={theme.colors.warning} />
           <View style={styles.escrowContent}>
-            <Text style={styles.escrowTitle}>CoBuddy Escrow Protection</Text>
+            <Text style={styles.escrowTitle}>Checkout unavailable</Text>
             <Text style={styles.escrowDesc}>
-              Your money is held securely by our escrow trustee. The companion will only be paid after mutual check-in and session completion.
+              Payment processing is not configured in this app build. No payment was submitted and no funds were held by this screen.
             </Text>
+            <Text style={styles.escrowDesc}>{paymentStateText}</Text>
           </View>
-        </View>
-
-        {/* Payment Methods Selection */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Select Payment Method</Text>
-
-          {/* Razorpay (Cards, NetBanking, UPI) */}
-          <TouchableOpacity
-            style={[styles.methodOption, selectedMethod === 'razorpay' && styles.methodOptionSelected]}
-            onPress={() => setSelectedMethod('razorpay')}
-            activeOpacity={0.8}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: selectedMethod === 'razorpay' }}
-          >
-            <View style={styles.methodIconBox}>
-              <Icon name="credit-card-outline" size={22} color={selectedMethod === 'razorpay' ? theme.colors.primary : theme.colors.textSecondary} />
-            </View>
-            <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>Cards, UPI & NetBanking</Text>
-              <Text style={styles.methodSubtitle}>Instant checkout via Razorpay Secure</Text>
-            </View>
-            <View style={[styles.radioCircle, selectedMethod === 'razorpay' && styles.radioCircleActive]}>
-              {selectedMethod === 'razorpay' && <View style={styles.radioDot} />}
-            </View>
-          </TouchableOpacity>
-
-          {/* UPI Direct */}
-          <TouchableOpacity
-            style={[styles.methodOption, selectedMethod === 'upi' && styles.methodOptionSelected]}
-            onPress={() => setSelectedMethod('upi')}
-            activeOpacity={0.8}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: selectedMethod === 'upi' }}
-          >
-            <View style={styles.methodIconBox}>
-              <Icon name="qrcode-scan" size={22} color={selectedMethod === 'upi' ? theme.colors.primary : theme.colors.textSecondary} />
-            </View>
-            <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>UPI Instant Pay</Text>
-              <Text style={styles.methodSubtitle}>GPay, PhonePe, Paytm or BHIM UPI</Text>
-            </View>
-            <View style={[styles.radioCircle, selectedMethod === 'upi' && styles.radioCircleActive]}>
-              {selectedMethod === 'upi' && <View style={styles.radioDot} />}
-            </View>
-          </TouchableOpacity>
-
-          {/* CoBuddy Wallet */}
-          <TouchableOpacity
-            style={[styles.methodOption, selectedMethod === 'wallet' && styles.methodOptionSelected]}
-            onPress={() => setSelectedMethod('wallet')}
-            activeOpacity={0.8}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: selectedMethod === 'wallet' }}
-          >
-            <View style={styles.methodIconBox}>
-              <Icon name="wallet-outline" size={22} color={selectedMethod === 'wallet' ? theme.colors.primary : theme.colors.textSecondary} />
-            </View>
-            <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>CoBuddy Wallet</Text>
-              <Text style={styles.methodSubtitle}>
-                Available Balance: ₹{walletBalance !== null ? walletBalance.toLocaleString('en-IN') : '...'}
-                {!canUseWallet && walletBalance !== null && (
-                  <Text style={styles.insufficientText}> (Insufficient)</Text>
-                )}
-              </Text>
-            </View>
-            <View style={[styles.radioCircle, selectedMethod === 'wallet' && styles.radioCircleActive]}>
-              {selectedMethod === 'wallet' && <View style={styles.radioDot} />}
-            </View>
-          </TouchableOpacity>
         </View>
 
         {/* Transparent Cost Breakdown */}
@@ -267,41 +159,38 @@ export const PaymentScreen: React.FC = () => {
 
           {hasPriceBreakdown ? <>
           <View style={styles.feeRow}>
-            <Text style={styles.feeLabel}>Experience Rate ({durationHours} hr × ₹{baseRate})</Text>
-            <Text style={styles.feeValue}>₹{baseTotal!.toLocaleString('en-IN')}</Text>
+            <Text style={styles.feeLabel}>Session amount ({durationHours} hr)</Text>
+            <Text style={styles.feeValue}>{formatBookingAmount(baseTotal)}</Text>
           </View>
 
           <View style={styles.feeRow}>
-            <View style={styles.labelWithBadge}>
-              <Text style={styles.feeLabel}>Safety & Platform Fee (15%)</Text>
-            </View>
-            <Text style={styles.feeValue}>₹{platformFee!.toLocaleString('en-IN')}</Text>
+            <Text style={styles.feeLabel}>Platform fee</Text>
+            <Text style={styles.feeValue}>{formatBookingAmount(platformFee)}</Text>
           </View>
 
           <View style={styles.feeRow}>
-            <Text style={styles.feeLabel}>GST & Service Taxes (18%)</Text>
-            <Text style={styles.feeValue}>₹{taxes!.toLocaleString('en-IN')}</Text>
+            <Text style={styles.feeLabel}>Taxes</Text>
+            <Text style={styles.feeValue}>{formatBookingAmount(taxes)}</Text>
           </View>
           </> : (
-            <Text style={styles.feeLabel}>Server price breakdown unavailable.</Text>
+            <Text style={styles.feeLabel}>Price breakdown unavailable from the Customer Backend.</Text>
           )}
 
           <View style={styles.divider} />
 
           <View style={styles.totalRow}>
             <View>
-              <Text style={styles.totalLabel}>Total Escrow Amount</Text>
-              <Text style={styles.totalSubtext}>Includes all taxes & safety coverage</Text>
+              <Text style={styles.totalLabel}>Booking total</Text>
+              <Text style={styles.totalSubtext}>Server-reported amount; this screen does not charge or hold funds.</Text>
             </View>
-              <Text style={styles.totalValue}>{hasPrice ? '₹' + totalAmount.toLocaleString('en-IN') : 'Unavailable'}</Text>
+              <Text style={styles.totalValue}>{formatBookingAmount(totalAmount)}</Text>
           </View>
         </View>
 
-        {/* Error notification banner if any */}
-        {errorMessage && (
+        {loadError && (
           <View style={styles.errorBox}>
             <Icon name="alert-circle-outline" size={20} color={theme.colors.error} />
-            <Text style={styles.errorText}>{errorMessage}</Text>
+            <Text style={styles.errorText}>Booking details could not be loaded. No price or payment status is being assumed.</Text>
           </View>
         )}
       </ScrollView>
@@ -309,20 +198,19 @@ export const PaymentScreen: React.FC = () => {
       {/* Sticky Bottom Payment Button */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomTotalWrap}>
-          <Text style={styles.bottomTotalLabel}>Total to pay</Text>
-          <Text style={styles.bottomTotalAmount}>{hasPrice ? '₹' + totalAmount.toLocaleString('en-IN') : 'Unavailable'}</Text>
+          <Text style={styles.bottomTotalLabel}>Booking total</Text>
+          <Text style={styles.bottomTotalAmount}>{formatBookingAmount(totalAmount)}</Text>
         </View>
 
         <TouchableOpacity
-          style={[styles.payButton, !hasPrice && styles.payButtonDisabled]}
-          onPress={handleProceedPayment}
-          disabled={!hasPrice}
+          style={[styles.payButton, styles.payButtonDisabled]}
+          disabled
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel={hasPrice ? 'Pay rupees ' + totalAmount + ' now' : 'Payment unavailable'}
+          accessibilityLabel="Checkout unavailable"
         >
-          <Icon name="lock" size={18} color={theme.colors.background} />
-          <Text style={styles.payButtonText}>Continue to payment</Text>
+          <Icon name="credit-card-off-outline" size={18} color={theme.colors.background} />
+          <Text style={styles.payButtonText}>Checkout unavailable</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -446,7 +334,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.textSecondary,
   },
-  escrowCard: {
+  checkoutUnavailableCard: {
     flexDirection: 'row',
     backgroundColor: 'rgba(212, 175, 55, 0.08)',
     borderRadius: 16,

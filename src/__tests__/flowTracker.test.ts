@@ -1,7 +1,6 @@
 import { FlowTracker } from '../services/flowTracker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { profileApi, kycApi } from '../services/api';
-import { useAuthStore } from '../store/slices/authStore';
 
 jest.mock('../services/api', () => ({
   profileApi: {

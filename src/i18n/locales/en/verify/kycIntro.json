@@ -1,12 +1,12 @@
 {
-  "verifyIdentity": "Verify your Identity",
-  "govId": "Government ID Verification",
-  "govIdDesc": "Securely scan your Aadhaar, PAN, DL, or Passport.",
-  "livenessCheck": "Liveness Check",
-  "livenessDesc": "A quick selfie to ensure you match your ID.",
+  "verifyIdentity": "Identity verification",
+  "govId": "Identity document evidence",
+  "govIdDesc": "A real document picker is not installed. No identity document can be uploaded from this app build.",
+  "livenessCheck": "Selfie evidence",
+  "livenessDesc": "Camera support and automated identity matching are unavailable in this app build.",
   "startVerify": "Start Verification",
-  "toEnsureASafeAnd": "To ensure a safe and trustworthy community, all users must complete a quick verification before their first booking.",
+  "toEnsureASafeAnd": "The Customer Backend requires a server-reported verification status for booking. Document upload and identity review are unavailable in this app build.",
   "a11yClose": "Close",
   "a11yStartVerification": "Start Verification",
-  "dataSecureNotice": "Your data is encrypted and securely stored. It is used strictly for identity verification as required by local regulations. We never share your government ID with companions or third parties."
+  "dataSecureNotice": "Do not enter sensitive identity details while document upload is unavailable."
 }

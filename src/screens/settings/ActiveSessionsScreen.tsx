@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { accountApi, ActiveSession as ActiveSessionType } from '../../services/api';
+import { accountApi } from '../../services/api';
 
 interface Session {
     id: string;

@@ -1,12 +1,12 @@
 {
   "title": "Request Sent!",
   "cardHeader": "REQUEST SNAPSHOT",
-  "detailLabel": "Escrow Amount Held",
+  "detailLabel": "Server-quoted booking total",
   "primaryBtnText": "View Request Details",
   "secondaryBtnText": "Return to Home",
   "a11yViewRequestDetails": "View Request Details",
   "a11yReturnToHome": "Return to Home",
   "bookingRequestSent": {
-    "body": "We've notified {{name}}. They have 24 hours to review your request, but companions usually respond within a few hours."
+    "body": "The Companion Backend accepted the booking request for {{name}}. Check booking details for updates."
   }
 }

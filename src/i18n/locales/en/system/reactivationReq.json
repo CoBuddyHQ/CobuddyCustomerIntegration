@@ -1,6 +1,12 @@
 {
-  "title": "Request Received",
+  "title": "Request recorded",
+  "requestTitle": "Reactivation request",
+  "requestPrompt": "Submit a reactivation request. Response timing is not guaranteed.",
+  "requestSending": "Submitting request to the Customer Backend…",
+  "requestUnavailable": "The Customer Backend did not confirm a reactivation request. No request has been marked as submitted.",
+  "submitBtn": "Submit reactivation request",
   "loginBtn": "Return to Login",
-  "yourRequestToReactivateYour": "Your request to reactivate your account has been submitted successfully. Our team will review it and notify you within 24 hours.",
-  "a11yReturnToLogin": "Return to Login"
+  "yourRequestToReactivateYour": "The Customer Backend saved your request. Response timing is not guaranteed.",
+  "a11yReturnToLogin": "Return to Login",
+  "a11ySubmitRequest": "Submit reactivation request"
 }

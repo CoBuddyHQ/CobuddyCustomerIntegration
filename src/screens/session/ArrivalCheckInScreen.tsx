@@ -18,38 +18,73 @@ export const ArrivalCheckInScreen = () => {
   const { companionId, companionName, bookingId } = route.params || {};
   const [hasArrived, setHasArrived] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [isRefreshingSession, setIsRefreshingSession] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<string | null>(null);
+  const [customerSessionId, setCustomerSessionId] = useState<string | null>(null);
   const [passCode, setPassCode] = useState('');
   const [venueName, setVenueName] = useState<string>(route?.params?.venueName || '');
 
   React.useEffect(() => {
-    sessionApi.getCurrentSession().then((sess) => {
-      if (sess?.passCode) {
-        setPassCode(sess.passCode);
+    let isMounted = true;
+    const loadSession = async () => {
+      if (!bookingId) return;
+      const [sessionResult, bookingResult] = await Promise.allSettled([
+        sessionApi.getCurrentSession(),
+        bookingApi.getBooking(bookingId),
+      ]);
+      if (!isMounted) return;
+      if (bookingResult.status === 'fulfilled') {
+        const booking = bookingResult.value;
+        setVenueName(booking?.venueName || booking?.venue?.name || 'Venue details unavailable');
       }
-    }).catch(() => {});
-
-    if (bookingId) {
-      bookingApi.getBooking(bookingId).then((b: any) => {
-        if (b?.sessionPassCode) {
-          setPassCode(b.sessionPassCode);
+      if (sessionResult.status === 'fulfilled') {
+        const session = sessionResult.value;
+        if (session && session.bookingId === bookingId && session.passCode) {
+          setPassCode(session.passCode);
+          setCustomerSessionId(session.id);
+          setSessionStatus(session.status);
+          setHasArrived(['checked_in', 'active', 'extending'].includes(session.status));
         }
-        setVenueName(b?.venueName || b?.venue?.name || 'Venue details unavailable');
-      }).catch(() => {});
-    }
+      }
+    };
+    loadSession();
+    return () => { isMounted = false; };
   }, [bookingId]);
+
+  const refreshSessionStatus = async () => {
+    if (isRefreshingSession || !bookingId) return;
+    setIsRefreshingSession(true);
+    try {
+      const session = await sessionApi.getCurrentSession();
+      if (!session || session.bookingId !== bookingId) {
+        setSessionStatus(null);
+        return;
+      }
+      setCustomerSessionId(session.id);
+      setSessionStatus(session.status);
+      if (session.passCode) setPassCode(session.passCode);
+      setHasArrived(['checked_in', 'active', 'extending'].includes(session.status));
+    } catch {
+      Alert.alert('Session status unavailable', 'The Customer Backend could not refresh the session status. Try again when connected.');
+    } finally {
+      setIsRefreshingSession(false);
+    }
+  };
 
   const handleCheckIn = async () => {
     if (!bookingId) {
       Alert.alert('Check-in unavailable', 'A booking identifier is required. No arrival was recorded.');
       return;
     }
-    if (!passCode) {
-      Alert.alert('Check-in unavailable', 'A server-issued session pass is not available. No arrival was recorded.');
-      return;
-    }
     setIsLocating(true);
     try {
-      await sessionApi.checkIn(bookingId, passCode);
+      const result = await sessionApi.checkIn(bookingId);
+      if (result.bookingId !== bookingId || !result.passCode || !['checked_in', 'active', 'extending'].includes(result.status)) {
+        throw new Error('The Customer Backend did not confirm check-in.');
+      }
+      setPassCode(result.passCode);
+      setCustomerSessionId(result.id);
+      setSessionStatus(result.status);
       setHasArrived(true);
     } catch {
       Alert.alert('Check-in failed', 'The server did not confirm your arrival. Please retry.');
@@ -86,12 +121,12 @@ export const ArrivalCheckInScreen = () => {
               <Text style={{color: theme.colors.textSecondary, marginTop: 12}}>{t('gpsUnavailable', 'Live location is not shared by this build')}</Text>
             </View>
             <Text style={styles.otpTitle}>{t('otpTitle1', 'Are you at the venue?')}</Text>
-            <Text style={styles.otpDesc}>{t('otpDesc1', 'Please confirm you have physically arrived at the meeting location to unlock your Escrow OTP.')}</Text>
+            <Text style={styles.otpDesc}>{t('otpDesc1', 'Confirm your arrival to record check-in and display the session pass code. This app build does not share your live location.')}</Text>
             
             <TouchableOpacity 
               style={[styles.primaryBtn, { width: '100%' }, isLocating && { opacity: 0.7 }]} 
               onPress={handleCheckIn}
-              disabled={isLocating} accessibilityRole="button" accessibilityLabel={t('a11yShareLocation', 'Share live location')}
+              disabled={isLocating} accessibilityRole="button" accessibilityLabel={t('a11yCheckIn', 'Check in at the venue')}
             >
               {isLocating ? (
                 <ActivityIndicator color={theme.colors.background} />
@@ -106,8 +141,8 @@ export const ArrivalCheckInScreen = () => {
             <View style={styles.iconCircle}>
               <Icon name="shield-check" size={32} color={theme.colors.primary} />
             </View>
-            <Text style={styles.otpTitle}>{t('otpTitle2', 'Escrow Unlock OTP')}</Text>
-            <Text style={styles.otpDesc}>{t('otpSharePrefix', 'Share this 4-digit code with ')}<Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>{companionName}</Text>{t('otpShareSuffix', ' to start the session.')}</Text>
+            <Text style={styles.otpTitle}>{t('otpTitle2', 'Session pass code')}</Text>
+            <Text style={styles.otpDesc}>{t('otpSharePrefix', 'Share this server-issued code in person with ')}<Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>{companionName || 'your companion'}</Text>{t('otpShareSuffix', ' to verify the session start in the Companion app.')}</Text>
             
             <View style={styles.codeBox}>
               {passCode.split('').map((digit, index) => (
@@ -119,8 +154,16 @@ export const ArrivalCheckInScreen = () => {
 
             <Text style={styles.warningText}>
               {t('arrival.neverShareOtp', 'Never share this OTP over phone or chat. Only share it in person when you meet.')} 
-              {"\n\n"}{t('arrival.shareCodeWarning', 'Sharing this code will instantly release Escrow funds and start the session timer.')}
+              {"\n\n"}{t('arrival.shareCodeWarning', 'This code verifies the session start. It does not initiate or release a payment.')}
             </Text>
+            {sessionStatus !== 'active' && sessionStatus !== 'extending' ? (
+              <View style={{ alignItems: 'center', gap: 12, marginTop: 16 }}>
+                <Text style={styles.warningText}>The companion must verify this code before the Customer Backend records an active session.</Text>
+                <TouchableOpacity onPress={refreshSessionStatus} disabled={isRefreshingSession} accessibilityRole="button">
+                  {isRefreshingSession ? <ActivityIndicator color={theme.colors.primary} /> : <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Refresh session status</Text>}
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         )}
 
@@ -158,11 +201,11 @@ export const ArrivalCheckInScreen = () => {
 
       </ScrollView>
 
-      {hasArrived && (
+      {hasArrived && (sessionStatus === 'active' || sessionStatus === 'extending') && (
         <View style={styles.bottomBar}>
           <TouchableOpacity 
             style={styles.primaryBtn} 
-            onPress={() => navigation.navigate('ActiveSessionScreen', { companionId, companionName })} accessibilityRole="button" accessibilityLabel={t('a11yContinueToActiveSession', 'Continue to Active Session')}
+            onPress={() => navigation.navigate('ActiveSessionScreen', { companionId, companionName, sessionId: customerSessionId || undefined })} accessibilityRole="button" accessibilityLabel={t('a11yContinueToActiveSession', 'Continue to Active Session')}
           >
             <Text style={styles.primaryBtnText}>{t('continueSession', 'Continue to Active Session')}</Text>
           </TouchableOpacity>

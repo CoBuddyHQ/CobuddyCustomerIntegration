@@ -70,11 +70,11 @@ export type RootStackParamList = {
   IncidentReportScreen: { companionName?: string; bookingId?: string; companionId?: string } | undefined;
   TrustedContactsScreen: { fromSettings?: boolean } | undefined;
   SafetySettingsScreen: undefined;
-  ActiveSessionScreen: { companionId?: string; companionName?: string } | undefined;
+  ActiveSessionScreen: { companionId?: string; companionName?: string; sessionId?: string } | undefined;
   ArrivalCheckInScreen: { companionId?: string; companionName?: string } | undefined;
   SessionReminderScreen: { bookingId?: string; companionName?: string; time?: string; venue?: string } | undefined;
-  SessionCompleteScreen: { companionId?: string; companionName?: string } | undefined;
-  PostSessionFeedbackScreen: { companionId?: string; companionName?: string } | undefined;
+  SessionCompleteScreen: { companionId?: string; companionName?: string; sessionId?: string; sessionStatus?: string } | undefined;
+  PostSessionFeedbackScreen: { companionId?: string; companionName?: string; sessionId?: string } | undefined;
   TipGratuityScreen: { companionId?: string; companionName?: string } | undefined;
   CompanionReviewScreen: { bookingId?: string; companionId?: string; companionName?: string } | undefined;
   ActiveSessionsScreen: undefined;

@@ -4,7 +4,7 @@
   "privacySub": "CoBuddy is built on a privacy-first architecture.",
   "pillar1": "Data Sovereignty",
   "pillar2": "Zero-Share",
-  "pillar3": "AES-256 Auth",
+  "pillar3": "Account security",
   "devZone": "DEV ZONE (TEMPORARY)",
   "dangerZone": "DANGER ZONE",
   "logOut": "Log Out",
@@ -68,7 +68,7 @@
     },
     "contact": {
       "title": "Contact Support",
-      "sub": "24/7 Concierge Chat"
+      "sub": "Support chat"
     },
     "report": {
       "title": "Report a Problem",

@@ -82,7 +82,7 @@ export const BookingRequestSentScreen = ({ route }: { route: any }) => {
         </Text>
         <Text style={styles.subtitle}>
           {bookingData.companionRequestStatus === 'sent'
-            ? t('bookingRequestSent.body', 'The companion service accepted your booking request for {{name}}.', { name: bookingData.companionName })
+            ? t('bookingRequestSent.body', 'The Companion Backend accepted the booking request for {{name}}. Check booking details for updates.', { name: bookingData.companionName })
             : 'The Customer Backend saved the booking, but did not confirm delivery to the Companion Backend. No request-sent state is claimed.'}
         </Text>
 
@@ -110,7 +110,7 @@ export const BookingRequestSentScreen = ({ route }: { route: any }) => {
           <View style={styles.divider} />
           
           <View style={[styles.detailRow, { marginBottom: 0, justifyContent: 'space-between' }]}>
-            <Text style={styles.detailLabel}>{t('detailLabel', 'Escrow Amount Held')}</Text>
+            <Text style={styles.detailLabel}>{t('detailLabel', 'Server-quoted booking total')}</Text>
             <Text style={styles.amountText}>{bookingData.amount}</Text>
           </View>
         </View>

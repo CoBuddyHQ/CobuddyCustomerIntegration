@@ -52,7 +52,7 @@ export const ModifyBookingScreen = () => {
         if (isMounted) setIsLoading(false);
       });
     return () => { isMounted = false; };
-  }, [bookingId]);
+  }, [bookingId, smartGoBack]);
 
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
@@ -102,9 +102,34 @@ export const ModifyBookingScreen = () => {
     if (!bookingId) return;
     setIsSubmitting(true);
     try {
+      const localDate = newDate ? parseDateToISO(newDate).slice(0, 10) : undefined;
+      const localTime = newTime ? `${newTime} ${amPm}` : undefined;
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const scheduledStart = localDate && localTime
+        ? (() => {
+            const [, year, month, day] = localDate.match(/^(\d{4})-(\d{2})-(\d{2})$/) || [];
+            const [hourText, minuteText] = newTime.split(':');
+            let hour = Number(hourText);
+            if (amPm === 'AM' && hour === 12) hour = 0;
+            if (amPm === 'PM' && hour < 12) hour += 12;
+            const candidate = new Date(Number(year), Number(month) - 1, Number(day), hour, Number(minuteText));
+            if (
+              candidate.getFullYear() !== Number(year) || candidate.getMonth() !== Number(month) - 1 ||
+              candidate.getDate() !== Number(day) || candidate.getHours() !== hour ||
+              candidate.getMinutes() !== Number(minuteText)
+            ) return undefined;
+            return candidate.toISOString();
+          })()
+        : undefined;
+      if (localDate && localTime && !scheduledStart) {
+        Alert.alert('Invalid schedule', 'Choose a valid local date and time.');
+        return;
+      }
       await bookingApi.modifyBooking(bookingId, {
-        date: newDate ? parseDateToISO(newDate) : undefined,
-        time: newTime ? `${newTime} ${amPm}` : undefined,
+        date: localDate,
+        time: localTime,
+        timeZone,
+        scheduledStart,
         durationHours: duration,
         venueName: newVenue || undefined,
       });
@@ -127,7 +152,7 @@ export const ModifyBookingScreen = () => {
     }
   };
 
-  const isFormValid = newDate.length > 5 && newTime.length > 3;
+  const isFormValid = newDate.length === 10 && newTime.length > 3;
 
   if (isLoading) {
     return (
@@ -266,11 +291,11 @@ export const ModifyBookingScreen = () => {
         <View style={styles.bottomBarHandle} />
         <View style={styles.actionCol}>
           <TouchableOpacity 
-            style={[styles.primaryBtn, { opacity: isFormValid ? 1 : 0.5 }]} 
-            disabled={!isFormValid}
+            style={[styles.primaryBtn, { opacity: isFormValid && !isSubmitting ? 1 : 0.5 }]}
+            disabled={!isFormValid || isSubmitting}
             onPress={handleSendRequest} accessibilityRole="button" accessibilityLabel={t('a11ySendModificationRequest', 'Send Modification Request')}
           >
-            <Text style={styles.primaryBtnText}>{t('sendBtn', 'Send Modification Request')}</Text>
+            <Text style={styles.primaryBtnText}>{isSubmitting ? t('sendProgress', 'Sending…') : t('sendBtn', 'Send Modification Request')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.ghostBtn} onPress={handleBack} accessibilityRole="button" accessibilityLabel={t('a11yCancel', 'Cancel')}>
             <Text style={styles.ghostBtnText}>{t('cancelBtn', 'Cancel')}</Text>

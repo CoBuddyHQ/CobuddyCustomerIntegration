@@ -9,8 +9,8 @@
   "alertTitleIncomplete": "Incomplete",
   "alertMsgPleaseselectanincide": "Please select an incident type and provide details.",
   "alertTitleReportSubmitted": "Report Submitted",
-  "alertMsgYoursafetyreporthasb": "Your safety report has been escalated to our Trust & Safety team. We will review this immediately and contact you.",
-  "confidentialAlert": "All reports are strictly confidential. In case of immediate physical danger, please contact local authorities (112) first.",
+  "alertMsgYoursafetyreporthasb": "The Customer Backend saved the report. External emergency dispatch and Admin review were not confirmed.",
+  "confidentialAlert": "Reports are stored by the Customer Backend and may be reviewed by authorized staff. In case of immediate physical danger, contact local authorities first.",
   "placeholder": {
     "eGBooking4412Or": "e.g., Booking #4412 or Companion name",
     "PleaseDescribeE": "Please describe exactly what happened..."

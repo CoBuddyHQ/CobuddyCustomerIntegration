@@ -23,8 +23,8 @@ export const CreateSupportTicketScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
-  const [hasAttachment, setHasAttachment] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!selectedCategory || !subject.trim() || !description.trim()) {
@@ -33,18 +33,23 @@ export const CreateSupportTicketScreen = () => {
     }
     
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      await supportApi.createTicket({
+      const ticket = await supportApi.createTicket({
         category: selectedCategory,
         subject: subject.trim(),
         message: description.trim(),
       });
+      if (!ticket?.id) throw new Error('The Customer Backend did not confirm the ticket.');
+      Alert.alert(
+        t('alertTitleTicketSubmitted', 'Ticket recorded'),
+        t('alertMsgTicketRecorded', 'The Customer Backend saved your ticket. Response timing is not guaranteed.'),
+        [{ text: t('okBtn', 'OK'), onPress: () => smartGoBack() }],
+      );
     } catch {
-      // Fallback
+      setSubmitError(t('alertMsgTicketFailed', 'The Customer Backend did not confirm ticket creation. The ticket has not been marked as submitted.'));
     } finally {
       setIsSubmitting(false);
-      smartGoBack();
-      Alert.alert(t('alertTitleTicketSubmitted', 'Ticket Submitted'), t('alertMsgOursupportteamwillge', 'Our support team will get back to you within 24 hours.'));
     }
   };
 
@@ -118,27 +123,18 @@ export const CreateSupportTicketScreen = () => {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>{t('attachmentsOptional', 'ATTACHMENTS (OPTIONAL)')}</Text>
-            <TouchableOpacity 
-              style={[styles.attachmentBtn, hasAttachment && styles.attachmentBtnActive]}
-              onPress={() => setHasAttachment(!hasAttachment)}
-              activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={hasAttachment ? t('a11yScreenshotAttached', 'Screenshot Attached') : t('a11yUploadScreenshot', 'Upload Screenshot')}
-            >
-              <Icon 
-                name={hasAttachment ? "image-check" : "camera-plus"} 
-                size={24} 
-                color={hasAttachment ? theme.colors.primary : theme.colors.textSecondary} 
-              />
-              <Text style={[styles.attachmentText, hasAttachment && { color: theme.colors.primary }]}>
-                {hasAttachment ? t('ticket.screenshotAttached', 'Screenshot Attached (Tap to remove)') : t('ticket.uploadScreenshot', 'Upload Screenshot or Photo')}
-              </Text>
-            </TouchableOpacity>
+            <Text style={styles.inputLabel}>{t('attachmentsOptional', 'ATTACHMENTS')}</Text>
+            <View style={styles.attachmentBtn}>
+              <Icon name="camera-off-outline" size={24} color={theme.colors.textSecondary} />
+              <Text style={styles.attachmentText}>{t('attachmentsUnavailable', 'File attachments are unavailable in this app build. No file will be added.')}</Text>
+            </View>
           </View>
 
         </ScrollView>
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
+        {submitError ? <Text accessibilityRole="alert" style={styles.submitError}>{submitError}</Text> : null}
         <TouchableOpacity 
           style={[styles.submitBtn, (!selectedCategory || !subject || !description || isSubmitting) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
@@ -182,6 +178,7 @@ const styles = StyleSheet.create({
   attachmentBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: theme.colors.border, borderStyle: 'dashed', gap: 12 },
   attachmentBtnActive: { borderColor: theme.colors.primary, backgroundColor: 'rgba(212, 175, 55, 0.05)', borderStyle: 'solid' },
   attachmentText: { fontSize: 14, fontWeight: '500', color: theme.colors.textSecondary },
+  submitError: { color: theme.colors.error, fontSize: 13, textAlign: 'center', marginBottom: 12 },
 
   footer: { padding: 20, paddingBottom: 32, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background },
   submitBtn: { backgroundColor: theme.colors.primary, paddingVertical: 16, borderRadius: 16, alignItems: 'center' },

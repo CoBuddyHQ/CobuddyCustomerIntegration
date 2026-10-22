@@ -10,13 +10,13 @@
   "recentTransactions": "Recent Transactions",
   "downloadStatement": "Download Statement",
   "viewAll": "View All",
-  "escrowProtection": "Secured by CoBuddy Escrow Protection",
-  "escrowSubtext": "Your money is safely held and only released upon successful session completion.",
+  "escrowProtection": "Wallet values are reported by the Customer Backend.",
+  "escrowSubtext": "This app build does not hold booking payments in escrow or process provider refunds.",
   "alertTitleAutoReload": "Auto-Reload",
   "alertMsgThisfeaturewillbeava": "This feature will be available in V2.",
   "v2": "V2",
   "alertTitleDownloadStateme": "Download Statement",
-  "alertMsgPDFstatementhasbeeng": "PDF statement has been generated and saved.",
+  "alertMsgPDFstatementhasbeeng": "Statement export is not implemented. No file was generated or saved.",
   "transactionType": {
     "add": "Money Added",
     "deduct": "Session Payment",
@@ -37,7 +37,7 @@
     "refundProcessed": "Refund Processed"
   },
   "wallet": {
-    "pendingRefunds": "Pending Refunds: ₹",
-    "heldInEscrow": "Held in Escrow: ₹"
+    "pendingRefunds": "Pending refund state unavailable",
+    "heldInEscrow": "Escrow is not configured"
   }
 }

@@ -3,23 +3,23 @@
   "subtitle": "We use your location to show available companions and exclusive venues near you.",
   "btn_allow": "Allow Location Access",
   "btn_skip": "Skip for now",
-  "trust_note": "Your location is only used while the app is active to match you with nearby services.",
+  "trust_note": "Location permission supports discovery. Continuous session tracking is not available in this build.",
   "benefits": {
     "safety": {
       "title": "Safety Monitoring",
-      "sub": "Real-time location shared with trusted contacts during sessions"
+      "sub": "Live session location sharing is not available in this build"
     },
     "discovery": {
       "title": "Venue Discovery",
-      "sub": "Find safe public places and popular venues near you"
+      "sub": "A verified venue catalog is not configured in this build"
     },
     "transit": {
-      "title": "Protected Routes",
-      "sub": "Secure navigation and safe transit options"
+      "title": "Transit Planning",
+      "sub": "Route guidance is not configured in this build"
     }
   },
   "alertTitleLocationAccess": "Location Access",
-  "alertMsgLocationpermissionwi": "Location permission will be requested on your device. This enables safety monitoring and venue discovery.",
+  "alertMsgLocationpermissionwi": "Location permission will be requested to support discovery. Live safety tracking is unavailable in this build.",
   "cancelBtn": "Cancel",
   "continueBtn": "Continue",
   "a11ySkip": "Skip location permission",

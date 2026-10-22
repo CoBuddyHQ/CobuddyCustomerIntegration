@@ -1,11 +1,12 @@
 export interface BookingActivity {
   id: string;
-  titleKey: string;
-  defaultTitle: string;
-  icon: string;
-  price: string;
-  descKey: string;
-  defaultDesc: string;
+  name?: string;
+  titleKey?: string;
+  defaultTitle?: string;
+  icon?: string;
+  price?: string;
+  descKey?: string;
+  defaultDesc?: string;
 }
 
 export interface BookingVenue {

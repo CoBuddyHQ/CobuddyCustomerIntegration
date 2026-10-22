@@ -30,8 +30,8 @@
       "description": "Rahul has proposed a different time and price for your coffee meetup."
     },
     "n2": {
-      "title": "Refund Processed",
-      "description": "₹1,500 has been successfully refunded to your CoBuddy Wallet."
+      "title": "Refund status",
+      "description": "No refund event was confirmed by the Customer Backend."
     },
     "n3": {
       "title": "New Login Detected",

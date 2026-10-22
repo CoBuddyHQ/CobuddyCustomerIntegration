@@ -4,11 +4,11 @@
   "venueName": "Starbucks, Connaught Place",
   "gpsActive": "GPS Tracking Active",
   "otpTitle1": "Are you at the venue?",
-  "otpDesc1": "Please confirm you have physically arrived at the meeting location to unlock your Escrow OTP.",
+  "otpDesc1": "Confirm your arrival to record check-in and display the session pass code. This app build does not share your live location.",
   "checkInBtn": "I'm at the Venue (Check-In)",
-  "otpTitle2": "Escrow Unlock OTP",
-  "otpSharePrefix": "Share this 4-digit code with ",
-  "otpShareSuffix": " to start the session.",
+  "otpTitle2": "Session pass code",
+  "otpSharePrefix": "Share this server-issued code in person with ",
+  "otpShareSuffix": " to verify the session start in the Companion app.",
   "commTitle": "Can't find your companion?",
   "commCall": "Call Securely",
   "commMessage": "Message",
@@ -22,9 +22,9 @@
   "a11yMessage": "Message",
   "a11yMockCompanionEnteredOtp": "[MOCK] Companion entered OTP",
   "a11yCompanionDidntShowUp": "Companion didn't show up",
-  "a11yShareLocation": "Share live location",
+  "a11yCheckIn": "Check in at the venue",
   "arrival": {
-    "neverShareOtp": "Never share this OTP over phone or chat. Only share it in person when you meet.",
-    "shareCodeWarning": "Sharing this code will instantly release Escrow funds and start the session timer."
+    "neverShareOtp": "Never share this code over phone or chat. Only share it in person when you meet.",
+    "shareCodeWarning": "This code verifies the session start. It does not initiate or release a payment."
   }
 }

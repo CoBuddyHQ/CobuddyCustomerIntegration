@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +26,19 @@ const GENDER_OPTIONS = ['Any', 'Male', 'Female'];
 const RATING_PILLS = [4.0, 4.5, 5.0];
 const PRICE_PILLS = [500, 1000, 2000];
 const DISTANCE_PILLS = [5, 15, 50];
+
+const EmptyCompanions = ({ onClear }: { onClear: () => void }) => {
+  const { t } = useTranslation(['discover']);
+  return (
+    <View style={styles.emptyContainer}>
+      <Icon name="account-search-outline" size={48} color={theme.colors.border} />
+      <Text style={styles.emptyText}>{t('noCompanions', 'No companions found')}</Text>
+      <TouchableOpacity style={styles.clearAllBtn} onPress={onClear} accessibilityRole="button" accessibilityLabel={t('a11yClearFilters', 'Clear Filters')}>
+        <Text style={styles.clearAllBtnText}>{t('clearFilters', 'Clear Filters')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 // --- Custom Slider Component ---
 const CustomSlider = ({ value, onValueChange, min, max, step, prefix = '', suffix = '' }: { value: number; onValueChange: (v: number) => void; min: number; max: number; step: number; prefix?: string; suffix?: string; }) => {
@@ -113,7 +126,9 @@ export const DiscoverScreen = () => {
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [apiCompanions, setApiCompanions] = useState<CompanionCardType[]>([]);
+  const requestVersion = useRef(0);
 
   // Count active advanced filters
   const activeFilterCount = React.useMemo(() => {
@@ -189,6 +204,9 @@ export const DiscoverScreen = () => {
   );
 
   const fetchCompanions = useCallback(async () => {
+    const currentRequest = ++requestVersion.current;
+    setLoading(true);
+    setLoadFailed(false);
     try {
       const params: any = {};
       if (searchQuery.trim()) params.search = searchQuery.trim();
@@ -201,24 +219,28 @@ export const DiscoverScreen = () => {
 
       const res = await discoveryApi.getCompanions(params);
       const list = res?.data || res?.companions || [];
-      setApiCompanions(list);
+      if (!Array.isArray(list)) throw new Error('Companion discovery returned an invalid response.');
+      if (currentRequest === requestVersion.current) setApiCompanions(list);
     } catch {
-      setApiCompanions([]);
+      if (currentRequest === requestVersion.current) {
+        setApiCompanions([]);
+        setLoadFailed(true);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (currentRequest === requestVersion.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [searchQuery, appliedActivity, appliedGender, appliedMaxPrice, appliedRating, appliedDistance, activeStatus]);
 
-  useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(fetchCompanions, 250);
-    return () => clearTimeout(timer);
-  }, [fetchCompanions]);
-
   useFocusEffect(
     useCallback(() => {
-      fetchCompanions();
+      const timer = setTimeout(() => { fetchCompanions(); }, 250);
+      return () => {
+        clearTimeout(timer);
+        requestVersion.current += 1;
+      };
     }, [fetchCompanions])
   );
 
@@ -446,6 +468,14 @@ export const DiscoverScreen = () => {
           <CompanionCardSkeleton />
           <CompanionCardSkeleton />
         </ScrollView>
+      ) : loadFailed ? (
+        <View style={styles.emptyContainer}>
+          <Icon name="wifi-alert" size={48} color={theme.colors.border} />
+          <Text style={styles.emptyText}>{t('loadError', 'Companion discovery is temporarily unavailable.')}</Text>
+          <TouchableOpacity style={styles.clearAllBtn} onPress={() => { fetchCompanions(); }} accessibilityRole="button" accessibilityLabel={t('a11yRetry', 'Retry discovery')}>
+            <Text style={styles.clearAllBtnText}>{t('retry', 'Try again')}</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={filteredCompanions}
@@ -466,15 +496,7 @@ export const DiscoverScreen = () => {
               onPress={(id) => navigation.navigate('CompanionProfileScreen', { companionId: id })}
             />
           )}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Icon name="account-search-outline" size={48} color={theme.colors.border} />
-              <Text style={styles.emptyText}>{t('noCompanions', 'No companions found')}</Text>
-              <TouchableOpacity style={styles.clearAllBtn} onPress={clearAllFilters} accessibilityRole="button" accessibilityLabel={t('a11yClearFilters', 'Clear Filters')}>
-                <Text style={styles.clearAllBtnText}>{t('clearFilters', 'Clear Filters')}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          ListEmptyComponent={<EmptyCompanions onClear={clearAllFilters} />}
         />
       )}
 

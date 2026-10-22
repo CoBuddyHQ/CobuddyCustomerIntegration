@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Animated, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Animated, Modal, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { sessionApi } from '../../services/api';
+import type { Session } from '../../services/api/session.api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -13,18 +14,20 @@ export const ActiveSessionScreen = () => {
   const { t } = useTranslation('session.active');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<any>();
-  const [sessionData, setSessionData] = useState<any>(null);
+  const [sessionData, setSessionData] = useState<Session | null>(null);
+  const [sessionLoadState, setSessionLoadState] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
+  const [isEndingSession, setIsEndingSession] = useState(false);
+  const [endSessionError, setEndSessionError] = useState(false);
   const companionId = route.params?.companionId || sessionData?.companionId;
-  const companionName = route.params?.companionName || sessionData?.companionName || sessionData?.booking?.companionName || 'Companion';
+  const companionName = route.params?.companionName || sessionData?.companionName || sessionData?.booking?.companionName || 'Unavailable';
   const [etiquetteVisible, setEtiquetteVisible] = useState(true);
   
   // Timer State (in seconds)
-  const [totalSeconds, setTotalSeconds] = useState(7200);
-  const [timeLeft, setTimeLeft] = useState(7200);
+  const [totalSeconds, setTotalSeconds] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0);
 
   // Modals & Prompts
   const [extendModalVisible, setExtendModalVisible] = useState(false);
-  const [selectedExtension, setSelectedExtension] = useState<30 | 60>(60);
   const [endEarlyModalVisible, setEndEarlyModalVisible] = useState(false);
   const [bookingDetailsModalVisible, setBookingDetailsModalVisible] = useState(false);
   const [timeoutModalVisible, setTimeoutModalVisible] = useState(false);
@@ -35,29 +38,41 @@ export const ActiveSessionScreen = () => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Fetch live session from backend
-    sessionApi.getCurrentSession().then((sess) => {
-      if (sess) {
-        setSessionData(sess);
-        const baseDurationSec = (sess.durationMinutes || 60) * 60;
-        const extraSec = (sess.extensionMinutes || 0) * 60;
-        const fullDurationSec = baseDurationSec + extraSec;
-        setTotalSeconds(fullDurationSec);
-
-        if (sess.startedAt) {
-          const elapsedSec = Math.floor((Date.now() - new Date(sess.startedAt).getTime()) / 1000);
-          const remaining = Math.max(0, fullDurationSec - elapsedSec);
-          setTimeLeft(remaining);
-
-          if (remaining === 0 && !timeoutPromptedRef.current) {
-            timeoutPromptedRef.current = true;
-            setTimeoutModalVisible(true);
-          }
+    let isMounted = true;
+    const loadSession = async () => {
+      try {
+        const session = await sessionApi.getCurrentSession();
+        if (!isMounted) return;
+        const requestedSessionId = route.params?.sessionId;
+        if (requestedSessionId && session?.id !== requestedSessionId) {
+          setSessionLoadState('unavailable');
+          return;
         }
-      }
-    }).catch(() => {});
+        const isActive = session && ['active', 'extending'].includes(session.status);
+        const startedAt = session?.startedAt ? new Date(session.startedAt) : null;
+        const durationMinutes = Number(session?.durationMinutes);
+        if (!session || !isActive || !startedAt || !Number.isFinite(startedAt.getTime()) || !Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+          setSessionLoadState('unavailable');
+          return;
+        }
 
-    // Pulse animation
+        const durationSeconds = (durationMinutes + Math.max(0, session.extensionMinutes || 0)) * 60;
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 1000));
+        const remainingSeconds = Math.max(0, durationSeconds - elapsedSeconds);
+        setSessionData(session);
+        setTotalSeconds(durationSeconds);
+        setTimeLeft(remainingSeconds);
+        setSessionLoadState('ready');
+        if (remainingSeconds === 0 && !timeoutPromptedRef.current) {
+          timeoutPromptedRef.current = true;
+          setTimeoutModalVisible(true);
+        }
+      } catch {
+        if (isMounted) setSessionLoadState('error');
+      }
+    };
+    loadSession();
+
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 0.2, duration: 1000, useNativeDriver: true }),
@@ -65,7 +80,11 @@ export const ActiveSessionScreen = () => {
       ])
     ).start();
 
-    // Countdown Timer
+    return () => { isMounted = false; };
+  }, [pulseAnim, route.params?.sessionId]);
+
+  useEffect(() => {
+    if (sessionLoadState !== 'ready') return;
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -78,9 +97,8 @@ export const ActiveSessionScreen = () => {
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(interval);
-  }, [pulseAnim]);
+  }, [sessionLoadState]);
 
   // Format Time (HH:MM:SS)
   const formatTime = (seconds: number) => {
@@ -97,53 +115,72 @@ export const ActiveSessionScreen = () => {
   const formatAmPm = (d: Date) => {
     return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   };
-  const startDate = sessionData?.startedAt ? new Date(sessionData.startedAt) : new Date(Date.now() - (totalSeconds - timeLeft) * 1000);
+  const startDate = sessionData?.startedAt ? new Date(sessionData.startedAt) : new Date(0);
   const endDate = new Date(startDate.getTime() + totalSeconds * 1000);
   const startedLabel = `Started: ${formatAmPm(startDate)}`;
   const endsLabel = isTimedOut ? `Ended: ${formatAmPm(endDate)}` : `Ends: ${formatAmPm(endDate)}`;
 
-  // Pro-rata breakdown for Early End
   const elapsedSeconds = Math.max(0, totalSeconds - timeLeft);
   const completedMins = Math.max(1, Math.floor(elapsedSeconds / 60));
   const completedHours = Math.floor(completedMins / 60);
   const completedRemMins = completedMins % 60;
   const timeCompletedText = completedHours > 0 ? `${completedHours} hr ${completedRemMins} mins` : `${completedMins} mins`;
-  const totalBookingAmount = Number(sessionData?.booking?.totalAmount || 3000);
-  const proRataEscrow = Math.min(totalBookingAmount, Math.round((completedMins / Math.max(1, Math.floor(totalSeconds / 60))) * totalBookingAmount));
-  const refundAmount = Math.max(0, totalBookingAmount - proRataEscrow);
-
-  const handleEndEarly = async () => {
-    setEndEarlyModalVisible(false);
-    setTimeoutModalVisible(false);
+  const handleFinishSession = async () => {
+    if (!sessionData?.id || isEndingSession) return;
+    setIsEndingSession(true);
+    setEndSessionError(false);
     try {
-      const current = await sessionApi.getCurrentSession();
-      if (current?.id) {
-        await sessionApi.endSession(current.id);
+      const history = await sessionApi.getSessionHistory();
+      const confirmed = history.find((session) => session.id === sessionData.id);
+      if (!confirmed || confirmed.status !== 'completed') {
+        setEndSessionError(true);
+        Alert.alert(
+          'Waiting for companion confirmation',
+          'The Companion Backend must record session completion. No completion or payment action was performed by this screen. Ask your companion to finish the session, then refresh its status.',
+        );
+        return;
       }
+      setEndEarlyModalVisible(false);
+      setTimeoutModalVisible(false);
+      navigation.navigate('SessionCompleteScreen', {
+        companionId,
+        companionName,
+        sessionId: confirmed.id,
+        sessionStatus: confirmed.status,
+      });
     } catch {
-      // Graceful fallback
+      setEndSessionError(true);
+      Alert.alert('Session status unavailable', 'The Customer Backend could not confirm session completion. No completion or payment action was performed by this screen.');
     } finally {
-      navigation.navigate('SessionCompleteScreen', { companionId, companionName });
+      setIsEndingSession(false);
     }
   };
 
-  const handleConfirmExtension = async () => {
-    const extraSec = selectedExtension * 60;
-    setTimeLeft(prev => prev + extraSec);
-    setTotalSeconds(prev => prev + extraSec);
-    setExtendModalVisible(false);
-    setTimeoutModalVisible(false);
-    timeoutPromptedRef.current = false; // Reset trigger so it warns again on new timeout
+  if (sessionLoadState === 'loading') {
+    return (
+      <SafeAreaView style={[styles.root, { justifyContent: 'center', alignItems: 'center', gap: 12 }]}>
+        <ActivityIndicator color={theme.colors.primary} />
+        <Text style={{ color: theme.colors.textSecondary }}>Checking session status…</Text>
+      </SafeAreaView>
+    );
+  }
 
-    try {
-      const current = await sessionApi.getCurrentSession();
-      if (current?.id) {
-        await sessionApi.extendSession(current.id, selectedExtension);
-      }
-    } catch {
-      // Graceful fallback
-    }
-  };
+  if (sessionLoadState !== 'ready' || !sessionData) {
+    return (
+      <SafeAreaView style={[styles.root, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+        <Icon name="alert-circle-outline" size={52} color={theme.colors.warning} />
+        <Text style={[styles.modalTitle, { textAlign: 'center', marginVertical: 12 }]}>Session unavailable</Text>
+        <Text style={{ color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+          {sessionLoadState === 'error'
+            ? 'The Customer Backend could not confirm an active session. No session timer was started.'
+            : 'No active, server-confirmed session was found.'}
+        </Text>
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.goBack()} accessibilityRole="button">
+          <Text style={styles.primaryBtnText}>Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
@@ -169,6 +206,11 @@ export const ActiveSessionScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {endSessionError ? (
+          <View style={styles.warningBox}>
+            <Text style={styles.warningBoxText}>Session end was not confirmed. The session remains open in this app.</Text>
+          </View>
+        ) : null}
         
         {/* Etiquette Reminder */}
         {etiquetteVisible && (
@@ -261,7 +303,8 @@ export const ActiveSessionScreen = () => {
           
           <TouchableOpacity 
             style={[styles.actionBtnSecondary, isTimedOut && { borderColor: theme.colors.primary, backgroundColor: 'rgba(212,175,55,0.1)' }]} 
-            onPress={() => isTimedOut ? navigation.navigate('SessionCompleteScreen', { companionId, companionName }) : setEndEarlyModalVisible(true)} 
+            onPress={() => isTimedOut ? handleFinishSession() : setEndEarlyModalVisible(true)}
+            disabled={isEndingSession}
             accessibilityRole="button" 
             accessibilityLabel={isTimedOut ? 'Complete Meetup' : 'End Early'}
           >
@@ -270,7 +313,7 @@ export const ActiveSessionScreen = () => {
               {isTimedOut ? t('completeMeetup', 'Complete Meetup') : t('endEarly', 'End Early')}
             </Text>
             <Text style={[styles.actionBtnSecondarySub, isTimedOut && { color: theme.colors.primary }]}>
-              {isTimedOut ? t('reviewAndPay', 'Review & ratings') : t('proRataCharges', 'Pro-rata charges')}
+              {isTimedOut ? t('reviewAndPay', 'Finish and review') : t('proRataCharges', 'Payment adjustment unavailable')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -302,7 +345,7 @@ export const ActiveSessionScreen = () => {
                 style={styles.primaryBtn} 
                 onPress={() => {
                   setTimeoutModalVisible(false);
-                  navigation.navigate('SessionCompleteScreen', { companionId, companionName });
+                  handleFinishSession();
                 }} 
                 accessibilityRole="button" 
                 accessibilityLabel="Complete and Review Session"
@@ -345,28 +388,11 @@ export const ActiveSessionScreen = () => {
                 <Icon name="close" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalDesc}>{t('extendModalDesc', 'How much longer would you like to extend this session?')}</Text>
-            
-            <View style={{ gap: 12, marginBottom: 24 }}>
-              <TouchableOpacity 
-                style={[styles.extensionOption, selectedExtension === 30 && { borderColor: theme.colors.primary, backgroundColor: 'rgba(212,175,55,0.1)' }]}
-                onPress={() => setSelectedExtension(30)} accessibilityRole="button" accessibilityLabel={t('a11y30Mins750', '+ 30 Mins ₹750')}
-              >
-                <Text style={[styles.extensionTime, selectedExtension === 30 && { color: theme.colors.primary }]}>{t('plus30Mins', '+ 30 Mins')}</Text>
-                <Text style={[styles.extensionPrice, selectedExtension === 30 && { color: theme.colors.primary }]}>₹750</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.extensionOption, selectedExtension === 60 && { borderColor: theme.colors.primary, backgroundColor: 'rgba(212,175,55,0.1)' }]}
-                onPress={() => setSelectedExtension(60)} accessibilityRole="button" accessibilityLabel={t('a11y1Hour1500', '+ 1 Hour ₹1,500')}
-              >
-                <Text style={[styles.extensionTime, selectedExtension === 60 && { color: theme.colors.primary }]}>{t('plus1Hour', '+ 1 Hour')}</Text>
-                <Text style={[styles.extensionPrice, selectedExtension === 60 && { color: theme.colors.primary }]}>₹1,500</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleConfirmExtension} accessibilityRole="button" accessibilityLabel={t('a11yConfirmExtension', 'Confirm session extension')}>
-              <Text style={styles.primaryBtnText}>{t('confirmExtensionPrice', 'Confirm Extension (₹{{amount}})', { amount: selectedExtension === 30 ? '750' : '1,500' })}</Text>
+            <Text style={styles.modalDesc}>
+              Companion approval and payment processing are not configured for extensions in this app build. The session duration will not change.
+            </Text>
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => setExtendModalVisible(false)} accessibilityRole="button">
+              <Text style={styles.primaryBtnText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -385,7 +411,7 @@ export const ActiveSessionScreen = () => {
             
             <View style={styles.warningBox}>
               <Icon name="alert-circle-outline" size={20} color={theme.colors.warning} />
-              <Text style={styles.warningBoxText}>{t('endingNowWillReleaseEscrow', 'Ending now will release escrow funds based on our Pro-Rata Policy.')}</Text>
+              <Text style={styles.warningBoxText}>{t('endingNowWillReleaseEscrow', 'The Customer Backend can record this session as ended. The Companion Backend and payment provider are not coordinated by this action.')}</Text>
             </View>
 
             <View style={{ gap: 8, marginBottom: 24 }}>
@@ -393,21 +419,13 @@ export const ActiveSessionScreen = () => {
                 <Text style={{ color: theme.colors.textSecondary }}>{t('timeCompleted', 'Time completed')}</Text>
                 <Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>{timeCompletedText}</Text>
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: theme.colors.textSecondary }}>{t('escrowReleased', 'Escrow to be released')}</Text>
-                <Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>₹{proRataEscrow.toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: theme.colors.textSecondary }}>{t('refundToYou', 'Refund to you')}</Text>
-                <Text style={{ color: theme.colors.success, fontWeight: 'bold' }}>₹{refundAmount.toLocaleString('en-IN')}</Text>
-              </View>
             </View>
 
             <TouchableOpacity 
               style={[styles.primaryBtn, { backgroundColor: theme.colors.error }]} 
-              onPress={handleEndEarly} accessibilityRole="button" accessibilityLabel={t('a11yConfirmEndSession', 'Confirm & End Session')}
+              onPress={handleFinishSession} disabled={isEndingSession} accessibilityRole="button" accessibilityLabel={t('a11yConfirmEndSession', 'Confirm & End Session')}
             >
-              <Text style={styles.primaryBtnText}>{t('confirmEndSession', 'Confirm & End Session')}</Text>
+              <Text style={styles.primaryBtnText}>{isEndingSession ? 'Ending session…' : t('confirmEndSession', 'Confirm & End Session')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={{ marginTop: 16, alignItems: 'center' }} onPress={() => setEndEarlyModalVisible(false)} accessibilityRole="button" accessibilityLabel={t('a11yKeepSessionActive', 'Keep Session Active')}>
@@ -465,7 +483,8 @@ export const ActiveSessionScreen = () => {
         {isTimedOut ? (
           <TouchableOpacity 
             style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]} 
-            onPress={() => navigation.navigate('SessionCompleteScreen', { companionId, companionName })} 
+            onPress={handleFinishSession}
+            disabled={isEndingSession}
             accessibilityRole="button" 
             accessibilityLabel={t('a11yCompleteReview', 'Complete & Review Meetup')}
           >

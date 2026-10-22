@@ -1,7 +1,7 @@
 {
   "headerTitle": "Secure Verification",
   "protectedInfo": "Your Information Is Protected",
-  "trustSubText": "We use military-grade end-to-end encryption to secure your identity data.\\nYour documents are strictly used for verification purposes and are never shared.",
+  "trustSubText": "Verification results are shown only after confirmation from the server.",
   "status": {
     "completed": "COMPLETED",
     "processing": "PROCESSING",
@@ -15,11 +15,13 @@
   },
   "processing": {
     "profileTrusted": "Your profile is now trusted.",
-    "reviewingDetails": "Reviewing verification details...",
+    "reviewingDetails": "Retrieving your latest verification status...",
     "statusCompleted": "COMPLETED",
     "statusProcessing": "PROCESSING",
     "statusPending": "PENDING"
   },
   "heroTitleComplete": "Verification\\nComplete",
-  "heroTitleVerifying": "Securely Verifying\\nYour Identity"
+  "heroTitleVerifying": "Checking Your Verification Status",
+  "statusUnavailable": "We could not check your verification status. Please try again.",
+  "retry": "Try Again"
 }
