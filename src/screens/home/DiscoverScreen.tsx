@@ -11,7 +11,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore';
 import { selectInterests } from '../../store/selectors/userPreferencesSelectors';
-import { INTEREST_MAPPING } from '../../services/mock/interestMapping';
+import { INTEREST_MAPPING } from '../../constants/uiConstants';
 import { discoveryApi, CompanionCard as CompanionCardType } from '../../services/api';
 
 const FILTER_STATUS = ['All', 'Available Today', 'Top Rated', 'Nearby'];

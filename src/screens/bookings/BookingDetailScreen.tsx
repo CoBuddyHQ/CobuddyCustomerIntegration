@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
@@ -55,6 +55,21 @@ export const BookingDetailScreen = () => {
     return () => { isMounted = false; };
   }, [bookingId, loadAttempt]);
 
+  // Live polling so status transitions reflect instantly
+  useFocusEffect(
+    useCallback(() => {
+      if (!bookingId) return;
+      const interval = setInterval(() => {
+        bookingApi.getBooking(bookingId)
+          .then(res => {
+            if (res) setApiBooking(res);
+          })
+          .catch(() => {});
+      }, 4000);
+      return () => clearInterval(interval);
+    }, [bookingId])
+  );
+
   const rawStatus = apiBooking?.status || route.params?.status || 'pending';
   const displayStatus = rawStatus === 'accepted' ? 'Accepted' 
     : rawStatus === 'counter_proposed' || rawStatus === 'countered' ? 'Counter-Proposed'
@@ -92,6 +107,7 @@ export const BookingDetailScreen = () => {
           ? new Date(apiBooking.acceptedAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
           : t('unavailable', 'Unavailable'),
         declineReason: apiBooking.declineReason || t('reasonUnavailable', 'No reason was provided.'),
+        sessionPassCode: apiBooking.sessionPassCode || (apiBooking as any).sessions?.[0]?.passCode || null,
       }
     : null;
 
@@ -180,49 +196,41 @@ export const BookingDetailScreen = () => {
 
       return (
         <View style={styles.actionCol}>
-          {!isPaid ? (
-            <View>
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={() => navigation.navigate('PaymentScreen', {
-                  bookingId: data.id,
-                  companionName: data.companionName,
-                  activityName: data.activity,
-                })}
-                accessibilityRole="button"
-                accessibilityLabel={t('a11yPaymentDetails', 'View payment details')}
-              >
-                <Icon name="receipt-text-outline" size={18} color={theme.colors.background} />
-                <Text style={styles.primaryBtnText}>{t('viewPaymentDetails', 'View payment details')}</Text>
-              </TouchableOpacity>
-              <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
-                {t('checkoutUnavailable', 'Checkout is unavailable in this app build. No payment has been submitted.')}
-              </Text>
-            </View>
-          ) : (
-            <View>
-              <TouchableOpacity 
-                style={styles.primaryBtn} 
-                onPress={() => navigation.navigate('LiveSessionStack', {
-       screen: 'ArrivalCheckInScreen',
-       params: { companionId: data.companionId, companionName: data.companionName, bookingId: data.id } as any,
-     })} accessibilityRole="button" accessibilityLabel={t('a11yViewUpcomingMeetup', 'View Upcoming Meetup')}
-              >
-                <Icon name="key" size={18} color={theme.colors.background} />
-                <Text style={styles.primaryBtnText}>{t('viewUpcoming', 'View Upcoming Meetup')}</Text>
-              </TouchableOpacity>
-              <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
-                {t('unlockedText', 'Unlocked! Share this with your companion upon meeting.')}
-              </Text>
-            </View>
-          )}
+          <TouchableOpacity 
+            style={styles.primaryBtn} 
+            onPress={() => {
+              const rootNav = (navigation.getParent() || navigation) as any;
+              rootNav.navigate('LiveSessionStack', {
+                screen: 'ArrivalCheckInScreen',
+                params: { companionId: data.companionId, companionName: data.companionName, bookingId: data.id } as any,
+              });
+            }} 
+            accessibilityRole="button" 
+            accessibilityLabel={t('a11yViewUpcomingMeetup', 'View Meetup & Check-in')}
+          >
+            <Icon name="map-marker-check" size={20} color={theme.colors.background} />
+            <Text style={styles.primaryBtnText}>Meetup & Check-in</Text>
+          </TouchableOpacity>
 
           <View style={styles.actionRow}>
             <TouchableOpacity style={[styles.secondaryBtn, { flex: 1, backgroundColor: 'rgba(212, 175, 55, 0.1)', borderColor: theme.colors.primary }]} onPress={handleMessage} accessibilityRole="button" accessibilityLabel={t('a11yMessage', 'Message')}>
               <Icon name="chat" size={18} color={theme.colors.primary} />
               <Text style={[styles.secondaryBtnText, { color: theme.colors.primary, marginLeft: 4 }]}>{t('message', 'Message')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => navigation.navigate('CancelBookingScreen', { bookingId: data.id })} accessibilityRole="button" accessibilityLabel={t('a11yCancel', 'Cancel')}>
+            {!isPaid && (
+              <TouchableOpacity 
+                style={[styles.secondaryBtn, { flex: 1 }]} 
+                onPress={() => navigation.navigate('PaymentScreen', {
+                  bookingId: data.id,
+                  companionName: data.companionName,
+                  activityName: data.activity,
+                })}
+              >
+                <Icon name="receipt-text-outline" size={18} color={theme.colors.textPrimary} />
+                <Text style={styles.secondaryBtnText}>Payment</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={[styles.secondaryBtn, { flex: isPaid ? 1 : 0.8 }]} onPress={() => navigation.navigate('CancelBookingScreen', { bookingId: data.id })} accessibilityRole="button" accessibilityLabel={t('a11yCancel', 'Cancel')}>
               <Text style={[styles.secondaryBtnText, { color: theme.colors.error }]}>{t('cancel', 'Cancel')}</Text>
             </TouchableOpacity>
           </View>
@@ -341,6 +349,22 @@ export const BookingDetailScreen = () => {
           <Text style={styles.sectionTitle}>{t('statusTimeline', 'STATUS TIMELINE')}</Text>
           {renderStepper()}
         </View>
+
+        {/* Live Session Pass Code Card for Accepted/Upcoming sessions */}
+        {data.sessionPassCode && (data.status === 'Accepted' || data.status === 'in_progress') && (
+          <View style={styles.passCodeCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Icon name="shield-key" size={22} color={theme.colors.primary} />
+              <Text style={styles.passCodeLabel}>SESSION PASS CODE</Text>
+            </View>
+            <View style={styles.passCodeBadge}>
+              <Text style={styles.passCodeValue}>{data.sessionPassCode}</Text>
+            </View>
+            <Text style={styles.passCodeSubtext}>
+              Share this 4-digit code with {data.companionName} when you meet to verify identity and start your session safely.
+            </Text>
+          </View>
+        )}
 
         {/* Companion Snapshot */}
         <TouchableOpacity 
@@ -566,4 +590,44 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: theme.colors.textPrimary, fontSize: 15, fontWeight: '600' },
   ghostBtn: { width: '100%', height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   ghostBtnText: { color: theme.colors.error, fontSize: 15, fontWeight: '600' },
+  passCodeCard: {
+    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary,
+    alignItems: 'center',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  passCodeLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: theme.colors.primary,
+    letterSpacing: 1.5,
+  },
+  passCodeBadge: {
+    backgroundColor: 'rgba(212, 175, 55, 0.18)',
+    paddingHorizontal: 28,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    marginVertical: 10,
+  },
+  passCodeValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: theme.colors.primary,
+    letterSpacing: 6,
+  },
+  passCodeSubtext: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
 });

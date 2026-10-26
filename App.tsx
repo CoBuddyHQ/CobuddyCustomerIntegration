@@ -30,17 +30,19 @@ const navTheme = {
 };
 
 function App() {
+  console.log('[CustomerApp] App rendering...');
   // Global lock against double hardware back presses that corrupt react-native-screens
   useHardwareBackLock();
 
   React.useEffect(() => {
+    console.log('[CustomerApp] App mounted');
     const cleanup = initAppStateSync();
     return cleanup;
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <SafeAreaProvider>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <NavigationContainer
           ref={customerNavRef}

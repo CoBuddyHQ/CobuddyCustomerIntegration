@@ -6,7 +6,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { SmartHeader } from '../../components/ui/SmartHeader';
-import { notificationsApi, Notification as ApiNotification } from '../../services/api';
+import { notificationsApi, bookingApi, Notification as ApiNotification } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -48,9 +48,9 @@ export const NotificationsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const fetchNotifications = useCallback(async () => {
-    setLoadError(false);
     try {
       const list = await notificationsApi.listNotifications();
       if (list && Array.isArray(list)) {
@@ -65,9 +65,15 @@ export const NotificationsScreen = () => {
           iconColor: n.iconColor || (n.category === 'Security' ? theme.colors.error : theme.colors.primary),
           route: n.route || 'HomeTab',
           stack: n.stack,
+          routeParams: (n.routeParams || n.data || {}) as Record<string, unknown>,
         })));
       }
-    } catch {
+      setLoadError(false);
+      setErrorMessage('');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || String(err);
+      console.error('[NotificationsScreen] fetchNotifications error:', msg);
+      setErrorMessage(msg);
       setLoadError(true);
     } finally {
       setLoading(false);
@@ -75,13 +81,13 @@ export const NotificationsScreen = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
   useFocusEffect(
     useCallback(() => {
       fetchNotifications();
+      const interval = setInterval(() => {
+        fetchNotifications();
+      }, 5000);
+      return () => clearInterval(interval);
     }, [fetchNotifications])
   );
 
@@ -111,13 +117,42 @@ export const NotificationsScreen = () => {
     } catch {
       // Ignored
     }
-    // Navigate across tabs if stack is provided
-    if (notification.stack) {
-      const nav = navigation as unknown as { navigate: (route: string, params?: unknown) => void };
-      nav.navigate(notification.stack, { screen: notification.route, params: notification.routeParams });
-    } else if (notification.route) {
-      const nav = navigation as unknown as { navigate: (route: string, params?: unknown) => void };
-      nav.navigate(notification.route, notification.routeParams);
+
+    const title = (notification.title || '').toLowerCase();
+    const routeParams = (notification.routeParams || {}) as Record<string, any>;
+    let targetRoute = notification.route;
+
+    // Resolve bookingId if missing in notification params
+    let targetBookingId = routeParams.bookingId || routeParams.id;
+    if (!targetBookingId && (title.includes('booking') || title.includes('session') || notification.category === 'booking' || notification.category === 'session')) {
+      try {
+        const bookings = await bookingApi.listBookings();
+        if (bookings && bookings.length > 0) {
+          targetBookingId = bookings[0].id;
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    const rootNav = (navigation.getParent() || navigation) as any;
+
+    if (title.includes('review') || targetRoute === 'SessionFeedbackScreen' || targetRoute === 'CompanionReviewScreen') {
+      const reviewParams = { ...routeParams, bookingId: targetBookingId || routeParams.bookingId };
+      rootNav.navigate('LiveSessionStack', { screen: 'CompanionReviewScreen', params: reviewParams });
+    } else if (title.includes('started') || (targetRoute === 'ActiveSessionScreen' && !title.includes('accepted'))) {
+      const sessionParams = { ...routeParams, bookingId: targetBookingId || routeParams.bookingId };
+      rootNav.navigate('LiveSessionStack', { screen: 'ActiveSessionScreen', params: sessionParams });
+    } else if (title.includes('counter') || targetRoute === 'BookingCounterOfferScreen') {
+      const counterParams = { ...routeParams, bookingId: targetBookingId || routeParams.bookingId };
+      rootNav.navigate('BookingFlowStack', { screen: 'BookingCounterOfferScreen', params: counterParams });
+    } else {
+      // Booking acceptance, booking request sent, status update, cancelled, etc.
+      if (targetBookingId) {
+        navigation.navigate('BookingDetailScreen' as any, { bookingId: targetBookingId, status: routeParams.status });
+      } else {
+        rootNav.navigate('BookingsTab', { screen: 'BookingsListScreen' });
+      }
     }
   };
 
@@ -188,7 +223,14 @@ export const NotificationsScreen = () => {
           </View>
         ) : loadError ? (
           <View style={styles.emptyState}>
-            <Text accessibilityRole="alert" style={styles.emptyTitle}>Notifications are unavailable. Pull to retry.</Text>
+            <Text accessibilityRole="alert" style={styles.emptyTitle}>Notifications are unavailable</Text>
+            {errorMessage ? <Text style={[styles.emptySub, { color: theme.colors.error, marginTop: 8 }]}>{errorMessage}</Text> : null}
+            <TouchableOpacity 
+              onPress={() => { setLoading(true); setLoadError(false); fetchNotifications(); }} 
+              style={{ marginTop: 16, backgroundColor: theme.colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 }}
+            >
+              <Text style={{ color: '#000', fontWeight: 'bold' }}>Tap to Retry</Text>
+            </TouchableOpacity>
           </View>
         ) : filteredNotifications.length === 0 ? (
           <View style={styles.emptyState}>

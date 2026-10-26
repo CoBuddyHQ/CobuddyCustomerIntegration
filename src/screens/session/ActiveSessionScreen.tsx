@@ -33,6 +33,7 @@ export const ActiveSessionScreen = () => {
   const [timeoutModalVisible, setTimeoutModalVisible] = useState(false);
   
   const timeoutPromptedRef = useRef(false);
+  const hasNavigatedRef = useRef(false);
 
   // Pulse Animation for LIVE badge
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -41,9 +42,28 @@ export const ActiveSessionScreen = () => {
     let isMounted = true;
     const loadSession = async () => {
       try {
+        const requestedSessionId = route.params?.sessionId;
+        if (requestedSessionId) {
+          const specific = await sessionApi.getSessionById(requestedSessionId);
+          if (!isMounted) return;
+          if (specific && (specific.status === 'completed' || specific.status === 'cancelled')) {
+            if (!hasNavigatedRef.current) {
+              hasNavigatedRef.current = true;
+              setTimeLeft(0);
+              navigation.replace('SessionCompleteScreen', {
+                bookingId: route.params?.bookingId || specific?.bookingId,
+                companionId: route.params?.companionId || specific?.companionId,
+                companionName,
+                sessionId: requestedSessionId,
+                sessionStatus: specific.status,
+              });
+            }
+            return;
+          }
+        }
+
         const session = await sessionApi.getCurrentSession();
         if (!isMounted) return;
-        const requestedSessionId = route.params?.sessionId;
         if (requestedSessionId && session?.id !== requestedSessionId) {
           setSessionLoadState('unavailable');
           return;
@@ -86,6 +106,10 @@ export const ActiveSessionScreen = () => {
   useEffect(() => {
     if (sessionLoadState !== 'ready') return;
     const interval = setInterval(() => {
+      if (hasNavigatedRef.current) {
+        clearInterval(interval);
+        return;
+      }
       setTimeLeft((prev) => {
         if (prev <= 1) {
           if (!timeoutPromptedRef.current) {
@@ -99,6 +123,49 @@ export const ActiveSessionScreen = () => {
     }, 1000);
     return () => clearInterval(interval);
   }, [sessionLoadState]);
+
+  // ── Auto-sync when session is completed or ended by Companion ─────────────
+  useEffect(() => {
+    if (sessionLoadState !== 'ready') return;
+    const currentSessionId = route.params?.sessionId || sessionData?.id;
+
+    const navigateToComplete = (finalStatus: string = 'completed') => {
+      if (hasNavigatedRef.current) return;
+      hasNavigatedRef.current = true;
+      setSessionLoadState('unavailable');
+      setTimeLeft(0);
+      navigation.replace('SessionCompleteScreen', {
+        bookingId: route.params?.bookingId || sessionData?.bookingId,
+        companionId: route.params?.companionId || sessionData?.companionId,
+        companionName,
+        sessionId: currentSessionId,
+        sessionStatus: finalStatus,
+      });
+    };
+
+    const pollId = setInterval(async () => {
+      if (hasNavigatedRef.current) {
+        clearInterval(pollId);
+        return;
+      }
+      try {
+        if (currentSessionId) {
+          const specific = await sessionApi.getSessionById(currentSessionId);
+          if (specific && (specific.status === 'completed' || specific.status === 'cancelled' || specific.status === 'ended_early')) {
+            navigateToComplete(specific.status);
+            return;
+          }
+        }
+
+        const current = await sessionApi.getCurrentSession();
+        if (!current || (currentSessionId && current.id !== currentSessionId) || current.status === 'completed' || current.status === 'cancelled') {
+          navigateToComplete('completed');
+          return;
+        }
+      } catch {}
+    }, 1000);
+    return () => clearInterval(pollId);
+  }, [sessionLoadState, companionName, navigation, route.params?.sessionId, route.params?.bookingId, sessionData?.id, sessionData?.bookingId, sessionData?.companionId]);
 
   // Format Time (HH:MM:SS)
   const formatTime = (seconds: number) => {
@@ -183,7 +250,7 @@ export const ActiveSessionScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
       
       {/* Urgent Header */}
@@ -263,7 +330,7 @@ export const ActiveSessionScreen = () => {
         {/* Companion Snapshot */}
         <View style={styles.companionCard}>
           <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitials}>{(companionName || 'Elena').charAt(0)}</Text>
+            <Text style={styles.avatarInitials}>{(companionName || 'C').charAt(0)}</Text>
           </View>
           <View style={{ flex: 1, paddingLeft: 12 }}>
             <Text style={styles.companionName} numberOfLines={1}>{companionName}</Text>
@@ -577,7 +644,7 @@ const styles = StyleSheet.create({
   warningBox: { flexDirection: 'row', backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: 16, borderRadius: 12, gap: 12, marginBottom: 24 },
   warningBoxText: { flex: 1, color: theme.colors.warning, fontSize: 13, lineHeight: 20 },
 
-  bottomBar: { padding: 20, paddingBottom: 32, backgroundColor: theme.colors.surface, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  bottomBar: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, backgroundColor: theme.colors.surface, borderTopWidth: 1, borderTopColor: theme.colors.border },
   primaryBtn: { width: '100%', backgroundColor: theme.colors.primary, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   primaryBtnText: { color: theme.colors.background, fontSize: 15, fontWeight: 'bold' },
 });

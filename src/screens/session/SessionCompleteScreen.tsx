@@ -13,7 +13,7 @@ export const SessionCompleteScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<any>();
   const { companionId, companionName } = route.params || {};
-  const isSessionComplete = route.params?.sessionStatus === 'completed';
+  const isSessionComplete = route.params?.sessionStatus !== 'unconfirmed';
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {

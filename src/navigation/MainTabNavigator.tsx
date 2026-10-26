@@ -72,6 +72,7 @@ const HomeTabStack = () => (
         never navigate('DiscoverTab', { screen: 'CompanionProfileScreen', ... }).
       */}
       <Stack.Screen name="CompanionProfileScreen" component={CompanionProfileScreen} />
+      <Stack.Screen name="BookingDetailScreen" component={BookingDetailScreen} />
   </Stack.Navigator>
 );
 

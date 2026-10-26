@@ -39,6 +39,16 @@ export const getCurrentSession = async (): Promise<Session | null> => {
   return res.data;
 };
 
+// ─── Get session by ID ────────────────────────────────────────────────────────
+export const getSessionById = async (sessionId: string): Promise<Session | null> => {
+  try {
+    const res = await apiClient.get<Session>(`/sessions/${sessionId}`);
+    return res.data;
+  } catch {
+    return null;
+  }
+};
+
 // ─── Get session history ──────────────────────────────────────────────────────
 export const getSessionHistory = async (): Promise<Session[]> => {
   const res = await apiClient.get<Session[]>('/sessions/history');

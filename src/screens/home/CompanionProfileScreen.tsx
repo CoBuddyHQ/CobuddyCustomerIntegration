@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Animated, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -28,20 +28,58 @@ const EMPTY_REVIEWS = { average: 5.0, count: 0, categories: { punctuality: 5.0, 
 
 export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackParamList, 'CompanionProfileScreen'> }) => {
   const { companionId } = route?.params || {};
-
+  const { t } = useTranslation(['companionProfile']);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { smartGoBack } = useSmartNavigation();
+  const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(true);
   const [apiProfile, setApiProfile] = useState<CompanionDetailType | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [showMenuSheet, setShowMenuSheet] = useState(false);
+
   const profile = apiProfile
     ? {
         ...apiProfile,
-        name: apiProfile.name || 'Companion',
-        photos: apiProfile.photos && apiProfile.photos.length > 0 ? apiProfile.photos : (apiProfile.avatar ? [apiProfile.avatar] : []),
-        languages: apiProfile.languages || [],
-        personality: apiProfile.personality || [],
-        hobbies: apiProfile.hobbies || [],
-        rules: apiProfile.rules || ['Public places only'],
-        pricing: apiProfile.pricing || [
-          { activity: 'Experience', price: `₹${apiProfile.rate || '500'}`, icon: 'coffee-outline' },
-        ],
+        name: apiProfile.name || apiProfile.displayName || 'Companion',
+        age: (apiProfile as any).age ?? '',
+        location: apiProfile.location || apiProfile.city || '',
+        distance: apiProfile.distance || '',
+        pronouns: apiProfile.pronouns || '',
+        lastActive: apiProfile.lastActive || (apiProfile.isOnline ? 'Online' : 'Recently active'),
+        responseTime: apiProfile.responseTime || 'Under 1 hr',
+        completedSessions: (apiProfile as any).completedSessions ?? (apiProfile as any).totalSessions ?? 0,
+        trustScore: (apiProfile as any).trustScore ?? (apiProfile.rating ? Math.round(apiProfile.rating * 20) : 95),
+        photos: (() => {
+          const raw =
+            apiProfile.photos && apiProfile.photos.length > 0
+              ? apiProfile.photos
+              : (apiProfile as any).galleryPhotos && (apiProfile as any).galleryPhotos.length > 0
+                ? (apiProfile as any).galleryPhotos
+                : apiProfile.photoUrl
+                  ? [apiProfile.photoUrl]
+                  : [];
+          const extracted = raw
+            .map((p: any) => (typeof p === 'string' ? p : p?.url || ''))
+            .filter((url: string) => typeof url === 'string' && url.length > 0);
+          return extracted.length > 0
+            ? extracted
+            : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80'];
+        })(),
+        languages: (apiProfile.languages || []).map((l: any) => (typeof l === 'string' ? l : l?.language || '')).filter(Boolean),
+        personality: (apiProfile.personality || []).map((p: any) => (typeof p === 'string' ? p : p?.name || p?.label || '')).filter(Boolean),
+        hobbies: (apiProfile.hobbies || []).map((h: any) => (typeof h === 'string' ? h : h?.name || h?.label || '')).filter(Boolean),
+        rules: apiProfile.rules || [],
+        pricing:
+          apiProfile.pricing && apiProfile.pricing.length > 0
+            ? apiProfile.pricing
+            : [
+                {
+                  activity: 'Experience',
+                  price: `₹${(apiProfile as any).hourlyRate || (apiProfile as any).rate || '750'}`,
+                  icon: 'coffee-outline',
+                },
+              ],
         verifications: apiProfile.verifications || [
           { label: 'ID Verified', icon: 'badge-account-horizontal-outline', color: '#10B981' },
           { label: 'Phone Verified', icon: 'phone-check-outline', color: '#10B981' },
@@ -49,14 +87,6 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
         reviews: apiProfile.reviews || EMPTY_REVIEWS,
       }
     : null;
-  const { t } = useTranslation(['companionProfile']);
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { smartGoBack } = useSmartNavigation();
-  const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(true);
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  const [showMenuSheet, setShowMenuSheet] = useState(false);
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -122,83 +152,12 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
     setActivePhotoIndex(index);
   };
 
+  // Instant render — no fake skeleton blocking screen
+
   if (loading) {
     return (
-      <View style={styles.container}>
-        {/* Edge-to-Edge Hero Skeleton */}
-        <View style={styles.heroContainer}>
-          <SkeletonLoader width={width} height={HERO_HEIGHT} borderRadius={0} />
-          {/* Dark Overlay Skeleton details */}
-          <View style={styles.heroOverlay}>
-            <View style={styles.heroDetails}>
-              <SkeletonLoader width="60%" height={38} borderRadius={8} style={{ marginBottom: 12 }} />
-              <SkeletonLoader width="40%" height={18} borderRadius={6} style={{ marginBottom: 16 }} />
-              <SkeletonLoader width="30%" height={16} borderRadius={6} />
-            </View>
-          </View>
-        </View>
-
-        {/* Content Body */}
-        <View style={styles.contentBody}>
-          {/* Quick Stats Row Skeleton */}
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <SkeletonLoader width={28} height={28} borderRadius={14} style={{ marginBottom: 8 }} />
-              <SkeletonLoader width={40} height={16} borderRadius={4} style={{ marginBottom: 4 }} />
-              <SkeletonLoader width={60} height={12} borderRadius={4} />
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <SkeletonLoader width={28} height={28} borderRadius={14} style={{ marginBottom: 8 }} />
-              <SkeletonLoader width={40} height={16} borderRadius={4} style={{ marginBottom: 4 }} />
-              <SkeletonLoader width={60} height={12} borderRadius={4} />
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <SkeletonLoader width={28} height={28} borderRadius={14} style={{ marginBottom: 8 }} />
-              <SkeletonLoader width={40} height={16} borderRadius={4} style={{ marginBottom: 4 }} />
-              <SkeletonLoader width={60} height={12} borderRadius={4} />
-            </View>
-          </View>
-
-          {/* About Card Skeleton */}
-          <View style={styles.card}>
-            <SkeletonLoader width="50%" height={24} borderRadius={6} style={{ marginBottom: 16 }} />
-            <SkeletonLoader width="100%" height={16} borderRadius={4} style={{ marginBottom: 8 }} />
-            <SkeletonLoader width="90%" height={16} borderRadius={4} style={{ marginBottom: 8 }} />
-            <SkeletonLoader width="70%" height={16} borderRadius={4} style={{ marginBottom: 20 }} />
-            
-            <View style={styles.tagsContainer}>
-              <SkeletonLoader width={80} height={32} borderRadius={16} />
-              <SkeletonLoader width={100} height={32} borderRadius={16} />
-              <SkeletonLoader width={90} height={32} borderRadius={16} />
-            </View>
-          </View>
-        </View>
-
-        {/* Floating Header Actions (static over skeleton) */}
-        <View style={[styles.floatingActions, { top: Math.max(insets.top, 16) + 6 }]}>
-          <TouchableOpacity style={styles.iconCircle} onPress={() => smartGoBack('DiscoverTab')} accessibilityRole="button" accessibilityLabel={t('a11yGoBack', 'Go back')}>
-            <Icon name="arrow-left" size={24} color={theme.colors.textPrimary} />
-          </TouchableOpacity>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={styles.iconCircle}>
-              <Icon name="heart-outline" size={22} color={theme.colors.textPrimary} />
-            </View>
-            <View style={styles.iconCircle}>
-              <Icon name="dots-vertical" size={22} color={theme.colors.textPrimary} />
-            </View>
-          </View>
-        </View>
-
-        {/* Premium Bottom Action Bar Skeleton */}
-        <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom + 8, 24), paddingTop: 16, position: 'absolute', bottom: 0, left: 0, right: 0 }]}>
-          <View style={styles.bottomBarLeft}>
-            <SkeletonLoader width={80} height={14} borderRadius={4} style={{ marginBottom: 6 }} />
-            <SkeletonLoader width={120} height={24} borderRadius={6} />
-          </View>
-          <SkeletonLoader width={160} height={48} borderRadius={24} />
-        </View>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -447,7 +406,7 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom + 8, 24), paddingTop: 16 }]}>
         <View style={styles.bottomBarLeft}>
           <Text style={styles.bottomPriceLabel}>{t('starts_from', 'Starts from')}</Text>
-          <Text style={styles.bottomPriceValue}>₹500 <Text style={styles.bottomPriceUnit}>{t('hr', '/ hr')}</Text></Text>
+          <Text style={styles.bottomPriceValue}>₹{(profile as any)?.hourlyRate || 750} <Text style={styles.bottomPriceUnit}>{t('hr', '/ hr')}</Text></Text>
         </View>
         
         <TouchableOpacity 

@@ -11,7 +11,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore';
 import { selectInterests } from '../../store/selectors/userPreferencesSelectors';
-import { INTEREST_MAPPING } from '../../services/mock/interestMapping';
+import { INTEREST_MAPPING } from '../../constants/uiConstants';
 import { useAuthStore } from '../../store/slices/authStore';
 import { discoveryApi, CompanionCard as CompanionCardType } from '../../services/api';
 
@@ -107,6 +107,10 @@ export const HomeDashboardScreen = () => {
   useFocusEffect(
     useCallback(() => {
       loadHomeData();
+      const interval = setInterval(() => {
+        loadHomeData();
+      }, 8000);
+      return () => clearInterval(interval);
     }, [loadHomeData])
   );
 

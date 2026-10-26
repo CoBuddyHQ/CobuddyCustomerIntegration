@@ -16,6 +16,7 @@ export interface Notification {
   iconColor?: string;
   route?: string;
   stack?: string;
+  routeParams?: Record<string, unknown>;
   isRead: boolean;
   data?: Record<string, unknown>;
   createdAt: string;

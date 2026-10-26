@@ -61,7 +61,7 @@ export const PostSessionFeedbackScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.question}>{t('questionRate', 'How was your session with {{name}}?', { name: companionName || 'Elena' })}</Text>
+        <Text style={styles.question}>{t('questionRate', 'How was your session with {{name}}?', { name: companionName || t('companion', 'Companion') })}</Text>
         
         <View style={styles.sentimentRow}>
           <TouchableOpacity 

@@ -51,6 +51,33 @@ export const ArrivalCheckInScreen = () => {
     return () => { isMounted = false; };
   }, [bookingId]);
 
+  // ── Auto-transition to ActiveSessionScreen when companion starts session ──
+  useEffect(() => {
+    if (sessionStatus === 'active' || sessionStatus === 'extending') {
+      navigation.replace('ActiveSessionScreen', {
+        bookingId,
+        companionId,
+        companionName,
+        sessionId: customerSessionId,
+      });
+    }
+  }, [sessionStatus, customerSessionId, bookingId, companionId, companionName, navigation]);
+
+  // ── Background Live Polling: Instantly detect session start ────────────────
+  useEffect(() => {
+    if (!hasArrived || !bookingId) return;
+    const pollId = setInterval(async () => {
+      try {
+        const session = await sessionApi.getCurrentSession();
+        if (session && (session.status === 'active' || session.status === 'extending')) {
+          setSessionStatus(session.status);
+          setCustomerSessionId(session.id);
+        }
+      } catch {}
+    }, 1000);
+    return () => clearInterval(pollId);
+  }, [hasArrived, bookingId]);
+
   const refreshSessionStatus = async () => {
     if (isRefreshingSession || !bookingId) return;
     setIsRefreshingSession(true);
