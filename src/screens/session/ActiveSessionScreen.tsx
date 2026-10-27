@@ -6,6 +6,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { sessionApi } from '../../services/api';
+import { isConfirmedTerminalSession } from '../../utils/sessionTerminalStatus';
 import type { Session } from '../../services/api/session.api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -46,7 +47,7 @@ export const ActiveSessionScreen = () => {
         if (requestedSessionId) {
           const specific = await sessionApi.getSessionById(requestedSessionId);
           if (!isMounted) return;
-          if (specific && (specific.status === 'completed' || specific.status === 'cancelled')) {
+          if (specific && isConfirmedTerminalSession(specific, requestedSessionId)) {
             if (!hasNavigatedRef.current) {
               hasNavigatedRef.current = true;
               setTimeLeft(0);
@@ -158,8 +159,11 @@ export const ActiveSessionScreen = () => {
         }
 
         const current = await sessionApi.getCurrentSession();
-        if (!current || (currentSessionId && current.id !== currentSessionId) || current.status === 'completed' || current.status === 'cancelled') {
-          navigateToComplete('completed');
+        // Absence from /sessions/current is not proof of completion: it may be a
+        // transient read failure or a different active booking. Only a terminal
+        // status returned by this session's owner can complete this screen.
+        if (current && isConfirmedTerminalSession(current, currentSessionId)) {
+          navigateToComplete(current.status);
           return;
         }
       } catch {}

@@ -11,7 +11,7 @@ export interface Session {
   companionId: string;
   companionName?: string;
   customerId: string;
-  status: 'active' | 'completed' | 'ended_early' | 'checked_in' | 'extending';
+  status: 'active' | 'completed' | 'ended_early' | 'checked_in' | 'extending' | 'cancelled';
   startedAt?: string;
   endedAt?: string;
   durationMinutes?: number;

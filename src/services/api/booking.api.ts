@@ -41,6 +41,7 @@ export interface Booking {
   cancellationReason?: string;
   declineReason?: string;
   paymentStatus?: string;
+  sessionPassCode?: string | null;
   counterOffer?: {
     proposedDate?: string;
     proposedTime?: string;

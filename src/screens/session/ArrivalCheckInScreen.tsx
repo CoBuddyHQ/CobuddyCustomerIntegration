@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +20,7 @@ export const ArrivalCheckInScreen = () => {
   const [isLocating, setIsLocating] = useState(false);
   const [isRefreshingSession, setIsRefreshingSession] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
-  const [customerSessionId, setCustomerSessionId] = useState<string | null>(null);
+  const [customerSessionId, setCustomerSessionId] = useState<string | undefined>(undefined);
   const [passCode, setPassCode] = useState('');
   const [venueName, setVenueName] = useState<string>(route?.params?.venueName || '');
 

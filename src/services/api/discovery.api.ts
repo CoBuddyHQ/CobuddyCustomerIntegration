@@ -27,6 +27,8 @@ export interface CompanionCard {
 }
 
 export interface CompanionDetail extends Omit<CompanionCard, 'reviews'> {
+  displayName?: string | null;
+  photoUrl?: string | null;
   photos?: string[];
   location?: string;
   languages?: string[];

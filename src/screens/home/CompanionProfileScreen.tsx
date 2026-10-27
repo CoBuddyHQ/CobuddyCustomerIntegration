@@ -196,7 +196,7 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={onMomentumScrollEnd}
           >
-            {profile.photos.map((photo, index) => (
+            {profile.photos.map((photo: string, index: number) => (
               <Image key={index} source={{ uri: photo }} style={styles.heroImage} />
             ))}
           </Animated.ScrollView>
@@ -225,7 +225,7 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
           </View>
 
           <View style={styles.paginationContainer}>
-            {profile.photos.map((_, i) => (
+            {profile.photos.map((_: string, i: number) => (
               <View key={i} style={[styles.dot, activePhotoIndex === i && styles.paginationActiveDot]} />
             ))}
           </View>
