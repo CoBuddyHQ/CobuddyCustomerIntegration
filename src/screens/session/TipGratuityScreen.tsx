@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -33,20 +33,22 @@ export const TipGratuityScreen = () => {
 
   const handlePayTip = async () => {
     const amount = selectedTip === -1 ? parseInt(customTip, 10) || 0 : (selectedTip || 0);
-    if (amount > 0) {
-      setIsSubmitting(true);
-      try {
-        const current = await sessionApi.getCurrentSession();
-        if (current?.id) {
-          await sessionApi.submitTip(current.id, amount);
-        }
-      } catch {
-        // Graceful fallback
-      } finally {
-        setIsSubmitting(false);
-      }
+    if (amount <= 0) return;
+
+    setIsSubmitting(true);
+    try {
+      const current = await sessionApi.getCurrentSession();
+      if (!current?.id) throw new Error('No active session was returned by the server.');
+      await sessionApi.submitTip(current.id, amount);
+      navigation.navigate('CompanionReviewScreen', { ...(route.params || {}), companionId, companionName });
+    } catch {
+      Alert.alert(
+        'Tip unavailable',
+        'The payment provider did not confirm a tip. No tip was charged or recorded.',
+      );
+    } finally {
+      setIsSubmitting(false);
     }
-    navigation.navigate('CompanionReviewScreen', { ...(route.params || {}), companionId, companionName });
   };
 
   const getButtonLabel = () => {
@@ -82,7 +84,7 @@ export const TipGratuityScreen = () => {
           </View>
           
           <Text style={styles.title}>{t('title', 'Show your appreciation')}</Text>
-          <Text style={styles.subtitle}>{t('subtitle', 'Did {{name}} go above and beyond? A small tip can make their day.', { name: companionName || 'Elena' })}</Text>
+          <Text style={styles.subtitle}>{t('subtitle', 'Did {{name}} go above and beyond? A small tip can make their day.', { name: companionName || 'your companion' })}</Text>
 
           <View style={styles.tipGrid}>
             {TIPS.map(amount => (

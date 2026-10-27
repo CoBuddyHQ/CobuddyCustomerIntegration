@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -8,15 +8,18 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { sessionApi } from '../../services/api';
 
 export const PostSessionFeedbackScreen = () => { 
   const { t } = useTranslation('session.postFeedback');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<any>();
-  const { companionId, companionName } = route.params || {};
+  const { companionName, sessionId } = route.params || {};
   const { smartGoBack } = useSmartNavigation();
   const [sentiment, setSentiment] = useState<'up' | 'down' | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
   const positiveTags = ['Great Listener', 'Punctual', 'Fun & Energetic', 'Dressed Well', 'Polite', 'Safe & Comforting'];
   const negativeTags = ['Late', 'Rude/Unprofessional', 'Catfished/Fake Profile', 'Made me uncomfortable', 'Boring'];
@@ -24,6 +27,24 @@ export const PostSessionFeedbackScreen = () => {
   const handleTagToggle = (tag: string) => {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
+
+  const handleSubmitFeedback = async () => {
+    if (!sessionId || !sentiment || selectedTags.length === 0 || isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError(false);
+    try {
+      const result = await sessionApi.submitFeedback(sessionId, sentiment, selectedTags);
+      if (!result?.message) throw new Error('The Customer Backend did not confirm feedback.');
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] });
+    } catch {
+      setSubmitError(true);
+      Alert.alert('Feedback not submitted', 'The Customer Backend did not confirm that your feedback was saved. Retry when connected.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSkip = () => navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] });
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
@@ -34,13 +55,13 @@ export const PostSessionFeedbackScreen = () => {
           <Icon name="arrow-left" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('headerTitle', 'Quick Feedback')}</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('TipGratuityScreen', { companionId, companionName })} accessibilityRole="button" accessibilityLabel={t('a11ySkip', 'Skip')}>
+        <TouchableOpacity onPress={handleSkip} accessibilityRole="button" accessibilityLabel={t('a11ySkip', 'Skip')}>
           <Text style={styles.skipBtn}>{t('skipBtn', 'Skip')}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.question}>{t('questionRate', 'How was your session with {{name}}?', { name: companionName || 'Elena' })}</Text>
+        <Text style={styles.question}>{t('questionRate', 'How was your session with {{name}}?', { name: companionName || t('companion', 'Companion') })}</Text>
         
         <View style={styles.sentimentRow}>
           <TouchableOpacity 
@@ -80,12 +101,13 @@ export const PostSessionFeedbackScreen = () => {
       </ScrollView>
 
       <View style={styles.bottomBar}>
+        {submitError ? <Text accessibilityRole="alert" style={styles.submitError}>Your feedback has not been confirmed as saved.</Text> : null}
         <TouchableOpacity 
           style={[styles.primaryBtn, (!sentiment || selectedTags.length === 0) && { opacity: 0.5 }]} 
-          disabled={!sentiment || selectedTags.length === 0}
-          onPress={() => navigation.navigate('TipGratuityScreen', { companionId, companionName })} accessibilityRole="button" accessibilityLabel={t('a11yContinue', 'Continue')}
+          disabled={!sessionId || !sentiment || selectedTags.length === 0 || isSubmitting}
+          onPress={handleSubmitFeedback} accessibilityRole="button" accessibilityLabel={t('a11yContinue', 'Submit Feedback')}
         >
-          <Text style={styles.primaryBtnText}>{t('continueBtn', 'Continue')}</Text>
+          <Text style={styles.primaryBtnText}>{isSubmitting ? 'Saving…' : t('continueBtn', 'Submit feedback')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -119,4 +141,5 @@ const styles = StyleSheet.create({
   bottomBar: { padding: 20, paddingBottom: 32, backgroundColor: theme.colors.surface, borderTopWidth: 1, borderTopColor: theme.colors.border },
   primaryBtn: { width: '100%', backgroundColor: theme.colors.primary, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   primaryBtnText: { color: theme.colors.background, fontSize: 15, fontWeight: 'bold' },
+  submitError: { color: theme.colors.error, fontSize: 13, textAlign: 'center', marginBottom: 10 },
 });

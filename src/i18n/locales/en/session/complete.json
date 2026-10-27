@@ -1,12 +1,12 @@
 {
-  "title": "Session Complete!",
-  "subtitle": "We hope you had a fantastic time with {{name}}.",
-  "cardTitle": "FINAL RECEIPT",
-  "labelBase": "Base Session (2 Hrs)",
-  "labelPlatform": "Platform Fee (5%)",
-  "labelTaxes": "Taxes (18% GST)",
-  "labelEscrow": "Escrow Released",
+  "title": "Session end recorded",
+  "subtitle": "The Customer Backend recorded the session as completed with {{name}}.",
+  "statusUnavailable": "Session completion not confirmed",
+  "statusMessage": "The Customer Backend did not confirm session completion.",
+  "cardTitle": "SESSION STATUS",
+  "sessionRecord": "Customer Backend record",
+  "financialNotice": "This screen does not release funds, issue a refund, or send an invoice. The Companion Backend is not updated by this customer action.",
   "primaryBtnText": "Continue to Feedback",
   "a11yContinueToFeedback": "Continue to Feedback",
-  "invoiceNotice": "An official invoice has been sent to your registered email."
+  "invoiceNotice": ""
 }

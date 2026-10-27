@@ -7,8 +7,12 @@
   "submitTicket": "Submit Ticket",
   "alertTitleIncomplete": "Incomplete",
   "alertMsgPleaseselectacategor": "Please select a category and fill out all fields.",
-  "alertTitleTicketSubmitted": "Ticket Submitted",
-  "alertMsgOursupportteamwillge": "Our support team will get back to you within 24 hours.",
+  "alertTitleTicketSubmitted": "Ticket recorded",
+  "alertMsgOursupportteamwillge": "The Customer Backend saved your ticket. Response timing is not guaranteed.",
+  "alertMsgTicketRecorded": "The Customer Backend saved your ticket. Response timing is not guaranteed.",
+  "alertMsgTicketFailed": "The Customer Backend did not confirm ticket creation. The ticket has not been marked as submitted.",
+  "attachmentsUnavailable": "File attachments are unavailable in this app build. No file will be added.",
+  "okBtn": "OK",
   "placeholder": {
     "BrieflyDescribe": "Briefly describe the issue",
     "ProvideAsManyDe": "Provide as many details as possible so we can help you faster..."

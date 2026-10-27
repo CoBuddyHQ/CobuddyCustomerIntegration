@@ -4,7 +4,7 @@
   "browseTopics": "BROWSE TOPICS",
   "noFaqs": "No FAQs found for this topic.",
   "stillNeedHelp": "Still need help?",
-  "contactSub": "Our 24/7 concierge team is here for you.",
+  "contactSub": "Create a support ticket in the app. Response timing is not guaranteed.",
   "chatNow": "Chat Now",
   "placeholder": {
     "SearchForHelpFA": "Search for help, FAQs..."
@@ -24,39 +24,39 @@
   "faq": {
     "f1": {
       "q": "How do I cancel a booking?",
-      "a": "Go to your booking details and tap \"Cancel Booking\". Cancellations made 24 hours prior are fully refunded."
+      "a": "Use booking details to request cancellation. The Customer Backend reports whether it was accepted. Provider refunds are unavailable in this app build."
     },
     "f2": {
       "q": "What if a companion doesn't show up?",
-      "a": "If a companion is a no-show, please report it immediately. You will receive a full refund, and the companion's profile will be penalized."
+      "a": "Submit an incident report and contact local emergency services if there is immediate danger. A refund or profile action is not guaranteed by this app build."
     },
     "f3": {
       "q": "Can I reschedule my meetup?",
-      "a": "Yes, you can modify your booking time up to 12 hours before the meetup, provided the companion accepts the new schedule."
+      "a": "Schedule changes are available for pending booking requests. The Customer Backend must confirm the Companion Backend accepted the update."
     },
     "f4": {
       "q": "Are there extra charges for overtime?",
-      "a": "Yes, if your session exceeds the booked time, you can negotiate an extension directly in the app and pay the difference."
+      "a": "Session extensions are unavailable in this app build because companion approval and payment processing are not connected."
     },
     "f5": {
       "q": "How is my payment secured?",
-      "a": "We use bank-level AES-256 encryption. Your money is held securely in escrow until the session is successfully completed."
+      "a": "Booking checkout is unavailable in this app build. No booking payment is submitted and no escrow funds are held by this screen."
     },
     "f6": {
       "q": "When will I get my refund?",
-      "a": "Refunds are processed immediately by our system but may take 3-5 business days to reflect in your bank account depending on your bank."
+      "a": "Refund transfers are not configured in this app build. If a paid cancellation requires a refund, the Customer Backend keeps the booking active and reports that it could not cancel it."
     },
     "f7": {
       "q": "What payment methods do you accept?",
-      "a": "We accept all major Credit/Debit Cards, UPI, Net Banking, and popular mobile wallets."
+      "a": "Card tokenization and booking checkout are unavailable in this app build. Do not enter payment credentials here."
     },
     "f8": {
       "q": "How does the SOS feature work?",
-      "a": "Tapping SOS immediately alerts your Trusted Contacts with your live location and notifies our 24/7 internal security team."
+      "a": "SOS records an event with the Customer Backend. This app build does not notify trusted contacts, share live location, or dispatch emergency services. Contact local authorities if you are in immediate danger."
     },
     "f9": {
       "q": "Are the companions identity-verified?",
-      "a": "Yes! Look for the blue tick badge. This means they have completed a strict KYC process including Govt ID verification."
+      "a": "A profile may show a verification state reported by the service. Do not treat a badge as a guarantee; meet in public and use your judgment."
     },
     "f10": {
       "q": "Can I hide my profile?",

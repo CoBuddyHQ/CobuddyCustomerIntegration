@@ -17,14 +17,16 @@ export const IncidentReportScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [bookingRef, setBookingRef] = useState(route.params?.companionName || '');
+  const [bookingRef, setBookingRef] = useState('');
   const [description, setDescription] = useState('');
   const [evidenceUris, setEvidenceUris] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddEvidence = () => {
-    // Select/capture evidence
-    setEvidenceUris([...evidenceUris, `https://picsum.photos/200?random=${Date.now()}`]);
+    Alert.alert(
+      'Evidence upload unavailable',
+      'A secure evidence picker is not installed in this app build. No image was attached.',
+    );
   };
 
   const handleRemoveEvidence = (index: number) => {
@@ -40,17 +42,26 @@ export const IncidentReportScreen = () => {
     setIsSubmitting(true);
     try {
       await safetyApi.createIncidentReport({
-        companionId: bookingRef || undefined,
-        description: `[${selectedType}] ${description.trim()}`,
+        companionId: route.params?.companionId,
+        bookingId: route.params?.bookingId,
+        description: [
+          `[${selectedType}] ${description.trim()}`,
+          bookingRef.trim() ? `Reference supplied by customer: ${bookingRef.trim()}` : '',
+        ].filter(Boolean).join('\n'),
         evidenceUrls: evidenceUris,
       });
+      Alert.alert(
+        'Report recorded',
+        'The Customer service stored the report. External emergency dispatch and Admin review were not confirmed.',
+        [{ text: t('okBtn', 'OK'), onPress: () => smartGoBack() }],
+      );
     } catch {
-      // Fallback
+      Alert.alert(
+        'Report not submitted',
+        'The Customer service did not confirm the report. Please retry when connected.',
+      );
     } finally {
       setIsSubmitting(false);
-      Alert.alert(t('alertTitleReportSubmitted', 'Report Submitted'), t('alertMsgYoursafetyreporthasb', 'Your safety report has been escalated to our Trust & Safety team. We will review this immediately and contact you.'),
-        [{ text: t('okBtn', 'OK'), onPress: () => smartGoBack() }]
-      );
     }
   };
 

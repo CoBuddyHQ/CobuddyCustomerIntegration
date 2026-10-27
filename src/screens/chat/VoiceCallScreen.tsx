@@ -12,7 +12,7 @@ export const VoiceCallScreen = () => {
   const { t } = useTranslation('chat.voiceCall');
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'VoiceCallScreen'>>();
-  const companionName = route.params?.companionName || 'Elena Vasquez';
+  const companionName = route.params?.companionName || 'Companion';
 
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);

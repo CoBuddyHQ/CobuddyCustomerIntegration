@@ -41,9 +41,9 @@ export { default as apiClient, getApiError, TokenStorage, setLogoutListener, BAS
 export type { CustomerFromAuth, VerifyOtpResponse } from './auth.api';
 export type { CustomerProfile, UpdateProfileRequest } from './profile.api';
 export type { CompanionCard, CompanionDetail, CompanionFilterParams } from './discovery.api';
-export type { Booking, CreateBookingRequest, BookingStatus } from './booking.api';
+export type { Booking, BookingPriceQuote, CreateBookingRequest, BookingStatus } from './booking.api';
 export type { Session, SessionPass } from './session.api';
-export type { WalletBalance, Transaction, PaymentMethod } from './wallet.api';
+export type { WalletBalance, Transaction, PaymentMethod, WithdrawalMethod } from './wallet.api';
 export type { TrustedContact, SOSEvent, IncidentReport } from './safety.api';
 export type { SupportTicket, TicketMessage, FAQ } from './support.api';
 export type { Notification } from './notifications.api';

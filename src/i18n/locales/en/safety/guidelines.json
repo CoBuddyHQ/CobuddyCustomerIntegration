@@ -8,12 +8,12 @@
       "desc": "Always arrange your first meetup in a well-lit, public location like a café, mall, or popular tourist spot. Avoid secluded areas or private residences."
     },
     "g2": {
-      "title": "Verify Their Identity",
-      "desc": "Look for the \"Identity Verified\" badge on their profile. Trust your instincts—if a profile seems fake or suspicious, report it immediately."
+      "title": "Review profile information",
+      "desc": "A verification state is information reported by the service, not a guarantee. Meet in public and report concerns."
     },
     "g3": {
       "title": "Share Your Plans",
-      "desc": "Use the \"Trusted Contacts\" feature to automatically share your live location and meetup details with a friend or family member."
+      "desc": "You can save trusted contacts, but this build does not send them your live location or emergency messages. Tell someone you trust about your meetup plans."
     },
     "g4": {
       "title": "Control Your Transport",

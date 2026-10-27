@@ -1,11 +1,12 @@
 export interface BookingActivity {
   id: string;
-  titleKey: string;
-  defaultTitle: string;
-  icon: string;
-  price: string;
-  descKey: string;
-  defaultDesc: string;
+  name?: string;
+  titleKey?: string;
+  defaultTitle?: string;
+  icon?: string;
+  price?: string;
+  descKey?: string;
+  defaultDesc?: string;
 }
 
 export interface BookingVenue {
@@ -22,7 +23,7 @@ export interface BookingStackParamList {
   BookingTimeSelectScreen: { activity?: BookingActivity; venue?: BookingVenue; companionId?: string; companionName?: string } | undefined;
   BookingSummaryScreen: { activity?: BookingActivity; venue?: BookingVenue; date?: string; time?: string; duration?: number; bookingId?: string; companionId?: string; companionName?: string; } | undefined;
   BookingSuccessScreen: undefined;
-  BookingRequestSentScreen: { bookingId?: string; companionName?: string; date?: string; time?: string; venue?: string; amount?: string; } | undefined;
+  BookingRequestSentScreen: { bookingId?: string; companionName?: string; date?: string; time?: string; venue?: string; amount?: string; companionRequestStatus?: 'sent' | 'unavailable'; } | undefined;
   BookingAcceptedScreen: undefined;
   BookingDeclinedScreen: undefined;
   BookingCounterOfferScreen: { bookingId?: string; companionName?: string; companionId?: string } | undefined;

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -7,16 +7,62 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { kycApi } from '../../services/api';
+import type { KycStatus } from '../../services/api/kyc.api';
 
 export const VerificationPendingScreen = () => { 
   const { t } = useTranslation('verify.pending');
-  const REVIEW_STEPS = [
-    {icon: 'check-circle',        label: t('steps.documentVerification', 'Document Verification'), status: t('status.completed', 'Completed'),    done: true},
-    {icon: 'check-circle',        label: t('steps.selfieLiveness', 'Selfie & Liveness Check'), status: t('status.completed', 'Completed'),    done: true},
-    {icon: 'timer-sand',          label: t('steps.profileReview', 'Profile Review'),        status: t('status.underReview', 'Under Review'), done: false},
-    {icon: 'clock-outline',       label: t('steps.bookingAuthorization', 'Booking Authorization'), status: t('status.pending', 'Pending'),      done: false},
-  ];
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [kycStatus, setKycStatus] = useState<KycStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadStatus = async () => {
+      setIsLoading(true);
+      setLoadError(false);
+      try {
+        const result = await kycApi.getKycStatus();
+        if (isMounted) setKycStatus(result);
+      } catch {
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+    loadStatus();
+    return () => { isMounted = false; };
+  }, [attempt]);
+
+  const verified = kycStatus?.status === 'verified' || kycStatus?.status === 'approved';
+  const reviewSteps = [
+    {
+      icon: kycStatus?.documentSubmitted ? 'file-document-check' : 'file-document-outline',
+      label: t('steps.documentVerification', 'Document evidence'),
+      status: kycStatus ? (kycStatus.documentSubmitted ? 'Evidence stored' : 'Not submitted') : 'Unavailable',
+      done: Boolean(kycStatus?.documentSubmitted),
+    },
+    {
+      icon: kycStatus?.selfieSubmitted ? 'image-check-outline' : 'image-outline',
+      label: t('steps.selfieLiveness', 'Selfie evidence'),
+      status: kycStatus ? (kycStatus.selfieSubmitted ? 'Evidence stored' : 'Not submitted') : 'Unavailable',
+      done: Boolean(kycStatus?.selfieSubmitted),
+    },
+    {
+      icon: kycStatus?.livenessSubmitted ? 'video-check-outline' : 'video-outline',
+      label: t('steps.profileReview', 'Liveness evidence'),
+      status: kycStatus ? (kycStatus.livenessSubmitted ? 'Evidence stored; no automated assessment' : 'Not submitted') : 'Unavailable',
+      done: Boolean(kycStatus?.livenessSubmitted),
+    },
+    {
+      icon: verified ? 'check-decagram' : 'account-search',
+      label: t('steps.bookingAuthorization', 'Verification status'),
+      status: verified ? 'Customer Backend reports verified' : 'Admin review is not connected',
+      done: verified,
+    },
+  ];
 
   const handleGoToIdentity = () => {
     // If KYC was opened from another flow (like Booking), return to it.
@@ -61,25 +107,36 @@ export const VerificationPendingScreen = () => {
             </View>
           </View>
 
-          <Text style={styles.heroTitle}>{t('heroTitle', 'Verification In Review')}</Text>
+          <Text style={styles.heroTitle}>
+            {isLoading ? 'Checking verification status…' : loadError ? 'Verification status unavailable' : verified ? 'Customer Backend reports verified' : 'Evidence status'}
+          </Text>
 
           <View style={styles.statusBadge}>
             <Icon name="clock-outline" size={14} color={theme.colors.warning} />
             <Text style={styles.statusBadgeLabel}>{t('statusLabel', 'STATUS')}</Text>
             <View style={styles.statusBadgeDivider} />
-            <Text style={styles.statusBadgeValue}>{t('statusValue', 'Verification Pending')}</Text>
+            <Text style={styles.statusBadgeValue}>{loadError ? 'Unavailable' : kycStatus?.status || 'Unavailable'}</Text>
           </View>
 
           <View style={styles.etaRow}>
-            <Icon name="clock-outline" size={14} color={theme.colors.textSecondary} />
-            <Text style={styles.etaText}>{t('estimatedTimeUsuallyCompletedWithin', 'Estimated Time: Usually completed within 24 hours.')}</Text>
+            {isLoading ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : <Icon name="information-outline" size={14} color={theme.colors.textSecondary} />}
+            <Text style={styles.etaText}>
+              {loadError
+                ? 'The Customer Backend could not return a verification status.'
+                : 'Automated identity assessment and administrative review are not connected. No completion time is available.'}
+            </Text>
           </View>
+          {loadError ? (
+            <TouchableOpacity onPress={() => setAttempt((current) => current + 1)} accessibilityRole="button">
+              <Text style={styles.statusBadgeValue}>Retry</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>{t('progress', 'VERIFICATION PROGRESS')}</Text>
-          {REVIEW_STEPS.map((step, i) => (
-            <View key={step.label} style={[styles.reviewRow, i < REVIEW_STEPS.length - 1 && styles.reviewRowBorder]}>
+          {reviewSteps.map((step, i) => (
+            <View key={step.label} style={[styles.reviewRow, i < reviewSteps.length - 1 && styles.reviewRowBorder]}>
               <View style={[styles.reviewIconWrap, step.done && styles.reviewIconWrapDone]}>
                 <Icon
                   name={step.icon}
@@ -108,7 +165,7 @@ export const VerificationPendingScreen = () => {
           </View>
           <View style={styles.nextMeta}>
             <Text style={styles.nextTitle}>{t('continueSetup', 'Continue Setting Up Your Experience')}</Text>
-            <Text style={styles.nextSub}>{t('youCanContinueExploringThe', 'You can continue exploring the app while verification is reviewed.')}</Text>
+            <Text style={styles.nextSub}>{t('youCanContinueExploringThe', 'You can continue using features that are available for your current server-reported status.')}</Text>
           </View>
         </View>
 
@@ -119,7 +176,7 @@ export const VerificationPendingScreen = () => {
 
         <View style={styles.securityNote}>
           <Icon name="lock" size={13} color={theme.colors.textSecondary} />
-          <Text style={styles.securityText}>{t('allVerificationDataIsProtected', 'All verification data is protected with end-to-end encryption and never shared without consent.')}</Text>
+          <Text style={styles.securityText}>{t('allVerificationDataIsProtected', 'Evidence is stored by the Customer Backend. This app build does not perform an automated identity match or administrative review.')}</Text>
         </View>
 
         <View style={{height: 20}} />

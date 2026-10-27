@@ -4,9 +4,9 @@
   "helperText": "Minimum top-up is ₹100. Max limit ₹10,000 per transaction.",
   "sectionTitle": "PAYING FROM",
   "btnChange": "Change",
-  "trustTitle": "100% Safe & Secure",
-  "trustSub": "PCI-DSS compliant encrypted payments",
-  "proceedToPay": "Proceed to Pay ₹{{amount}}",
+  "trustTitle": "Checkout unavailable",
+  "trustSub": "No payment provider is configured. No amount will be submitted.",
+  "proceedToPay": "Checkout unavailable",
   "placeholder": {
     "0": "0"
   },

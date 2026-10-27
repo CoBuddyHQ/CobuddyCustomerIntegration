@@ -83,3 +83,28 @@ fix_*.py
 patch_*.py
 patch_*.js
 
+# Environment Variables & Secrets
+.env
+.env.*
+*.env
+*.env.local
+azure-env*.json
+env*.json
+google-services.json
+GoogleService-Info.plist
+*.pem
+*.key
+*.cert
+release.keystore
+*.jks
+
+# Audit reports, system dumps, and patches
+*AUDIT*.md
+AUDIT_*.md
+*REPORT*.md
+*.patch
+*.diff
+*.zip
+bugreport*
+
+

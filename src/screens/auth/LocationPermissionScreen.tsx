@@ -13,7 +13,7 @@ import { theme } from '../../theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useTranslation } from 'react-i18next';
-import { LOCATION_BENEFITS } from '../../services/mock';
+import { LOCATION_BENEFITS } from '../../constants/uiConstants';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { profileApi } from '../../services/api';
@@ -30,27 +30,10 @@ export const LocationPermissionScreen = () => {
   }, []);
 
   const handleAllowLocation = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      // Send location data to backend
-      await profileApi.updateLocation({
-        latitude: 19.0760,
-        longitude: 72.8777,
-        city: 'Mumbai',
-        address: 'Mumbai, Maharashtra',
-        permissionGranted: true,
-        skipped: false,
-      });
-      navigation.navigate('NotificationPermissionScreen');
-    } catch (e: any) {
-      showApiError(e, {
-        title: 'Location Save Failed',
-        onRetry: handleAllowLocation,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    Alert.alert(
+      'Location unavailable',
+      'Device location support is not configured in this app build. No location was read or sent. You can continue without sharing location.',
+    );
   };
 
   const handleSkipLocation = async () => {
@@ -129,10 +112,10 @@ export const LocationPermissionScreen = () => {
           style={[styles.ctaPrimary, isSubmitting && { opacity: 0.8 }]}
           onPress={handleAllowLocation}
           disabled={isSubmitting}
-          activeOpacity={0.88} accessibilityRole="button" accessibilityLabel={t('location.a11yAllowLocation', 'Allow current location')}>
+          activeOpacity={0.88} accessibilityRole="button" accessibilityLabel={t('location.a11yAllowLocation', 'Location unavailable')}>
           <Icon name="crosshairs-gps" size={20} color={theme.colors.background} />
           <Text style={styles.ctaPrimaryText}>
-            {isSubmitting ? 'Saving Location...' : t('location.btn_allow')}
+            {t('location.unavailable', 'Location unavailable in this build')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity

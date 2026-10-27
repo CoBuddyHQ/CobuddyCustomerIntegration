@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, StatusBar, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Animated, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -17,35 +17,41 @@ export const VerificationProcessingScreen = () => {
   const { t } = useTranslation('verify.processing');
 
   const STEPS = [
-  {id: 1, icon: 'file-document-check', label: t('steps.documentVerification', 'Document Verification'), status: t('processing.statusCompleted', t('status.completed', 'COMPLETED'))},
-  {id: 2, icon: 'face-recognition',    label: t('steps.selfieLiveness', 'Selfie & Liveness Check'),status: t('status.completed', 'COMPLETED')},
-  {id: 3, icon: 'account-search',      label: t('steps.profileReview', 'Profile Review'),        status: t('processing.statusProcessing', t('status.processing', 'PROCESSING'))},
-  {id: 4, icon: 'check-decagram',      label: t('steps.bookingAuthorization', 'Booking Authorization'), status: t('processing.statusPending', t('status.pending', 'PENDING'))},
+  {id: 1, icon: 'file-document-outline', label: t('steps.documentVerification', 'Document evidence'), status: t('status.pending', 'NOT CONFIRMED')},
+  {id: 2, icon: 'face-recognition', label: t('steps.selfieLiveness', 'Selfie evidence'), status: t('status.pending', 'NOT CONFIRMED')},
+  {id: 3, icon: 'account-search', label: t('steps.profileReview', 'Administrative review'), status: t('status.pending', 'NOT CONFIRMED')},
+  {id: 4, icon: 'check-decagram', label: t('steps.bookingAuthorization', 'Booking authorization'), status: t('status.pending', 'NOT CONFIRMED')},
 ];
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const setKycStatus = useAuthStore((s) => s.setKycStatus);
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const [activeStep, setActiveStep] = useState(2); // 0=none, 1=doc, 2=selfie, 3=profile, 4=done
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    Animated.loop(
+    let active = true;
+    setError(false);
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {toValue: 1.15, duration: 900, useNativeDriver: true}),
         Animated.timing(pulseAnim, {toValue: 1.0,  duration: 900, useNativeDriver: true}),
       ]),
-    ).start();
-
-    const t1 = setTimeout(() => setActiveStep(3), 1500); 
-    const t2 = setTimeout(() => setActiveStep(4), 3000); 
-    const t3 = setTimeout(async () => {
+    );
+    animation.start();
+    const checkStatus = async () => {
       try {
         const res = await kycApi.getKycStatus();
-        const status = (res?.status || 'pending').toLowerCase();
+        if (!active) return;
+        if (!res || typeof res.status !== 'string') {
+          setError(true);
+          return;
+        }
+        const status = res.status.toLowerCase();
         if (status === 'approved' || status === 'verified') {
           setKycStatus('verified');
           navigation.replace('VerificationSuccessScreen');
-        } else if (status === 'rejected') {
+        } else if (status === 'rejected' || status === 'resubmit') {
           setKycStatus('rejected');
           navigation.replace('VerificationRejectedScreen');
         } else {
@@ -53,17 +59,16 @@ export const VerificationProcessingScreen = () => {
           navigation.replace('VerificationPendingScreen');
         }
       } catch {
-        setKycStatus('pending');
-        navigation.replace('VerificationPendingScreen');
+        if (active) setError(true);
       }
-    }, 4500);
+    };
+    void checkStatus();
 
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
+      active = false;
+      animation.stop();
     };
-  }, [navigation, pulseAnim]);
+  }, [navigation, pulseAnim, setKycStatus, attempt]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
@@ -82,25 +87,29 @@ export const VerificationProcessingScreen = () => {
       <ScrollView style={styles.bodyScroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.heroRing, {transform: [{scale: pulseAnim}]}]}>
           <View style={styles.heroInnerRing}>
-            <Icon name={activeStep >= 4 ? "check-decagram" : "shield-search"} size={52} color={theme.colors.primary} />
+            <Icon name="shield-search" size={52} color={theme.colors.primary} />
           </View>
         </Animated.View>
 
         <Text style={styles.heroTitle}>
-          {activeStep >= 4 ? t('heroTitleComplete', 'Verification\nComplete') : t('heroTitleVerifying', 'Securely Verifying\nYour Identity')}
+          {t('heroTitleVerifying', 'Checking Your\nVerification Status')}
         </Text>
         <Text style={styles.heroSub}>
-          {activeStep >= 4 ? t('processing.profileTrusted', 'Your profile is now trusted.') : t('processing.reviewingDetails', 'Reviewing verification details...')}
+          {error
+            ? t('statusUnavailable', 'We could not check your verification status. Please try again.')
+            : t('processing.reviewingDetails', 'Retrieving your latest verification status...')}
         </Text>
 
-        <View style={styles.progressBarTrack}>
-          <Animated.View style={[styles.progressBarFill, { width: activeStep >= 4 ? '100%' : '75%' }]} />
-        </View>
+        {error && (
+          <TouchableOpacity accessibilityRole="button" onPress={() => setAttempt(value => value + 1)}>
+            <Text style={styles.heroSub}>{t('retry', 'Try Again')}</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.stepStack}>
           {STEPS.map((step, i) => {
-            const isDone = activeStep > i;
-            const isProcessing = activeStep === i;
+            const isDone = false;
+            const isProcessing = !error && i === 0;
             
             return (
               <View key={step.id} style={[styles.stepRow, i < STEPS.length - 1 && styles.stepRowBorder]}>
@@ -151,7 +160,7 @@ export const VerificationProcessingScreen = () => {
           <View style={styles.trustMeta}>
             <Text style={styles.trustTitle}>{t('protectedInfo', 'Your Information Is Protected')}</Text>
             <Text style={styles.trustSub}>
-              {t('trustSubText', 'We use military-grade end-to-end encryption to secure your identity data.\nYour documents are strictly used for verification purposes and are never shared.')}
+              {t('trustSubText', 'Verification results are shown only after confirmation from the server.')}
             </Text>
           </View>
         </View>

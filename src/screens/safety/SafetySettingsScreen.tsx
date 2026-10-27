@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Animated } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -9,45 +9,15 @@ import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-const CustomSwitch = ({ value, onValueChange, label }: { value: boolean, onValueChange: (val: boolean) => void, label?: string }) => {
-    const translateX = useRef(new Animated.Value(value ? 20 : 0)).current;
-
-    useEffect(() => {
-        Animated.timing(translateX, {
-            toValue: value ? 20 : 0,
-            duration: 200,
-            useNativeDriver: true,
-        }).start();
-    }, [value, translateX]);
-
-    return (
-        <TouchableOpacity 
-            activeOpacity={0.8}
-            onPress={() => onValueChange(!value)}
-            style={[
-                styles.switchContainer, 
-                { backgroundColor: value ? theme.colors.primary : 'rgba(255,255,255,0.1)' }
-            ]} accessibilityRole="button" accessibilityLabel={label || 'Toggle switch'}
-        >
-            <Animated.View style={[
-                styles.switchThumb,
-                { transform: [{ translateX }] }
-            ]} />
-        </TouchableOpacity>
-    );
-};
+const CapabilityStatus = ({ label }: { label: string }) => (
+  <Text style={styles.capabilityStatus}>{label}</Text>
+);
 
 export const SafetySettingsScreen = () => { 
   const { t } = useTranslation('safety.settings');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   
-  const [incognito, setIncognito] = useState(false);
-  const [safeChat, setSafeChat] = useState(true);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [contactShare, setContactShare] = useState(true);
-  const [liveMonitor, setLiveMonitor] = useState(true);
-
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
@@ -75,13 +45,13 @@ export const SafetySettingsScreen = () => {
         <View style={styles.card}>
             <View style={styles.settingRow}>
                 <View style={styles.iconBox}>
-                    <Icon name="incognito" size={20} color={incognito ? theme.colors.primary : theme.colors.textSecondary} />
+                    <Icon name="incognito" size={20} color={theme.colors.textSecondary} />
                 </View>
                 <View style={styles.settingTextContent}>
-                    <Text style={styles.settingTitle}>{t('incognitoMode', 'Incognito Mode')}</Text>
-                    <Text style={styles.settingDesc}>{t('incognitoModeSub', 'Hide your profile from Discover. Only people you message can see you.')}</Text>
+                    <Text style={styles.settingTitle}>{t('incognitoMode', 'Profile Visibility Controls')}</Text>
+                    <Text style={styles.settingDesc}>{t('incognitoModeSub', 'Profile visibility controls are not configured in this app build.')}</Text>
                 </View>
-                <CustomSwitch value={incognito} onValueChange={setIncognito} label={t('a11yIncognitoMode', 'Toggle incognito mode')} />
+                <CapabilityStatus label={t('unavailable', 'Unavailable')} />
             </View>
         </View>
 
@@ -90,26 +60,26 @@ export const SafetySettingsScreen = () => {
         <View style={styles.card}>
             <View style={styles.settingRow}>
                 <View style={styles.iconBox}>
-                    <Icon name="message-alert-outline" size={20} color={safeChat ? theme.colors.primary : theme.colors.textSecondary} />
+                    <Icon name="message-alert-outline" size={20} color={theme.colors.textSecondary} />
                 </View>
                 <View style={styles.settingTextContent}>
                     <Text style={styles.settingTitle}>{t('safeChat', 'Safe Chat Filter')}</Text>
-                    <Text style={styles.settingDesc}>{t('safeChatSub', 'Automatically blur explicit images and flag offensive words in messages.')}</Text>
+                    <Text style={styles.settingDesc}>{t('safeChatSub', 'Automatic image blurring and message filtering are not configured in this app build.')}</Text>
                 </View>
-                <CustomSwitch value={safeChat} onValueChange={setSafeChat} label={t('a11ySafeChat', 'Toggle safe chat mode')} />
+                <CapabilityStatus label={t('unavailable', 'Unavailable')} />
             </View>
             
             <View style={styles.divider} />
             
             <View style={styles.settingRow}>
                 <View style={styles.iconBox}>
-                    <Icon name="check-decagram-outline" size={20} color={verifiedOnly ? theme.colors.primary : theme.colors.textSecondary} />
+                    <Icon name="check-decagram-outline" size={20} color={theme.colors.primary} />
                 </View>
                 <View style={styles.settingTextContent}>
-                    <Text style={styles.settingTitle}>{t('verifiedUsers', 'Verified Users Only')}</Text>
-                    <Text style={styles.settingDesc}>{t('verifiedUsersSub', 'Only allow users with KYC verified profiles to send you booking requests.')}</Text>
+                    <Text style={styles.settingTitle}>{t('verifiedUsers', 'Approved Companion Profiles')}</Text>
+                    <Text style={styles.settingDesc}>{t('verifiedUsersSub', 'Discovery returns only active companion profiles approved and published by the Companion service.')}</Text>
                 </View>
-                <CustomSwitch value={verifiedOnly} onValueChange={setVerifiedOnly} label={t('a11yVerifiedOnly', 'Toggle Verified Users Only')} />
+                <CapabilityStatus label={t('serviceEnforced', 'Service enforced')} />
             </View>
         </View>
 
@@ -126,7 +96,7 @@ export const SafetySettingsScreen = () => {
                 </View>
                 <View style={styles.settingTextContent}>
                     <Text style={styles.settingTitle}>{t('emergencyContacts', 'Emergency Contacts (SOS)')}</Text>
-                    <Text style={styles.settingDesc}>{t('emergencyContactsSub', 'Add up to 3 trusted contacts. We\'ll share your live location with them if you trigger an SOS.')}</Text>
+                    <Text style={styles.settingDesc}>{t('emergencyContactsSub', 'Save up to 3 contacts for reference. This build does not send them location or SOS messages.')}</Text>
                 </View>
                 <Icon name="chevron-right" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
@@ -137,26 +107,26 @@ export const SafetySettingsScreen = () => {
         <View style={styles.card}>
             <View style={styles.settingRow}>
                 <View style={styles.iconBox}>
-                    <Icon name="share-variant-outline" size={20} color={contactShare ? theme.colors.primary : theme.colors.textSecondary} />
+                    <Icon name="share-variant-outline" size={20} color={theme.colors.textSecondary} />
                 </View>
                 <View style={styles.settingTextContent}>
                     <Text style={styles.settingTitle}>{t('contactSharing', 'Trusted Contact Sharing')}</Text>
-                    <Text style={styles.settingDesc}>{t('contactSharingSub', 'Automatically share your active session details and live location with your trusted contacts.')}</Text>
+                    <Text style={styles.settingDesc}>{t('contactSharingSub', 'External contact sharing is not configured in this build.')}</Text>
                 </View>
-                <CustomSwitch value={contactShare} onValueChange={setContactShare} label={t('a11yContactShare', 'Toggle Trusted Contact Sharing')} />
+                <CapabilityStatus label={t('unavailable', 'Unavailable')} />
             </View>
             
             <View style={styles.divider} />
             
             <View style={styles.settingRow}>
                 <View style={styles.iconBox}>
-                    <Icon name="radar" size={20} color={liveMonitor ? theme.colors.primary : theme.colors.textSecondary} />
+                    <Icon name="radar" size={20} color={theme.colors.textSecondary} />
                 </View>
                 <View style={styles.settingTextContent}>
                     <Text style={styles.settingTitle}>{t('liveMonitoring', 'Live Safety Monitoring')}</Text>
-                    <Text style={styles.settingDesc}>{t('liveMonitoringSub', 'Enable active tracking and anomaly detection during your meetup sessions.')}</Text>
+                    <Text style={styles.settingDesc}>{t('liveMonitoringSub', 'Live session tracking and anomaly detection are not configured in this build.')}</Text>
                 </View>
-                <CustomSwitch value={liveMonitor} onValueChange={setLiveMonitor} label={t('a11yLiveMonitor', 'Toggle Live Safety Monitoring')} />
+                <CapabilityStatus label={t('unavailable', 'Unavailable')} />
             </View>
         </View>
 
@@ -172,7 +142,7 @@ export const SafetySettingsScreen = () => {
 
         <View style={styles.footerNote}>
             <Icon name="lock-check-outline" size={16} color={theme.colors.success} />
-            <Text style={styles.footerText}>{t('cobuddyActivelyMonitorsReportsTo', 'CoBuddy actively monitors reports to maintain a safe community.')}</Text>
+            <Text style={styles.footerText}>{t('cobuddyActivelyMonitorsReportsTo', 'Safety reports can be recorded. Live monitoring and external emergency dispatch are not configured in this build.')}</Text>
         </View>
 
       </ScrollView>
@@ -206,8 +176,7 @@ const styles = StyleSheet.create({
 
   divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: 16 },
 
-  switchContainer: { width: 46, height: 26, borderRadius: 13, padding: 2, justifyContent: 'center' },
-  switchThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
+  capabilityStatus: { color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600', textAlign: 'right', maxWidth: 94 },
 
   hubBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.colors.primary, borderRadius: 20, paddingVertical: 14, paddingHorizontal: 16, marginTop: 12 },
   hubBtnText: { fontSize: 15, fontWeight: 'bold', color: theme.colors.background },

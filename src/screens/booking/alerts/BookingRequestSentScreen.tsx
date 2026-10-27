@@ -16,10 +16,11 @@ export const BookingRequestSentScreen = ({ route }: { route: any }) => {
   const bookingData = {
     bookingId: route?.params?.bookingId || '',
     companionName: route?.params?.companionName || 'Companion',
-    date: route?.params?.date || 'Today',
-    time: route?.params?.time || '18:00',
-    venue: route?.params?.venue || 'Public Venue',
-    amount: route?.params?.amount || '₹1,000',
+    date: route?.params?.date || 'Unavailable',
+    time: route?.params?.time || 'Unavailable',
+    venue: route?.params?.venue || 'Unavailable',
+    amount: route?.params?.amount || 'Unavailable',
+    companionRequestStatus: route?.params?.companionRequestStatus || 'unavailable',
   };
 
   useEffect(() => {
@@ -67,12 +68,22 @@ export const BookingRequestSentScreen = ({ route }: { route: any }) => {
       <View style={styles.content}>
         <View style={styles.iconContainer}>
           <Animated.View style={[styles.glow, { transform: [{ scale: pulseAnim }] }]} />
-          <Icon name="send-circle" size={90} color={theme.colors.primary} />
+          <Icon
+            name={bookingData.companionRequestStatus === 'sent' ? 'send-circle' : 'alert-circle'}
+            size={90}
+            color={bookingData.companionRequestStatus === 'sent' ? theme.colors.primary : theme.colors.error}
+          />
         </View>
 
-        <Text style={styles.title}>{t('title', 'Request Sent!')}</Text>
+        <Text style={styles.title}>
+          {bookingData.companionRequestStatus === 'sent'
+            ? t('title', 'Request Sent!')
+            : 'Booking saved; request not delivered'}
+        </Text>
         <Text style={styles.subtitle}>
-          {t('bookingRequestSent.body', 'We\'ve notified {{name}}. They have 24 hours to review your request, but companions usually respond within a few hours.', { name: bookingData.companionName })}
+          {bookingData.companionRequestStatus === 'sent'
+            ? t('bookingRequestSent.body', 'The Companion Backend accepted the booking request for {{name}}. Check booking details for updates.', { name: bookingData.companionName })
+            : 'The Customer Backend saved the booking, but did not confirm delivery to the Companion Backend. No request-sent state is claimed.'}
         </Text>
 
         <View style={styles.card}>
@@ -99,7 +110,7 @@ export const BookingRequestSentScreen = ({ route }: { route: any }) => {
           <View style={styles.divider} />
           
           <View style={[styles.detailRow, { marginBottom: 0, justifyContent: 'space-between' }]}>
-            <Text style={styles.detailLabel}>{t('detailLabel', 'Escrow Amount Held')}</Text>
+            <Text style={styles.detailLabel}>{t('detailLabel', 'Server-quoted booking total')}</Text>
             <Text style={styles.amountText}>{bookingData.amount}</Text>
           </View>
         </View>

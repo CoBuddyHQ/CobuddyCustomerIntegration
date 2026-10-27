@@ -13,7 +13,7 @@ import { theme } from '../../theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useTranslation } from 'react-i18next';
-import { NOTIFICATION_BENEFITS } from '../../services/mock';
+import { NOTIFICATION_BENEFITS } from '../../constants/uiConstants';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { notificationsApi } from '../../services/api';
@@ -30,22 +30,10 @@ export const NotificationPermissionScreen = () => {
   }, []);
 
   const handleEnableNotifications = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      await notificationsApi.updateNotificationPermission({
-        enabled: true,
-        skipped: false,
-      });
-      navigation.navigate('BasicProfileSetupScreen');
-    } catch (e: any) {
-      showApiError(e, {
-        title: 'Notification Setup Failed',
-        onRetry: handleEnableNotifications,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    Alert.alert(
+      'Notifications unavailable',
+      'Native notification permission and device-token registration are not configured in this app build. No notifications were enabled.',
+    );
   };
 
   const handleSkipNotifications = async () => {

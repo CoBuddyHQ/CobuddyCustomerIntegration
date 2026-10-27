@@ -13,7 +13,6 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
-import { MOCK_CHAT_LIST } from '../../services/mock';
 import { chatApi, bookingApi, Conversation } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -61,19 +60,17 @@ export const ChatListScreen = () => {
     return () => { isMounted = false; };
   }, []);
 
-  const displayChats = conversations.length > 0
-    ? conversations.map(c => ({
-        id: c.id,
-        name: c.companionName || 'Companion',
-        companionId: c.companionId || 'c1',
-        lastMessage: c.lastMessage || 'Tap to chat',
-        time: c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now',
-        unread: c.unreadCount || 0,
-        isOnline: true,
-        isTyping: false,
-        readReceipt: 'read',
-      }))
-    : MOCK_CHAT_LIST;
+  const displayChats = conversations.map(c => ({
+    id: c.id,
+    name: c.companionName || 'Companion',
+    companionId: c.companionId || '',
+    lastMessage: c.lastMessage || 'Tap to chat',
+    time: c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now',
+    unread: c.unreadCount || 0,
+    isOnline: true,
+    isTyping: false,
+    readReceipt: 'read',
+  }));
 
 
 
@@ -112,7 +109,7 @@ export const ChatListScreen = () => {
             </View>
 
             <Text style={styles.liveCardTitle}>{t('liveCardTitle', 'CoBuddy Concierge')}</Text>
-            <Text style={styles.liveCardSub}>{t('connectWithADedicatedSpecialist', 'Connect with a dedicated specialist for immediate 24/7 assistance.')}</Text>
+            <Text style={styles.liveCardSub}>{t('connectWithADedicatedSpecialist', 'Start a support conversation. Response timing is not guaranteed.')}</Text>
 
             <TouchableOpacity
               style={styles.startBtn}
@@ -131,7 +128,16 @@ export const ChatListScreen = () => {
           <Text style={styles.convoHeaderLabel}>{t('convoHeaderLabel', 'ACTIVE CONVERSATIONS')}</Text>
         </View>
 
-        {displayChats.map((chat, index) => (
+        {displayChats.length === 0 ? (
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
+            <Icon name="chat-outline" size={48} color={Colors.textSecondary} style={{ marginBottom: 12, opacity: 0.5 }} />
+            <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 4 }}>No messages yet</Text>
+            <Text style={{ color: Colors.textSecondary, fontSize: 13, textAlign: 'center' }}>
+              Your conversations with confirmed companions will appear here.
+            </Text>
+          </View>
+        ) : (
+          displayChats.map((chat, index) => (
           <React.Fragment key={chat.id}>
             <TouchableOpacity
               style={styles.convoItem}
@@ -180,17 +186,9 @@ export const ChatListScreen = () => {
             </TouchableOpacity>
             
             {/* Divider between chats */}
-            {index < MOCK_CHAT_LIST.length - 1 && <View style={styles.chatDivider} />}
+            {index < displayChats.length - 1 && <View style={styles.chatDivider} />}
           </React.Fragment>
-        ))}
-
-        {MOCK_CHAT_LIST.length === 0 && (
-          <View style={styles.emptyState}>
-            <Icon name="message-text-outline" size={48} color={Colors.border} />
-            <Text style={styles.emptyTitle}>{t('emptyTitle', 'No active chats')}</Text>
-            <Text style={styles.emptyDesc}>{t('emptyDesc', 'Once your booking is accepted, you can securely chat with your companion here.')}</Text>
-          </View>
-        )}
+        )))}
 
         <View style={{height: 32}} />
       </ScrollView>

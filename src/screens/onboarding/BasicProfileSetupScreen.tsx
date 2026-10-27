@@ -72,11 +72,11 @@ export const BasicProfileSetupScreen = () => {
       try {
         const profile = await profileApi.getProfile();
         if (profile) {
-          if (profile.name && !name) setName(profile.name);
-          if (profile.city && !city) setCity(profile.city);
-          if (profile.gender && !gender) setGender(profile.gender);
-          if (profile.bio && !bio) setBio(profile.bio);
-          if (profile.avatar) setAvatarState('photo');
+          if (profile.name) setName((current) => current || profile.name || '');
+          if (profile.city) setCity((current) => current || profile.city || '');
+          if (profile.gender) setGender((current) => current || profile.gender || '');
+          if (profile.bio) setBio((current) => current || profile.bio || '');
+          if (profile.avatar) setAvatarState((current) => current === 'none' ? 'photo' : current);
         }
       } catch {
         // Fallback to local store

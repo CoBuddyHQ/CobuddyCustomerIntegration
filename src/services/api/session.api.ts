@@ -11,7 +11,7 @@ export interface Session {
   companionId: string;
   companionName?: string;
   customerId: string;
-  status: 'active' | 'completed' | 'ended_early' | 'checked_in' | 'extending';
+  status: 'active' | 'completed' | 'ended_early' | 'checked_in' | 'extending' | 'cancelled';
   startedAt?: string;
   endedAt?: string;
   durationMinutes?: number;
@@ -39,6 +39,16 @@ export const getCurrentSession = async (): Promise<Session | null> => {
   return res.data;
 };
 
+// ─── Get session by ID ────────────────────────────────────────────────────────
+export const getSessionById = async (sessionId: string): Promise<Session | null> => {
+  try {
+    const res = await apiClient.get<Session>(`/sessions/${sessionId}`);
+    return res.data;
+  } catch {
+    return null;
+  }
+};
+
 // ─── Get session history ──────────────────────────────────────────────────────
 export const getSessionHistory = async (): Promise<Session[]> => {
   const res = await apiClient.get<Session[]>('/sessions/history');
@@ -46,8 +56,8 @@ export const getSessionHistory = async (): Promise<Session[]> => {
 };
 
 // ─── Check in ─────────────────────────────────────────────────────────────────
-export const checkIn = async (bookingId: string, passCode?: string): Promise<Session> => {
-  const res = await apiClient.post<Session>('/sessions/check-in', { bookingId, passCode });
+export const checkIn = async (bookingId: string): Promise<Session> => {
+  const res = await apiClient.post<Session>('/sessions/check-in', { bookingId });
   return res.data;
 };
 

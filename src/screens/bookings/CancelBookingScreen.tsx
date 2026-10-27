@@ -46,8 +46,8 @@ export const CancelBookingScreen = () => {
           });
         }
       })
-      .catch((err) => {
-        console.warn('[CancelBookingScreen] Failed to fetch booking:', err?.message || err);
+      .catch(() => {
+        setBooking(null);
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
@@ -56,30 +56,35 @@ export const CancelBookingScreen = () => {
   }, [bookingId]);
 
   // Calculate dynamic refund
-  const parsedDate = new Date(`${booking?.date} ${booking?.time || '18:00'}`);
-  const hoursUntilSession = isNaN(parsedDate.getTime()) ? 48 : (parsedDate.getTime() - Date.now()) / (1000 * 60 * 60);
+  const parsedDate = booking?.date ? new Date(booking.date) : new Date(Number.NaN);
+  const hoursUntilSession = Number.isFinite(parsedDate.getTime())
+    ? (parsedDate.getTime() - Date.now()) / (1000 * 60 * 60)
+    : Number.NaN;
 
   const { tier1, tier2, tier3 } = adminValues.cancellationRefundTiers;
-  let refundPercent = 100;
-  let refundText = t('refundText.tier1', 'Since you are cancelling more than 48 hours in advance, you will receive a ');
+  let refundPercent = Number.isFinite(hoursUntilSession) ? 100 : 0;
+  let refundText = Number.isFinite(hoursUntilSession)
+    ? t('refundText.tier1', 'Cancellation policy assessment: ')
+    : 'Cancellation policy is unavailable until booking details load.';
 
   if (hoursUntilSession >= tier1.minHours) {
     refundPercent = tier1.refundPercent;
-    refundText = t('refundText.tier1', 'Since you are cancelling more than 48 hours in advance, you will receive a ');
+    refundText = t('refundText.tier1', 'Cancellation policy assessment: ');
   } else if (hoursUntilSession >= tier2.minHours) {
     refundPercent = tier2.refundPercent;
-    refundText = t('refundText.tier2', 'Since you are cancelling between 24 and 48 hours in advance, you will receive a ');
+    refundText = t('refundText.tier2', 'Cancellation policy assessment: ');
   } else {
     refundPercent = tier3.refundPercent;
-    refundText = t('refundText.tier3', 'Since you are cancelling less than 24 hours in advance, you will receive a ');
+    refundText = t('refundText.tier3', 'Cancellation policy assessment: ');
   }
+  const providerRefundUnavailable = booking?.paymentStatus === 'completed' && refundPercent > 0;
 
   // Guard: should never arrive here without a real bookingId
   useEffect(() => {
     if (!bookingId) {
       smartGoBack();
     }
-  }, [bookingId]);
+  }, [bookingId, smartGoBack]);
 
   const handleBack = () => smartGoBack();
   
@@ -90,16 +95,11 @@ export const CancelBookingScreen = () => {
       await bookingApi.cancelBooking(bookingId, {
         reason: selectedReason || 'Booked By Mistake',
       });
-    } catch (err: any) {
-      console.warn('[CancelBookingScreen] cancel booking API error:', err?.message || err);
-    } finally {
       try {
         cancelBooking(bookingId);
-      } catch (e) {
-        console.warn('[CancelBookingScreen] cancelBooking store error:', e);
+      } catch {
+        // The backend is authoritative; a local cache update may be retried on refresh.
       }
-      setIsCancelling(false);
-
       Alert.alert(
         t('cancelSuccessTitle', 'Booking Cancelled'),
         t('cancelSuccessMsg', 'Your booking request has been cancelled successfully.'),
@@ -116,6 +116,11 @@ export const CancelBookingScreen = () => {
           },
         ]
       );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unable to cancel this booking. Please try again.';
+      Alert.alert(t('cancelErrorTitle', 'Cancellation unavailable'), message);
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -155,12 +160,30 @@ export const CancelBookingScreen = () => {
           </View>
         </View>
 
+        {!booking ? (
+          <Text accessibilityRole="alert" style={styles.warningDesc}>
+            Booking details are unavailable. Refresh before cancelling.
+          </Text>
+        ) : null}
+
         {/* Warning Card */}
         <View style={styles.warningCard}>
           <Icon name="alert-circle-outline" size={24} color={theme.colors.error} />
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.warningTitle}>{t('warningTitle', 'Cancellation Policy')}</Text>
-            <Text style={styles.warningDesc}>{t('warningDesc1', refundText)}<Text style={{fontWeight: 'bold', color: theme.colors.error}}>{t('warningDesc2', `${refundPercent}% refund`)}</Text>{t('warningDesc3', '. The escrow hold will be adjusted immediately.')}</Text>
+            {!booking ? (
+              <Text style={styles.warningDesc}>Booking details are unavailable. Refresh before cancelling.</Text>
+            ) : providerRefundUnavailable ? (
+              <Text style={styles.warningDesc}>
+                {refundText}{refundPercent}% would be eligible under the policy, but provider refunds are not configured. This booking will remain active if cancellation is rejected.
+              </Text>
+            ) : (
+              <Text style={styles.warningDesc}>
+                {booking.paymentStatus === 'completed'
+                  ? 'No refund is due under the current cancellation window.'
+                  : 'No successful payment is recorded for this booking, so no refund is due.'}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -190,14 +213,14 @@ export const CancelBookingScreen = () => {
       <View style={styles.bottomBar}>
         <View style={styles.bottomBarHandle} />
         <TouchableOpacity 
-          style={[styles.cancelBtn, (!selectedReason || isCancelling) && styles.cancelBtnDisabled]} 
+          style={[styles.cancelBtn, (!booking || !selectedReason || isCancelling) && styles.cancelBtnDisabled]}
           onPress={handleConfirmCancel}
-          disabled={!selectedReason || isCancelling}
+          disabled={!booking || !selectedReason || isCancelling || providerRefundUnavailable}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel={t('a11yConfirmCancellation', 'Confirm Cancellation')}
         >
-          <Text style={styles.cancelBtnText}>{isCancelling ? 'Cancelling...' : t('btn.confirmCancellation', 'Confirm Cancellation')}</Text>
+          <Text style={styles.cancelBtnText}>{isCancelling ? 'Cancelling...' : providerRefundUnavailable ? 'Cancellation unavailable' : t('btn.confirmCancellation', 'Confirm Cancellation')}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.keepBtn} 

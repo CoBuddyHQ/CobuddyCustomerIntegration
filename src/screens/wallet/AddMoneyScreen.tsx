@@ -1,18 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, Platform, KeyboardAvoidingView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { paymentApi, walletApi } from '../../services/api';
+import { walletApi } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const PRESET_AMOUNTS = ['500', '1000', '2000', '5000'];
-const DEFAULT_PAYMENT = { id: 'pm_upi', icon: 'qrcode', title: 'UPI / GPay', sub: 'shlok@okicici' };
+const DEFAULT_PAYMENT = { id: 'unavailable', icon: 'credit-card-outline', title: 'Payment method', sub: 'No payment method configured' };
 
 export const AddMoneyScreen = () => { 
   const { t } = useTranslation('wallet.addMoney');
@@ -22,13 +22,12 @@ export const AddMoneyScreen = () => {
   const [amount, setAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<any>(DEFAULT_PAYMENT);
 
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [currentBalance, setCurrentBalance] = useState<number>(4500);
+  const [currentBalance, setCurrentBalance] = useState<number | null>(null);
 
   useEffect(() => {
     walletApi.getWalletBalance().then(wb => {
       if (wb?.balance !== undefined) setCurrentBalance(wb.balance);
-    }).catch(() => {});
+    }).catch(() => setCurrentBalance(null));
   }, []);
 
   useEffect(() => {
@@ -41,25 +40,10 @@ export const AddMoneyScreen = () => {
   const handleProceed = async () => {
     const val = parseInt(amount, 10);
     if (!amount || isNaN(val) || val < 100) return;
-
-    setIsProcessing(true);
-    try {
-      const order = await paymentApi.createWalletTopupOrder(val);
-      // Simulate/Trigger payment gateway verification
-      if (order?.orderId) {
-        await paymentApi.verifyWalletTopup({
-          razorpay_order_id: order.orderId,
-          razorpay_payment_id: `pay_${Date.now()}`,
-          razorpay_signature: `sig_${Date.now()}`,
-          amount: val,
-        });
-      }
-    } catch {
-      // Fallback
-    } finally {
-      setIsProcessing(false);
-      navigation.navigate('TransactionHistoryScreen');
-    }
+    Alert.alert(
+      'Top-up unavailable',
+      'Secure checkout is not configured in this app version. No payment was submitted and your wallet was not changed.',
+    );
   };
 
   return (
@@ -79,7 +63,9 @@ export const AddMoneyScreen = () => {
             
             <View style={styles.balanceInfoBox}>
                 <Text style={styles.balanceInfoLabel}>{t('balanceLabel', 'CURRENT BALANCE')}</Text>
-                <Text style={styles.balanceInfoValue}>₹{currentBalance.toLocaleString()}</Text>
+                <Text style={styles.balanceInfoValue}>
+                  {currentBalance === null ? 'Unavailable' : `₹${currentBalance.toLocaleString()}`}
+                </Text>
             </View>
 
             <View style={styles.inputContainer}>
@@ -130,11 +116,11 @@ export const AddMoneyScreen = () => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.trustBanner}>
-                    <Icon name="shield-check" size={16} color={theme.colors.success} />
+            <View style={styles.trustBanner}>
+                    <Icon name="alert-circle-outline" size={16} color={theme.colors.warning} />
                     <View>
-                        <Text style={styles.trustTitle}>{t('trustTitle', '100% Safe & Secure')}</Text>
-                        <Text style={styles.trustSub}>{t('trustSub', 'PCI-DSS compliant encrypted payments')}</Text>
+                <Text style={styles.trustTitle}>{t('trustTitle', 'Checkout unavailable')}</Text>
+                <Text style={styles.trustSub}>{t('trustSub', 'No payment provider is configured. No amount will be submitted.')}</Text>
                     </View>
                 </View>
             </View>
@@ -144,13 +130,13 @@ export const AddMoneyScreen = () => {
 
       <View style={styles.footer}>
           <TouchableOpacity 
-              style={[styles.proceedBtn, (!amount || parseInt(amount) < 100 || isProcessing) ? styles.proceedBtnDisabled : null]} 
-              disabled={!amount || parseInt(amount) < 100 || isProcessing}
+              style={[styles.proceedBtn, (!amount || parseInt(amount) < 100) ? styles.proceedBtnDisabled : null]}
+              disabled={!amount || parseInt(amount) < 100}
               activeOpacity={0.8}
               onPress={handleProceed} accessibilityRole="button" accessibilityLabel={t('a11yProceedToPay', 'Proceed to pay')}
           >
               <Text style={styles.proceedText}>
-                {isProcessing ? 'Processing...' : t('proceedToPay', 'Proceed to Pay ₹{{amount}}', { amount: amount || '0' })}
+                {t('proceedToPay', 'Checkout unavailable')}
               </Text>
           </TouchableOpacity>
       </View>
@@ -184,8 +170,8 @@ const styles = StyleSheet.create({
   paymentSub: { fontSize: 12, color: theme.colors.textSecondary },
   changeBtn: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, borderWidth: 1, borderColor: theme.colors.border },
   changeText: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textPrimary },
-  trustBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(16, 185, 129, 0.05)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)' },
-  trustTitle: { fontSize: 12, fontWeight: 'bold', color: theme.colors.success, marginBottom: 2 },
+  trustBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(245, 158, 11, 0.05)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.2)' },
+  trustTitle: { fontSize: 12, fontWeight: 'bold', color: theme.colors.warning, marginBottom: 2 },
   trustSub: { fontSize: 10, color: theme.colors.textSecondary },
   footer: { padding: 20, paddingBottom: Platform.OS === 'ios' ? 34 : 20, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background },
   proceedBtn: { backgroundColor: theme.colors.primary, paddingVertical: 18, borderRadius: 16, alignItems: 'center' },

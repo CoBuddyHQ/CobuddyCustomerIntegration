@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type QueryKey = readonly unknown[];
 
-export interface QueryOptions<T> {
+export interface QueryOptions {
   staleTime?: number; // ms before data is considered stale (default: 60,000ms = 1 min)
   cacheTime?: number; // ms before unused data is garbage-collected (default: 900,000ms = 15 min)
   persist?: boolean;  // whether to persist safe cache to AsyncStorage (default: false)
@@ -98,7 +98,7 @@ class QueryClient {
   /**
    * Set cached query data directly (e.g. from optimistic update or push notification)
    */
-  setQueryData<T>(key: QueryKey, data: T, options?: QueryOptions<T>): void {
+  setQueryData<T>(key: QueryKey, data: T, options?: QueryOptions): void {
     const sKey = this.serializeKey(key);
     const item: QueryCacheItem<T> = {
       data,
@@ -122,7 +122,7 @@ class QueryClient {
   async fetchQuery<T>(
     key: QueryKey,
     fetcher: () => Promise<T>,
-    options?: QueryOptions<T>
+    options?: QueryOptions
   ): Promise<T> {
     const sKey = this.serializeKey(key);
     const staleTime = options?.staleTime ?? 60_000;

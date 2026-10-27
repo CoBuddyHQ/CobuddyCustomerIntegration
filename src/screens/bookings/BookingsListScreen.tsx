@@ -38,8 +38,10 @@ export const BookingsListScreen = () => {
       };
 
       fetchBookings();
+      const interval = setInterval(fetchBookings, 6000);
       return () => {
         isMounted = false;
+        clearInterval(interval);
       };
     }, [activeTab])
   );

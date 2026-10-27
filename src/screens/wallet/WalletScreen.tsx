@@ -13,14 +13,8 @@ import { walletApi, WalletBalance, Transaction } from '../../services/api';
 import { useAuthStore } from '../../store/slices/authStore';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
-// Mock Data
-const WALLET_DATA = {
-  balance: 4500,
-  pendingRefund: 500,
-  escrowHeld: 1200,
-  kycStatus: 'unverified',
-};
+import { ActivityIndicator } from 'react-native';
+import { isTransactionSettled } from '../../utils/walletPresentation';
 
 
 
@@ -30,19 +24,16 @@ export const WalletScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const { kycStatus } = useAuthStore();
 
-  const [wallet, setWallet] = useState<WalletBalance>({
-    balance: 0,
-    currency: 'INR',
-    pendingRefund: 0,
-    escrowHeld: 0,
-  });
+  const [wallet, setWallet] = useState<WalletBalance | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   React.useEffect(() => {
     let isMounted = true;
     const fetchWalletData = async () => {
       setIsLoading(true);
+      setLoadFailed(false);
       try {
         const [wb, txs] = await Promise.allSettled([
           walletApi.getWalletBalance(),
@@ -54,8 +45,11 @@ export const WalletScreen = () => {
         if (isMounted && txs.status === 'fulfilled' && txs.value?.data) {
           setTransactions(txs.value.data);
         }
+        if (isMounted && (wb.status === 'rejected' || txs.status === 'rejected')) {
+          setLoadFailed(true);
+        }
       } catch {
-        // Fallback to initial state
+        if (isMounted) setLoadFailed(true);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -67,16 +61,20 @@ export const WalletScreen = () => {
     };
   }, []);
 
-  const displayTransactions = transactions.map((tx: Transaction) => ({
+  const displayTransactions = transactions.map((tx: Transaction) => {
+    const isSettled = isTransactionSettled(tx.status);
+    return ({
     id: tx.id,
     type: tx.type,
-    title: tx.type === 'credit' ? t('txTypes.moneyAdded', 'Money Added') : tx.type === 'refund' ? t('txTypes.refundProcessed', 'Refund Processed') : t('txTypes.sessionPayment', 'Session Payment'),
+    title: tx.type === 'credit' ? t('txTypes.moneyAdded', 'Money Added') : tx.type === 'refund' ? t('txTypes.refundProcessed', 'Refund') : t('txTypes.sessionPayment', 'Wallet transaction'),
     method: tx.category || tx.paymentSource || 'Wallet Transaction',
-    amount: `${tx.positive ? '+' : '-'} ₹${Math.abs(tx.amount).toLocaleString()}`,
+    isSettled,
+    amount: `${isSettled ? (tx.positive ? '+' : '-') : ''} ₹${Math.abs(tx.amount).toLocaleString()}`,
     date: tx.date || (tx.time ? `${tx.date} ${tx.time}` : 'Recent'),
-    positive: tx.positive,
+    positive: isSettled && tx.positive,
     isRefund: tx.type === 'refund',
-  }));
+    });
+  });
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -97,23 +95,30 @@ export const WalletScreen = () => {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
+        {isLoading ? (
+          <View style={styles.walletStatus}>
+            <ActivityIndicator color={theme.colors.primary} />
+            <Text style={styles.walletStatusText}>Loading your wallet…</Text>
+          </View>
+        ) : loadFailed ? (
+          <Text accessibilityRole="alert" style={styles.walletErrorText}>
+            Wallet details are unavailable. No balance or transactions are being shown.
+          </Text>
+        ) : null}
+
         
         <View style={styles.heroCard}>
           <View style={styles.heroGlow} />
           <Text style={styles.heroSubtitle}>{t('availableBalance', 'Available Balance')}</Text>
           <View style={styles.balanceRow}>
             <Text style={styles.currencySymbol}>₹</Text>
-            <Text style={styles.balanceText}>{(wallet.balance ?? 4500).toLocaleString()}</Text>
+            <Text style={styles.balanceText}>{wallet ? wallet.balance.toLocaleString() : '—'}</Text>
           </View>
 
           <View style={styles.statsContainer}>
             <View style={styles.statBadgeWarning}>
-              <Icon name="clock-outline" size={14} color={theme.colors.warning} />
-              <Text style={styles.statBadgeWarningText}>{t('wallet.pendingRefunds', 'Pending Refunds: ₹')}{(wallet.pendingRefund ?? 500).toLocaleString()}</Text>
-            </View>
-            <View style={styles.statBadgeNeutral}>
-              <Icon name="shield-lock-outline" size={14} color={theme.colors.textSecondary} />
-              <Text style={styles.statBadgeNeutralText}>{t('wallet.heldInEscrow', 'Held in Escrow: ₹')}{(wallet.escrowHeld ?? 1200).toLocaleString()}</Text>
+              <Icon name="information-outline" size={14} color={theme.colors.warning} />
+              <Text style={styles.statBadgeWarningText}>Escrow settlement and refund transfers are not configured in this app build.</Text>
             </View>
           </View>
 
@@ -172,7 +177,7 @@ export const WalletScreen = () => {
           <View style={styles.txHeader}>
             <View>
               <Text style={styles.sectionTitle}>{t('recentTransactions', 'Recent Transactions')}</Text>
-              <TouchableOpacity style={styles.downloadRow} onPress={() => Alert.alert(t('alertTitleDownloadStateme', 'Download Statement'), t('alertMsgPDFstatementhasbeeng', 'PDF statement has been generated and saved.'))} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11yDownloadStatement', 'Download Statement')}>
+              <TouchableOpacity style={styles.downloadRow} onPress={() => Alert.alert('Statement unavailable', 'Statement export is not implemented. No file was generated or saved.')} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11yDownloadStatement', 'Download Statement')}>
                 <Icon name="download" size={14} color={theme.colors.primary} />
                 <Text style={styles.downloadText}>{t('downloadStatement', 'Download Statement')}</Text>
               </TouchableOpacity>
@@ -193,7 +198,7 @@ export const WalletScreen = () => {
               </View>
               <View style={styles.txItemMeta}>
                 <Text style={styles.txItemTitle}>{tx.title}</Text>
-                <Text style={styles.txItemDate}>{tx.date} • {tx.method}</Text>
+                <Text style={styles.txItemDate}>{tx.date} • {tx.method} • {tx.isSettled ? 'Server reported settled' : 'Not confirmed settled'}</Text>
               </View>
               <Text style={[styles.txItemAmount, tx.positive ? styles.txAmountPos : styles.txAmountNeg, tx.isRefund && styles.txAmountRefund]}>
                 {tx.amount}
@@ -204,10 +209,10 @@ export const WalletScreen = () => {
 
         
         <View style={styles.trustFooter}>
-          <Icon name="shield-check" size={16} color={theme.colors.textSecondary} />
-          <Text style={styles.trustFooterText}>{t('escrowProtection', 'Secured by CoBuddy Escrow Protection')}</Text>
+          <Icon name="information-outline" size={16} color={theme.colors.textSecondary} />
+          <Text style={styles.trustFooterText}>Wallet values are reported by the Customer Backend.</Text>
         </View>
-        <Text style={styles.trustSubtext}>{t('escrowSubtext', 'Your money is safely held and only released upon successful session completion.')}</Text>
+        <Text style={styles.trustSubtext}>This app build does not hold booking payments in escrow or process provider refunds.</Text>
 
       </ScrollView>
     </SafeAreaView>
@@ -216,6 +221,9 @@ export const WalletScreen = () => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.colors.background },
+  walletStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  walletStatusText: { color: theme.colors.textSecondary },
+  walletErrorText: { color: theme.colors.error, textAlign: 'center', padding: 12 },
   
   // Header
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 60, borderBottomWidth: 1, borderBottomColor: theme.colors.border },

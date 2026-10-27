@@ -40,39 +40,32 @@ export const submitKycDocument = async (data: {
   const isLocalFile = (uri?: string) =>
     uri?.startsWith('file://') || uri?.startsWith('content://');
 
-  // If real local files are provided — use multipart/form-data
-  if (isLocalFile(data.frontDocUri) || isLocalFile(data.backDocUri)) {
-    const formData = new FormData();
-    formData.append('docType', normalizedType);
-    formData.append('documentType', normalizedType);
-    formData.append('docNumber', num);
-    formData.append('documentNumber', num);
-    formData.append('legalName', name);
-
-    if (isLocalFile(data.frontDocUri)) {
-      const frontFilename = data.frontDocUri!.split('/').pop() || 'front.jpg';
-      formData.append('frontDoc', { uri: data.frontDocUri, name: frontFilename, type: 'image/jpeg' } as unknown as Blob);
-    }
-    if (isLocalFile(data.backDocUri)) {
-      const backFilename = data.backDocUri!.split('/').pop() || 'back.jpg';
-      formData.append('backDoc', { uri: data.backDocUri, name: backFilename, type: 'image/jpeg' } as unknown as Blob);
-    }
-
-    const res = await apiClient.post<{ message: string }>('/kyc/document', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return res.data;
+  if (!isLocalFile(data.frontDocUri)) {
+    throw new Error('A real local front document file is required. Remote sample URLs are not accepted.');
   }
 
-  // Otherwise — send JSON (works for URL strings or no-file dev flow)
-  const res = await apiClient.post<{ message: string }>('/kyc/document', {
-    docType: normalizedType,
-    documentType: normalizedType,
-    docNumber: num,
-    documentNumber: num,
-    legalName: name,
-    frontDocUri: data.frontDocUri,
-    backDocUri: data.backDocUri,
+  const formData = new FormData();
+  formData.append('docType', normalizedType);
+  formData.append('docNumber', num);
+  formData.append('legalName', name);
+  const frontUri = data.frontDocUri!;
+  const frontFilename = frontUri.split('/').pop() || 'front.jpg';
+  formData.append('frontDoc', {
+    uri: frontUri,
+    name: frontFilename,
+    type: frontFilename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
+  } as unknown as Blob);
+  if (isLocalFile(data.backDocUri)) {
+    const backFilename = data.backDocUri!.split('/').pop() || 'back.jpg';
+    formData.append('backDoc', {
+      uri: data.backDocUri,
+      name: backFilename,
+      type: backFilename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
+    } as unknown as Blob);
+  }
+
+  const res = await apiClient.post<{ message: string }>('/kyc/document', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   });
   return res.data;
 };
@@ -80,19 +73,20 @@ export const submitKycDocument = async (data: {
 // ─── Submit selfie ────────────────────────────────────────────────────────────
 export const submitKycSelfie = async (localUri: string): Promise<{ message: string }> => {
   const isLocalFile = localUri.startsWith('file://') || localUri.startsWith('content://');
-  if (isLocalFile) {
-    const formData = new FormData();
-    const filename = localUri.split('/').pop() || 'selfie.jpg';
-    formData.append('file', { uri: localUri, name: filename, type: 'image/jpeg' } as unknown as Blob);
-
-    const res = await apiClient.post<{ message: string }>('/kyc/selfie', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return res.data;
+  if (!isLocalFile) {
+    throw new Error('A real local selfie file is required. Remote sample URLs are not accepted.');
   }
 
-  const res = await apiClient.post<{ message: string }>('/kyc/selfie', {
-    selfieUrl: localUri,
+  const formData = new FormData();
+  const filename = localUri.split('/').pop() || 'selfie.jpg';
+  formData.append('file', {
+    uri: localUri,
+    name: filename,
+    type: filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
+  } as unknown as Blob);
+
+  const res = await apiClient.post<{ message: string }>('/kyc/selfie', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   });
   return res.data;
 };
@@ -100,19 +94,16 @@ export const submitKycSelfie = async (localUri: string): Promise<{ message: stri
 // ─── Submit liveness ──────────────────────────────────────────────────────────
 export const submitKycLiveness = async (localUri: string): Promise<{ message: string }> => {
   const isLocalFile = localUri.startsWith('file://') || localUri.startsWith('content://');
-  if (isLocalFile) {
-    const formData = new FormData();
-    const filename = localUri.split('/').pop() || 'liveness.mp4';
-    formData.append('file', { uri: localUri, name: filename, type: 'video/mp4' } as unknown as Blob);
-
-    const res = await apiClient.post<{ message: string }>('/kyc/liveness', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return res.data;
+  if (!isLocalFile) {
+    throw new Error('A real local liveness video file is required. Remote sample URLs are not accepted.');
   }
 
-  const res = await apiClient.post<{ message: string }>('/kyc/liveness', {
-    livenessUrl: localUri,
+  const formData = new FormData();
+  const filename = localUri.split('/').pop() || 'liveness.mp4';
+  formData.append('file', { uri: localUri, name: filename, type: 'video/mp4' } as unknown as Blob);
+
+  const res = await apiClient.post<{ message: string }>('/kyc/liveness', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   });
   return res.data;
 };

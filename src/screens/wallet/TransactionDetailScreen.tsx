@@ -9,6 +9,7 @@ import { theme } from '../../theme';
 import { walletApi } from '../../services/api';
 import type { Transaction } from '../../services/api/wallet.api';
 import { RootStackParamList } from '../../types/navigation';
+import { isTransactionSettled, normalizeTransactionState } from '../../utils/walletPresentation';
 
 
 export const TransactionDetailScreen = () => { 
@@ -66,8 +67,16 @@ export const TransactionDetailScreen = () => {
     );
   }
 
+  const transactionState = normalizeTransactionState(tx.status);
+  const isSettled = isTransactionSettled(tx.status);
+  const statusColor = transactionState === 'failed'
+    ? theme.colors.error
+    : isSettled
+      ? theme.colors.success
+      : theme.colors.warning;
+
   const handleDownload = () => {
-    Alert.alert(t('alertTitleDownloadReceipt', 'Download Receipt'), t('alertMsgPDFreceipthasbeendow', 'PDF receipt has been downloaded successfully.'));
+    Alert.alert('Receipt unavailable', 'Receipt export is not implemented. No file was generated or saved.');
   };
 
   return (
@@ -95,19 +104,19 @@ export const TransactionDetailScreen = () => {
                     <Text style={styles.refLabel}>{t('refLabel', 'TRANSACTION ID')}</Text>
                     <Text style={styles.refValue}>{tx.refId}</Text>
                     <View style={styles.statusBadge}>
-                        <Icon name="check-circle" size={12} color={theme.colors.success} />
-                        <Text style={styles.statusBadgeText}>{t(`status.${tx.status}`, String(tx.status))}</Text>
+                        <Icon name={isSettled ? 'check-circle' : transactionState === 'failed' ? 'close-circle' : 'clock-outline'} size={12} color={statusColor} />
+                        <Text style={[styles.statusBadgeText, { color: statusColor }]}>{t(`status.${tx.status}`, String(tx.status))}</Text>
                     </View>
                 </View>
             </View>
 
-            <Text style={[styles.heroAmount, tx.positive && styles.heroAmountPos]}>{tx.amount}</Text>
+            <Text style={[styles.heroAmount, isSettled && tx.positive && styles.heroAmountPos]}>{tx.amount}</Text>
 
             <View style={styles.verifiedBanner}>
-                <Icon name="shield-check" size={16} color={theme.colors.success} />
+                <Icon name="information-outline" size={16} color={theme.colors.textSecondary} />
                 <View style={styles.verifiedMeta}>
-                    <Text style={styles.verifiedTitle}>{t('verifiedTitle', 'Secured Transaction')}</Text>
-                    <Text style={styles.verifiedSub}>{t('verifiedSub', 'Processed via CoBuddy Escrow')}</Text>
+                    <Text style={styles.verifiedTitle}>{t('verifiedTitle', 'Customer Backend record')}</Text>
+                    <Text style={styles.verifiedSub}>{t('verifiedSub', 'The status shown is reported by the Customer Backend. This screen does not hold or release funds.')}</Text>
                 </View>
             </View>
         </View>
@@ -189,14 +198,14 @@ const styles = StyleSheet.create({
   refBlock: { flex: 1, justifyContent: 'center', gap: 4 },
   refLabel: { fontSize: 10, fontWeight: '600', color: theme.colors.textSecondary, letterSpacing: 1 },
   refValue: { fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16, 185, 129, 0.1)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255, 255, 255, 0.06)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   statusBadgeText: { fontSize: 11, fontWeight: 'bold', color: theme.colors.success },
   heroAmount: { fontSize: 36, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 20 },
   heroAmountPos: { color: theme.colors.success },
   
-  verifiedBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(16, 185, 129, 0.05)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)' },
+  verifiedBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255, 255, 255, 0.04)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border },
   verifiedMeta: { flex: 1 },
-  verifiedTitle: { fontSize: 13, fontWeight: 'bold', color: theme.colors.success },
+  verifiedTitle: { fontSize: 13, fontWeight: 'bold', color: theme.colors.textPrimary },
   verifiedSub: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 2 },
 
   card: { backgroundColor: theme.colors.surface, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: theme.colors.border },

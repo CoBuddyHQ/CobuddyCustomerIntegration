@@ -1,13 +1,13 @@
 {
   "headerTitle": "Verification Status",
-  "heroTitle": "Verification In Review",
+  "heroTitle": "Verification status",
   "statusLabel": "STATUS",
-  "statusValue": "Verification Pending",
+  "statusValue": "Unavailable",
   "progress": "VERIFICATION PROGRESS",
   "continueSetup": "Continue Setting Up Your Experience",
-  "estimatedTimeUsuallyCompletedWithin": "Estimated Time: Usually completed within 24 hours.",
-  "youCanContinueExploringThe": "You can continue exploring the app while verification is reviewed.",
-  "allVerificationDataIsProtected": "All verification data is protected with end-to-end encryption and never shared without consent.",
+  "estimatedTimeUsuallyCompletedWithin": "Administrative review and automated identity assessment are not connected. No completion time is available.",
+  "youCanContinueExploringThe": "You can continue using features that are available for your current server-reported status.",
+  "allVerificationDataIsProtected": "Evidence is stored by the Customer Backend. This app build does not perform an automated identity match or administrative review.",
   "a11yClose": "Close",
   "steps": {
     "documentVerification": "Document Verification",

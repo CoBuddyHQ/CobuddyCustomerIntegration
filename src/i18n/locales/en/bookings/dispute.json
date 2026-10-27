@@ -1,8 +1,9 @@
 {
   "headerTitle": "Raise a Dispute",
   "summaryTitle": "Disputing Booking: {{id}}",
-  "infoTitle": "Escrow Frozen",
-  "infoDesc": "Submitting a dispute will freeze the escrow payment. Our safety team will review your claim within 24 hours.",
+  "infoTitle": "Dispute review",
+  "infoDesc": "Your report is saved with the booking. This app build does not freeze or hold payments. The Customer Backend states the review target is 24–48 hours.",
+  "submitError": "The Customer Backend did not confirm the report. It has not been marked as submitted. Try again later.",
   "sectionCategory": "ISSUE CATEGORY",
   "sectionDesc": "DETAILED DESCRIPTION",
   "sectionProof": "UPLOAD PROOF (OPTIONAL)",
@@ -19,7 +20,7 @@
   "a11ySubmitDispute": "Submit Dispute",
   "fallback": {
     "companionName": "Companion",
-    "date2": "Fri, 24 Oct 2026"
+    "date2": "Unavailable"
   },
   "category": {
     "no_show": "Companion No-Show",

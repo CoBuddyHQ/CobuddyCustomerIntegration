@@ -69,7 +69,9 @@ export const BlockedUsersScreen = () => {
             <Text style={styles.infoText}>{t('blockedUsersCannotSendYou', 'Blocked users cannot send you messages, request bookings, or view your profile. They won\'t be notified that you blocked them.')}</Text>
         </View>
 
-        {blockedUsers.length > 0 ? (
+        {isLoading ? (
+          <Text style={styles.emptySub}>Loading blocked users…</Text>
+        ) : blockedUsers.length > 0 ? (
             <View style={styles.listContainer}>
                 {blockedUsers.map((user, index) => (
                     <View key={user.id} style={[styles.userCard, index > 0 && styles.userCardBorder]}>

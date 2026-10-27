@@ -8,7 +8,7 @@
  *  - Unified state model: { data, isLoading, isFetching, isError, error, isSuccess, isStale, refetch }
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { queryClient, type QueryKey, type QueryOptions } from './queryClient';
 
 export interface UseServerQueryResult<T> {
@@ -25,15 +25,30 @@ export interface UseServerQueryResult<T> {
 export function useServerQuery<T>(
   key: QueryKey,
   fetcher: () => Promise<T>,
-  options?: QueryOptions<T>
+  options?: QueryOptions
 ): UseServerQueryResult<T> {
   const enabled = options?.enabled ?? true;
-  const initialCached = queryClient.getQueryData<T>(key);
-
-  const [data, setData] = useState<T | undefined>(initialCached);
-  const [isLoading, setIsLoading] = useState<boolean>(!initialCached && enabled);
-  const [isFetching, setIsFetching] = useState<boolean>(false);
-  const [error, setError] = useState<Error | null>(null);
+  const keyIdentity = JSON.stringify(key);
+  const stableKey = useMemo(() => JSON.parse(keyIdentity) as QueryKey, [keyIdentity]);
+  const initialCached = queryClient.getQueryData<T>(stableKey);
+  const [result, setResult] = useState<{ key: string; data: T } | null>(
+    initialCached === undefined ? null : { key: keyIdentity, data: initialCached },
+  );
+  const [queryStatus, setQueryStatus] = useState<{
+    key: string;
+    isLoading: boolean;
+    isFetching: boolean;
+    error: Error | null;
+  }>({ key: keyIdentity, isLoading: initialCached === undefined && enabled, isFetching: false, error: null });
+  const cachedData = queryClient.getQueryData<T>(stableKey);
+  const data = result?.key === keyIdentity ? result.data : cachedData;
+  const error = queryStatus.key === keyIdentity ? queryStatus.error : null;
+  const isLoading = enabled && data === undefined && (
+    queryStatus.key === keyIdentity ? queryStatus.isLoading : true
+  );
+  const isFetching = enabled && (
+    queryStatus.key === keyIdentity ? queryStatus.isFetching : !queryClient.isQueryFresh(stableKey)
+  );
 
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
@@ -41,75 +56,68 @@ export function useServerQuery<T>(
   optionsRef.current = options;
 
   const refetch = useCallback(async (): Promise<T> => {
-    setIsFetching(true);
-    setError(null);
+    setQueryStatus({ key: keyIdentity, isLoading: data === undefined, isFetching: true, error: null });
     try {
-      queryClient.invalidateQueries(key);
-      const res = await queryClient.fetchQuery(key, fetcherRef.current, optionsRef.current);
-      setData(res);
-      setIsLoading(false);
+      queryClient.invalidateQueries(stableKey);
+      const res = await queryClient.fetchQuery(stableKey, fetcherRef.current, optionsRef.current);
+      setResult({ key: keyIdentity, data: res });
+      setQueryStatus({ key: keyIdentity, isLoading: false, isFetching: false, error: null });
       return res;
-    } catch (err: any) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setIsLoading(false);
+    } catch (err: unknown) {
+      setQueryStatus({
+        key: keyIdentity, isLoading: false, isFetching: false,
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
       throw err;
-    } finally {
-      setIsFetching(false);
     }
-  }, [JSON.stringify(key)]);
+  }, [data, keyIdentity, stableKey]);
 
   useEffect(() => {
     if (!enabled) {
-      setIsLoading(false);
+      setQueryStatus({ key: keyIdentity, isLoading: false, isFetching: false, error: null });
       return;
     }
 
     let isMounted = true;
 
-    const unsubscribe = queryClient.subscribe(key, (newData) => {
+    const unsubscribe = queryClient.subscribe(stableKey, (newData: T) => {
       if (isMounted) {
-        setData(newData);
-        setError(null);
-        setIsLoading(false);
+        setResult({ key: keyIdentity, data: newData });
+        setQueryStatus({ key: keyIdentity, isLoading: false, isFetching: false, error: null });
       }
     });
 
-    const cachedData = queryClient.getQueryData<T>(key);
-    const isFresh = queryClient.isQueryFresh(key);
+    const effectCachedData = queryClient.getQueryData<T>(stableKey);
+    const isFresh = queryClient.isQueryFresh(stableKey);
 
-    if (cachedData !== undefined) {
-      setData(cachedData);
-      setIsLoading(false);
+    if (effectCachedData !== undefined) {
+      setResult({ key: keyIdentity, data: effectCachedData });
     }
 
     if (!isFresh) {
-      setIsFetching(true);
+      setQueryStatus({ key: keyIdentity, isLoading: effectCachedData === undefined, isFetching: true, error: null });
       queryClient
-        .fetchQuery(key, fetcherRef.current, optionsRef.current)
+        .fetchQuery(stableKey, fetcherRef.current, optionsRef.current)
         .then((res) => {
           if (isMounted) {
-            setData(res);
-            setError(null);
+            setResult({ key: keyIdentity, data: res });
+            setQueryStatus({ key: keyIdentity, isLoading: false, isFetching: false, error: null });
+          }
+        }).catch((err: unknown) => {
+          if (isMounted) {
+            setQueryStatus({
+              key: keyIdentity, isLoading: false, isFetching: false,
+              error: err instanceof Error ? err : new Error(String(err)),
+            });
           }
         })
-        .catch((err) => {
-          if (isMounted) {
-            setError(err instanceof Error ? err : new Error(String(err)));
-          }
-        })
-        .finally(() => {
-          if (isMounted) {
-            setIsLoading(false);
-            setIsFetching(false);
-          }
-        });
     }
 
     return () => {
       isMounted = false;
       unsubscribe();
     };
-  }, [enabled, JSON.stringify(key)]);
+  }, [enabled, keyIdentity, stableKey]);
 
   const isStale = !queryClient.isQueryFresh(key);
 

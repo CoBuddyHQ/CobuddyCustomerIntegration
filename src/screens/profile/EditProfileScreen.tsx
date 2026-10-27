@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -12,8 +12,9 @@ import { useAuthStore } from '../../store/slices/authStore';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+const INTERESTS_DATA = adminValues.activityCategories;
+
 export const EditProfileScreen = () => {
-  const INTERESTS_DATA = adminValues.activityCategories; 
   const { t } = useTranslation('profile.edit');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
@@ -26,6 +27,7 @@ export const EditProfileScreen = () => {
       name: '',
       bio: '',
       city: '',
+      avatarUrl: user?.avatar || '',
       languages: [] as string[],
       langIds: [] as string[],
       interests: [] as { id: string; label: string; icon: string }[],
@@ -40,13 +42,14 @@ export const EditProfileScreen = () => {
           name: p.name || '',
           bio: p.bio || '',
           city: p.city || '',
+          avatarUrl: p.avatar || user?.avatar || '',
           languages: p.spokenLanguages || [],
           langIds: p.spokenLanguages || [],
           interests: (p.interests || []).map((id: string) => INTERESTS_DATA.find(d => d.id === id) || { id, label: id, icon: 'star' }),
         }));
       }
     }).catch(() => {}).finally(() => setIsLoadingProfile(false));
-  }, []);
+  }, [user?.avatar]);
 
   // Handle incoming params from sub-screens (Location, Interests, Languages)
   useEffect(() => {
@@ -67,7 +70,7 @@ export const EditProfileScreen = () => {
               langIds: (route.params?.updatedLangIds as string[]) || prev.langIds 
           }));
       }
-  }, [route.params, INTERESTS_DATA]);
+  }, [route.params]);
 
   const updateForm = (key: string, value: string) => {
       setForm(prev => ({ ...prev, [key]: value }));
@@ -90,13 +93,22 @@ export const EditProfileScreen = () => {
           const interestLabels = form.interests.map(i => i.label || i.id);
           await profileApi.updateInterests(interestLabels);
         }
-      } catch {
-        // Fallback
+        Alert.alert(t('successTitle', 'Success'), t('successProfileUpdate', 'Profile updated successfully!'), [{ text: t('ok', 'OK'), onPress: () => smartGoBack() }]);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : t('updateFailed', 'Profile update failed. Please try again.');
+        Alert.alert(t('errorTitle', 'Unable to save'), message);
       } finally {
         setIsSaving(false);
-        Alert.alert(t('successTitle', 'Success'), t('successProfileUpdate', 'Profile updated successfully!'), [{ text: t('ok', 'OK'), onPress: () => smartGoBack() }]);
       }
   };
+
+  if (isLoadingProfile) {
+    return (
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <ActivityIndicator color={theme.colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -119,7 +131,13 @@ export const EditProfileScreen = () => {
             
             <View style={styles.avatarSection}>
                 <View style={styles.avatarWrap}>
-                    <Image source={{uri: 'https://i.pravatar.cc/300?img=11'}} style={styles.avatar} />
+                    {form.avatarUrl ? (
+                      <Image source={{ uri: form.avatarUrl }} style={styles.avatar} />
+                    ) : (
+                      <View style={[styles.avatar, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.surface }]}>
+                        <Icon name="account" size={48} color={theme.colors.textSecondary} />
+                      </View>
+                    )}
                     <TouchableOpacity style={styles.editAvatarBtn} accessibilityRole="button" accessibilityLabel={t('a11yCamera', 'Camera')}>
                         <Icon name="camera" size={16} color={theme.colors.surface} />
                     </TouchableOpacity>

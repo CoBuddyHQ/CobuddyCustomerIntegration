@@ -22,7 +22,7 @@ export interface Booking {
   scheduledStart: string;
   scheduledEnd: string;
   sessionPassCode: string;
-  matchScore?: number;
+  matchScore?: number | null;
   safetyTimerActive?: boolean;
   earningsBreakdown?: { base: number; tip: number; total: number };
   requestStatus: RequestStatus;

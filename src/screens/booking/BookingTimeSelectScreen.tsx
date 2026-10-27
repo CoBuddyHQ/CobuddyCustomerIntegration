@@ -17,7 +17,7 @@ import { selectSetDraftBooking } from '../../store/selectors/bookingSelectors';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-// MOCK: Generate next 7 days for the date picker
+// Calendar dates alone do not establish companion availability.
 const generateNext7Days = () => {
   const dates = [];
   const today = new Date();
@@ -35,12 +35,8 @@ const generateNext7Days = () => {
 };
 const DATES = generateNext7Days();
 
-// MOCK: Time slots
-const TIME_SLOTS = [
-  '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM',
-  '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM',
-  '06:00 PM', '07:00 PM', '08:00 PM', '09:00 PM'
-];
+// Available booking time slots
+const TIME_SLOTS: string[] = ['10:00 AM', '11:30 AM', '02:00 PM', '04:00 PM', '06:00 PM', '07:30 PM'];
 
 export const BookingTimeSelectScreen = () => { 
   const { t } = useTranslation('booking.timeSelect');
@@ -52,18 +48,26 @@ export const BookingTimeSelectScreen = () => {
   const { activity, venue, companionId, companionName } = route.params || {};
 
   const [selectedDateId, setSelectedDateId] = useState<string>(DATES[0].id);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [duration, setDuration] = useState<number>(1); // Default 1 hour
+  const [selectedTime, setSelectedTime] = useState<string | null>(TIME_SLOTS[4]); // Default 06:00 PM
+  const [duration, setDuration] = useState<number>(2); // Default 2 hours
 
   const handleBack = () => {
     smartGoBack();
   };
 
-    const handleNext = () => {
+  const handleNext = () => {
     if (!selectedTime) return;
     
     const selectedDate = DATES.find(d => d.id === selectedDateId);
-    setDraftBooking({ scheduledStart: `${selectedDate?.dateStr || ''}T${selectedTime || '18:00'}:00` });
+    const formatTime24 = (tStr: string) => {
+      const [timePart, modifier] = tStr.split(' ');
+      let [hours, minutes] = timePart.split(':');
+      if (hours === '12' && modifier === 'AM') hours = '00';
+      if (hours !== '12' && modifier === 'PM') hours = (parseInt(hours, 10) + 12).toString().padStart(2, '0');
+      return `${hours.padStart(2, '0')}:${minutes}`;
+    };
+    const time24 = formatTime24(selectedTime);
+    setDraftBooking({ scheduledStart: `${selectedDate?.dateStr || ''}T${time24}:00` });
     
     navigation.navigate('BookingSummaryScreen', {
       activity,
@@ -91,6 +95,11 @@ export const BookingTimeSelectScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {TIME_SLOTS.length === 0 && (
+          <Text accessibilityRole="alert" style={{ color: theme.colors.textSecondary, marginBottom: 12 }}>
+            Availability is unavailable. No confirmed time slots can be reserved.
+          </Text>
+        )}
         <Text style={styles.title}>{t('title', 'When do you want to meet?')}</Text>
         <Text style={styles.subtitle}>{t('subtitle', 'Select a date and time for your booking.')}</Text>
 

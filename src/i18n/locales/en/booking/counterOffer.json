@@ -9,7 +9,7 @@
   "detailLabelVenue": "Venue",
   "changeLabelTime": "Time",
   "changeLabelRate": "Rate",
-  "escrowNoteText": "If accepted, your Escrow hold will be updated securely.",
+  "escrowNoteText": "Accepting updates the booking terms. Payment processing is unavailable in this app build.",
   "primaryBtnText": "Accept New Offer",
   "secondaryBtnText": "Message Back",
   "ghostBtnText": "Decline Booking",

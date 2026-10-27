@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -11,11 +11,9 @@ import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore';
 import { selectInterests } from '../../store/selectors/userPreferencesSelectors';
-import { INTEREST_MAPPING } from '../../services/mock/interestMapping';
-import { useBookingStore } from '../../store/slices/bookingStore';
-import { selectActiveBooking } from '../../store/selectors/bookingSelectors';
+import { INTEREST_MAPPING } from '../../constants/uiConstants';
 import { useAuthStore } from '../../store/slices/authStore';
-import { discoveryApi, bookingApi, profileApi, notificationsApi, CompanionCard as CompanionCardType } from '../../services/api';
+import { discoveryApi, CompanionCard as CompanionCardType } from '../../services/api';
 
 const DEFAULT_CATEGORIES: discoveryApi.HomeCategory[] = [
   { id: 'coffee', title: 'Coffee Meetups', icon: 'coffee', color: '#D4AF37' },
@@ -25,55 +23,20 @@ const DEFAULT_CATEGORIES: discoveryApi.HomeCategory[] = [
   { id: 'shopping', title: 'Shopping & Lifestyle', icon: 'shopping', color: '#8B5CF6' },
 ];
 
-const DEFAULT_FEATURED_LIST: CompanionCardType[] = [
-  {
-    id: 'c1',
-    name: 'Elena Vasquez',
-    age: 26,
-    initials: 'EV',
-    title: 'City guide & local experiences expert',
-    bio: "Hi! I love exploring new cafes in the city and talking about art, literature, and movies.",
-    trustScore: 98,
-    rating: 4.97,
-    reviews: 124,
-    sessions: 312,
-    rate: '₹500 /hr',
-    distance: '2.5 km away',
-    isOnline: true,
-    category: 'coffee',
-    gender: 'Female',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    id: 'c2',
-    name: 'Aisha Sharma',
-    age: 24,
-    initials: 'AS',
-    title: 'Shopping & lifestyle companion',
-    bio: 'Fashion lover, shopping enthusiast and great listener.',
-    trustScore: 97,
-    rating: 5.0,
-    reviews: 76,
-    sessions: 150,
-    rate: '₹400 /hr',
-    distance: '3.0 km away',
-    isOnline: true,
-    category: 'shopping',
-    gender: 'Female',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
-  },
-];
+const DEFAULT_FEATURED_LIST: CompanionCardType[] = [];
 
 export const HomeDashboardScreen = () => {
   const { t } = useTranslation('home.dashboard');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<discoveryApi.HomeCategory[]>(DEFAULT_CATEGORIES);
   const [featuredList, setFeaturedList] = useState<CompanionCardType[]>(DEFAULT_FEATURED_LIST);
+  const [campaigns, setCampaigns] = useState<discoveryApi.Campaign[]>([]);
+  const [campaignsAvailable, setCampaignsAvailable] = useState(true);
   const [notificationCount, setNotificationCount] = useState(0);
   const [bookingCount, setBookingCount] = useState(0);
   const [activeBooking, setActiveBooking] = useState<any | null>(null);
@@ -103,6 +66,7 @@ export const HomeDashboardScreen = () => {
   }, [selectedInterests, categories]);
 
   const loadHomeData = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
       const homeData = await discoveryApi.getHomeDashboardData();
@@ -111,9 +75,13 @@ export const HomeDashboardScreen = () => {
         if (homeData.categories && homeData.categories.length > 0) {
           setCategories(homeData.categories);
         }
-        if (homeData.featuredCompanions && homeData.featuredCompanions.length > 0) {
+        if (Array.isArray(homeData.featuredCompanions)) {
           setFeaturedList(homeData.featuredCompanions);
         }
+        if (Array.isArray(homeData.campaigns)) {
+          setCampaigns(homeData.campaigns);
+        }
+        setCampaignsAvailable(homeData.campaignsAvailable !== false);
         setNotificationCount(homeData.quickAccess?.notificationCount || 0);
         setBookingCount(homeData.quickAccess?.bookingCount || 0);
         setActiveBooking(homeData.activeBooking || null);
@@ -136,14 +104,13 @@ export const HomeDashboardScreen = () => {
     }
   }, [updateUser]);
 
-  useEffect(() => {
-    loadHomeData();
-  }, [loadHomeData]);
-  
-
   useFocusEffect(
     useCallback(() => {
       loadHomeData();
+      const interval = setInterval(() => {
+        loadHomeData();
+      }, 8000);
+      return () => clearInterval(interval);
     }, [loadHomeData])
   );
 
@@ -205,6 +172,36 @@ export const HomeDashboardScreen = () => {
             </TouchableOpacity>
           </View>
         ) : null}
+
+        {/* Dynamic Marketing Campaign Banners */}
+        {campaigns.length > 0 && (
+          <View style={styles.campaignsContainer}>
+            <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={styles.campaignsScroll}>
+              {campaigns.map((camp) => (
+                <View key={camp.id} style={styles.campaignCard}>
+                  <View style={styles.campaignBadge}>
+                    <Icon name="tag" size={12} color="#D4AF37" />
+                    <Text style={styles.campaignBadgeText}>{camp.category || 'SPECIAL OFFER'}</Text>
+                  </View>
+                  <Text style={styles.campaignTitle}>{camp.title}</Text>
+                  <Text style={styles.campaignMessage} numberOfLines={2}>{camp.message}</Text>
+                  {camp.expiresAt ? (
+                    <Text style={styles.campaignValidity}>
+                      Valid until {new Date(camp.expiresAt).toLocaleDateString()}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        {campaigns.length === 0 && !campaignsAvailable && (
+          <View style={styles.campaignsContainer}>
+            <Text style={styles.campaignMessage}>
+              {t('campaignsUnavailable', 'Offers are temporarily unavailable. Try again later.')}
+            </Text>
+          </View>
+        )}
 
         {hasActiveBooking ? (
           <>
@@ -791,5 +788,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.primary,
     fontWeight: 'bold',
+  },
+  campaignsContainer: {
+    marginVertical: 12,
+  },
+  campaignsScroll: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  campaignCard: {
+    width: 300,
+    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.25)',
+  },
+  campaignBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  campaignBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D4AF37',
+    letterSpacing: 0.8,
+  },
+  campaignTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  campaignMessage: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+  },
+  campaignValidity: {
+    marginTop: 8,
+    color: theme.colors.textSecondary,
+    fontSize: 11,
   },
 });

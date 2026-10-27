@@ -31,7 +31,7 @@ export const SessionReminderScreen = () => {
         }
       }).catch(() => {});
     }
-  }, [route.params?.bookingId]);
+  }, [route.params?.bookingId, companionName, sessionTime, venue]);
 
     const SAFETY_TIPS = [
     { icon: 'shield-account-outline', text: t('safetyTip.public', 'Meet in a public place with good lighting.') },

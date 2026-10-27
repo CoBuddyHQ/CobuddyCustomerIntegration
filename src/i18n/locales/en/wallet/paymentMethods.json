@@ -4,7 +4,7 @@
   "defaultBadge": "Default",
   "addCard": "Add New Card",
   "modalTitle": "Add UPI ID",
-  "trustText": "End-to-end encrypted with AES-256",
+  "trustText": "No payment details are stored by this app. Secure tokenization is not configured.",
   "modalLabel": "Enter your UPI ID",
   "modalVerify": "Verify & Add",
   "secureTitle": "Secure & Encrypted",

@@ -15,7 +15,7 @@ export const IncomingCallScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'IncomingCallScreen'>>();
-  const callerName = route.params?.callerName || 'Elena Vasquez';
+  const callerName = route.params?.callerName || 'Companion';
 
   // Pulse animation for the caller avatar
   const pulseAnim = useRef(new Animated.Value(1)).current;

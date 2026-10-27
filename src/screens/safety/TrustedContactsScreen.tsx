@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Switch,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +39,7 @@ export const TrustedContactsScreen = () => {
   const { t } = useTranslation(['onboarding']);
   const completeOnboarding = useAuthStore(selectCompleteOnboarding);
   const isFromSettings = route.params?.fromSettings;
-  const { trustedContacts, addTrustedContact, removeTrustedContact, updateTrustedContact } = useSafetyStore();
+  const { trustedContacts, addTrustedContact, setTrustedContacts, removeTrustedContact } = useSafetyStore();
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
@@ -67,35 +67,33 @@ export const TrustedContactsScreen = () => {
   };
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [contactsLoadError, setContactsLoadError] = useState(false);
+
+  const loadContacts = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const contacts = await safetyApi.getTrustedContacts();
+      if (!Array.isArray(contacts)) throw new Error('Invalid trusted-contact response.');
+      setTrustedContacts(contacts);
+      setContactsLoadError(false);
+    } catch {
+      setTrustedContacts([]);
+      setContactsLoadError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setTrustedContacts]);
 
   React.useEffect(() => {
-    const fetchContacts = async () => {
-      setIsLoading(true);
-      try {
-        const contacts = await safetyApi.getTrustedContacts();
-        if (contacts && Array.isArray(contacts)) {
-          // Sync with store
-          contacts.forEach(c => {
-            if (!trustedContacts.some(tc => tc.id === c.id)) {
-              addTrustedContact(c);
-            }
-          });
-        }
-      } catch (err) {
-        // Fallback gracefully to local store
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchContacts();
-  }, []);
+    loadContacts();
+  }, [loadContacts]);
 
   const removeContact = async (id: string) => {
-    removeTrustedContact(id);
     try {
       await safetyApi.deleteTrustedContact(id);
+      removeTrustedContact(id);
     } catch {
-      // Ignored for graceful UI
+      Alert.alert('Could not remove contact', 'The server did not confirm the change. Your saved contact is still shown.');
     }
   };
 
@@ -118,15 +116,17 @@ export const TrustedContactsScreen = () => {
         phone: cleanPhone,
         relationship: newRel,
       });
+      if (!created?.id) throw new Error('The server did not confirm the saved contact.');
 
       addTrustedContact({
-        id: created.id || Date.now().toString(),
+        id: created.id,
         name: created.name || newName.trim(),
         phone: created.phone || cleanPhone,
         relationship: created.relationship || newRel,
       });
 
       setShowAddSheet(false);
+      setContactsLoadError(false);
       setNewName('');
       setNewPhone('');
       setNewRel('Friend');
@@ -138,7 +138,8 @@ export const TrustedContactsScreen = () => {
     }
   };
 
-  const isValid = trustedContacts.length > 0;
+  const visibleContacts = isLoading || contactsLoadError ? [] : trustedContacts;
+  const isValid = trustedContacts.length > 0 && !isLoading && !contactsLoadError;
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
@@ -187,7 +188,19 @@ export const TrustedContactsScreen = () => {
           </View>
 
           {/* Contacts List */}
-          {trustedContacts.map((contact) => (
+          {isLoading ? <Text style={styles.subtitle}>Loading your saved contacts…</Text> : null}
+          {contactsLoadError ? (
+            <View style={styles.loadErrorCard}>
+              <Text style={styles.subtitle}>Saved contacts could not be verified. Retry before managing the server list.</Text>
+              <TouchableOpacity onPress={loadContacts} style={styles.retryButton} accessibilityRole="button" disabled={isLoading}>
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {!isLoading && !contactsLoadError && visibleContacts.length === 0 ? (
+            <Text style={styles.subtitle}>No saved contacts yet.</Text>
+          ) : null}
+          {visibleContacts.map((contact) => (
             <View key={contact.id} style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderLeft}>
@@ -208,18 +221,14 @@ export const TrustedContactsScreen = () => {
                 <Text style={styles.cardPhone}>{contact.maskedPhone || (contact.phone ? '******' + contact.phone.slice(-4) : '')}</Text>
               </View>
               <View style={styles.toggleRow}>
-                <Text style={styles.toggleText}>{t('contacts.toggleLocation', 'Let this contact see my live-location during SOS.')}</Text>
-                <Switch 
-                  value={contact.shareLocation ?? false}
-                  onValueChange={(val) => updateTrustedContact(contact.id, { shareLocation: val })}
-                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                  thumbColor={theme.colors.surface}
-                />
+                <Text style={styles.toggleText}>
+                  {t('contacts.locationSharingUnavailable', 'Location sharing with trusted contacts is not configured in this build.')}
+                </Text>
               </View>
             </View>
           ))}
           
-          {trustedContacts.length < 3 && (
+          {!isLoading && !contactsLoadError && trustedContacts.length < 3 && (
             <TouchableOpacity onPress={() => setShowAddSheet(true)} style={styles.addButton} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('contacts.a11yAddContact', 'Add new trusted contact')}>
               <Icon name="plus-circle-outline" size={20} color={theme.colors.primary} />
               <Text style={styles.addButtonText}>{t('contacts.btn_add')}</Text>
@@ -365,6 +374,16 @@ const styles = StyleSheet.create({
   },
   privacyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   privacyText: { fontSize: 12, color: theme.colors.textSecondary, textAlign: 'center' },
+  loadErrorCard: {
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    marginBottom: 16,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16,
+  },
+  retryButton: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 18, backgroundColor: theme.colors.primary },
+  retryButtonText: { color: theme.colors.background, fontWeight: '700' },
 });
 
 const sheet = StyleSheet.create({

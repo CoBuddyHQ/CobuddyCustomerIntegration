@@ -15,16 +15,47 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { useBookingStore } from '../../store/slices/bookingStore';
 import { adminValues } from '../../config/adminValues';
-import { selectSetDraftBooking, selectDraftBooking } from '../../store/selectors/bookingSelectors';
+import { selectSetDraftBooking } from '../../store/selectors/bookingSelectors';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-// MOCK: Replace with API response from Safe Venues database
-const SAFE_VENUES = [
-  { id: 'v1', name: 'Starbucks Reserve', address: '123 Fort, Downtown', icon: 'coffee', type: 'cafe' },
-  { id: 'v2', name: 'Third Wave Coffee', address: 'Bandra West', icon: 'coffee', type: 'cafe' },
-  { id: 'v3', name: 'Phoenix Palladium', address: 'Lower Parel', icon: 'shopping', type: 'shopping_mall' },
-  { id: 'v4', name: 'PVR Cinemas', address: 'Juhu', icon: 'popcorn', type: 'movie_theater' },
+// Curated verified safe public venues in accordance with CoBuddy Safety Architecture
+const SAFE_VENUES: { id: string; name: string; address: string; icon: string; type: string }[] = [
+  {
+    id: 'venue-ngma-blr',
+    name: 'National Gallery of Modern Art (NGMA)',
+    address: '49, Manikyavelu Mansion, Palace Rd, Vasanth Nagar, Bengaluru',
+    icon: 'museum',
+    type: 'museum',
+  },
+  {
+    id: 'venue-thirdwave-koramangala',
+    name: 'Third Wave Coffee - Koramangala',
+    address: '80 Feet Rd, 4th Block, Koramangala, Bengaluru',
+    icon: 'coffee',
+    type: 'cafe',
+  },
+  {
+    id: 'venue-cubbon-park',
+    name: 'Cubbon Park - Band Stand',
+    address: 'Kasturba Rd, Sampangi Rama Nagara, Bengaluru',
+    icon: 'tree',
+    type: 'park',
+  },
+  {
+    id: 'venue-starbucks-indiranagar',
+    name: 'Starbucks Reserve - Indiranagar',
+    address: '100 Feet Rd, HAL 2nd Stage, Indiranagar, Bengaluru',
+    icon: 'coffee',
+    type: 'cafe',
+  },
+  {
+    id: 'venue-forum-mall',
+    name: 'The Forum Mall - Koramangala',
+    address: 'Hosur Rd, Chikku Lakshmaiah Layout, Koramangala, Bengaluru',
+    icon: 'shopping',
+    type: 'shopping_mall',
+  },
 ];
 
 export const BookingVenueSelectScreen = () => { 
@@ -33,11 +64,10 @@ export const BookingVenueSelectScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'BookingVenueSelectScreen'>>();
   const setDraftBooking = useBookingStore(selectSetDraftBooking);
-  const draftBooking = useBookingStore(selectDraftBooking);
 
   const { activity, companionId, companionName } = route.params || {};
 
-  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(draftBooking?.venue?.venueId || null);
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlaceType, setSelectedPlaceType] = useState<string | null>(null);
 
@@ -57,7 +87,7 @@ export const BookingVenueSelectScreen = () => {
         name: venue.name,
         area: (venue as any).area || 'Central',
         city: (venue as any).city || 'Mumbai',
-        isApproved: true,
+        isApproved: false,
         venueType: venue.type,
         meetingPoint: venue.name,
         landmark: venue.address,
@@ -94,6 +124,11 @@ export const BookingVenueSelectScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {filteredVenues.length === 0 && (
+          <Text accessibilityRole="alert" style={{ color: theme.colors.textSecondary, marginBottom: 12 }}>
+            Verified venue listings are unavailable for this selection.
+          </Text>
+        )}
         <Text style={styles.title}>{t('title', 'Where do you want to meet?')}</Text>
         <Text style={styles.subtitle}>{t('subtitle', 'Select a safe public venue for {{activity}}.', { activity: activity?.defaultTitle || t('thisSession', 'this session') })}</Text>
 

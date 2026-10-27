@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -13,10 +14,10 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { useBookingStore } from '../../store/slices/bookingStore';
-import { ACTIVITIES } from '../../services/mock/activities.mock';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { discoveryApi } from '../../services/api';
+import type { ActivityOption } from '../../services/api/discovery.api';
 
 export const BookingActivitySelectScreen = () => { 
   const { t } = useTranslation('booking.activitySelect');
@@ -26,34 +27,47 @@ export const BookingActivitySelectScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const { setDraftBooking, clearDraftBooking } = useBookingStore();
 
-  const defaultActivities = ACTIVITIES || [];
-  const [activitiesList, setActivitiesList] = React.useState<any[]>(defaultActivities);
+  const [activitiesList, setActivitiesList] = React.useState<ActivityOption[]>([]);
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const isMounted = React.useRef(false);
 
   React.useEffect(() => {
-    let isMounted = true;
-    discoveryApi.getActivities()
-      .then((data) => {
-        if (isMounted && Array.isArray(data) && data.length > 0) {
-          setActivitiesList(data);
-        }
-      })
-      .catch((err) => {
-        console.warn('[BookingActivitySelectScreen] Failed to fetch activities from API, using fallback:', err?.message || err);
-      });
-    return () => { isMounted = false; };
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
   }, []);
+
+  const loadActivities = React.useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(false);
+    setSelectedActivityId(null);
+    try {
+      const data = await discoveryApi.getActivities();
+      if (isMounted.current) setActivitiesList(data);
+    } catch {
+      if (isMounted.current) {
+        setActivitiesList([]);
+        setLoadError(true);
+      }
+    } finally {
+      if (isMounted.current) setIsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadActivities();
+  }, [loadActivities]);
 
   const handleNext = () => {
     if (!selectedActivityId) return;
     
-    const selectedActivity = activitiesList.find(a => a.id === selectedActivityId) || (defaultActivities && defaultActivities.find(a => a.id === selectedActivityId));
-    if (selectedActivity) {
-      const activityTitle = selectedActivity.titleKey 
-        ? (t(selectedActivity.titleKey, selectedActivity.defaultTitle) as string) 
-        : (selectedActivity.defaultTitle || selectedActivity.name || 'Activity');
-      setDraftBooking({ activity: activityTitle });
-    }
+    const selectedActivity = activitiesList.find(a => a.id === selectedActivityId);
+    if (!selectedActivity) return;
+    const activityTitle = selectedActivity.titleKey
+      ? (t(selectedActivity.titleKey, selectedActivity.defaultTitle || selectedActivity.name || 'Activity') as string)
+      : (selectedActivity.defaultTitle || selectedActivity.name || 'Activity');
+    setDraftBooking({ activity: activityTitle });
     
     navigation.navigate('BookingVenueSelectScreen', {
       activity: selectedActivity,
@@ -84,14 +98,30 @@ export const BookingActivitySelectScreen = () => {
         <Text style={styles.subtitle}>{t('subtitle', 'Select an activity for your booking request.')}</Text>
 
         <View style={styles.listContainer}>
-          {activitiesList.map((activity) => {
+          {isLoading ? (
+            <View style={styles.statusPanel}>
+              <ActivityIndicator color={theme.colors.primary} />
+              <Text style={styles.statusText}>{t('loadingActivities', 'Loading activities…')}</Text>
+            </View>
+          ) : loadError ? (
+            <View style={styles.statusPanel}>
+              <Text style={styles.statusText}>{t('activitiesUnavailable', 'Activities could not be loaded. Check your connection and try again.')}</Text>
+              <TouchableOpacity onPress={loadActivities} style={styles.retryBtn} accessibilityRole="button">
+                <Text style={styles.retryText}>{t('retry', 'Retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : activitiesList.length === 0 ? (
+            <View style={styles.statusPanel}>
+              <Text style={styles.statusText}>{t('noActivities', 'No activities are available right now.')}</Text>
+            </View>
+          ) : activitiesList.map((activity) => {
             const isSelected = selectedActivityId === activity.id;
             return (
               <TouchableOpacity
                 key={activity.id}
                 style={[styles.card, isSelected && styles.cardSelected]}
                 onPress={() => setSelectedActivityId(activity.id)}
-                activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('a11yPrice', 'Price: {{price}}', { price: activity.price })}
+                activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={activity.defaultTitle || activity.name || t('activity', 'Activity')}
               >
                 <View style={[styles.iconWrap, isSelected && styles.iconWrapSelected]}>
                   <Icon 
@@ -103,16 +133,14 @@ export const BookingActivitySelectScreen = () => {
                 
                 <View style={styles.cardContent}>
                   <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>
-                    {activity.titleKey ? (t(activity.titleKey, activity.defaultTitle) as string) : (activity.defaultTitle || activity.name)}
+                    {activity.titleKey ? (t(activity.titleKey, activity.defaultTitle || activity.name || 'Activity') as string) : (activity.defaultTitle || activity.name || t('activity', 'Activity'))}
                   </Text>
-                  <Text style={[styles.cardDesc, isSelected && styles.cardDescSelected]}>
-                    {activity.descKey ? (t(activity.descKey, activity.defaultDesc) as string) : (activity.defaultDesc || activity.description || 'Activity session')}
-                  </Text>
+                  {(activity.descKey || activity.defaultDesc) ? (
+                    <Text style={[styles.cardDesc, isSelected && styles.cardDescSelected]}>
+                      {activity.descKey ? (t(activity.descKey, activity.defaultDesc || '') as string) : activity.defaultDesc}
+                    </Text>
+                  ) : null}
                 </View>
-                
-                <Text style={[styles.cardPrice, isSelected && styles.cardPriceSelected]}>
-                  {activity.price || `₹${activity.basePrice || 500}/hr`}
-                </Text>
               </TouchableOpacity>
             );
           })}
@@ -122,12 +150,12 @@ export const BookingActivitySelectScreen = () => {
       {/* Bottom Action Bar */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={[styles.nextBtn, !selectedActivityId && styles.nextBtnDisabled]}
-          disabled={!selectedActivityId}
+          style={[styles.nextBtn, (!selectedActivityId || isLoading || loadError || activitiesList.length === 0) && styles.nextBtnDisabled]}
+          disabled={!selectedActivityId || isLoading || loadError || activitiesList.length === 0}
           onPress={handleNext}
           activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11yContinue', 'Continue')}
         >
-          <Text style={[styles.nextBtnText, !selectedActivityId && styles.nextBtnTextDisabled]}>{t('continue', 'Continue')}</Text>
+          <Text style={[styles.nextBtnText, (!selectedActivityId || isLoading || loadError || activitiesList.length === 0) && styles.nextBtnTextDisabled]}>{t('continue', 'Continue')}</Text>
           <Icon 
             name="arrow-right" 
             size={20} 
@@ -188,6 +216,28 @@ const styles = StyleSheet.create({
   listContainer: {
     gap: 16,
   },
+  statusPanel: {
+    alignItems: 'center',
+    gap: 12,
+    padding: 24,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  statusText: {
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  retryBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: theme.colors.primary,
+  },
+  retryText: { color: theme.colors.background, fontWeight: '700' },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,14 +283,6 @@ const styles = StyleSheet.create({
   },
   cardDescSelected: {
     color: 'rgba(212, 175, 55, 0.8)',
-  },
-  cardPrice: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: theme.colors.textPrimary,
-  },
-  cardPriceSelected: {
-    color: theme.colors.primary,
   },
   bottomBar: {
     padding: 24,
