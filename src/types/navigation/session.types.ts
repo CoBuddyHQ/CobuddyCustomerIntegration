@@ -5,5 +5,5 @@ export interface SessionStackParamList {
   SessionCompleteScreen: { bookingId?: string; companionId?: string; companionName?: string; sessionId?: string; sessionStatus?: string } | undefined;
   PostSessionFeedbackScreen: { companionId?: string; companionName?: string; sessionId?: string } | undefined;
   TipGratuityScreen: { companionId?: string; companionName?: string } | undefined;
-  CompanionReviewScreen: { bookingId?: string; companionId?: string; companionName?: string } | undefined;
+  CompanionReviewScreen: { bookingId?: string; companionId?: string; companionName?: string; sessionId?: string } | undefined;
 };

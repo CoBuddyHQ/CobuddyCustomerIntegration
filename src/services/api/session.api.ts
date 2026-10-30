@@ -39,6 +39,12 @@ export const getCurrentSession = async (): Promise<Session | null> => {
   return res.data;
 };
 
+// Booking-scoped status includes terminal sessions and is protected by customer ownership.
+export const getSessionForBooking = async (bookingId: string): Promise<Session | null> => {
+  const res = await apiClient.get<Session | null>(`/sessions/booking/${encodeURIComponent(bookingId)}`);
+  return res.data;
+};
+
 // ─── Get session by ID ────────────────────────────────────────────────────────
 export const getSessionById = async (sessionId: string): Promise<Session | null> => {
   try {

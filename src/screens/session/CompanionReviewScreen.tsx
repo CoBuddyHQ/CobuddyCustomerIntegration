@@ -53,13 +53,26 @@ export const CompanionReviewScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.root} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
       
       <View style={styles.header}>
-        <View style={styles.iconBtnPlaceholder} />
+        <TouchableOpacity 
+          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] })} 
+          style={styles.iconBtn} 
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <Icon name="close" size={24} color={theme.colors.textPrimary} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('headerTitle', 'Leave a Review')}</Text>
-        <View style={styles.iconBtnPlaceholder} />
+        <TouchableOpacity 
+          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] })} 
+          accessibilityRole="button"
+          accessibilityLabel="Skip"
+        >
+          <Text style={styles.skipBtn}>{t('skipBtn', 'Skip')}</Text>
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView 
@@ -178,7 +191,8 @@ export const CompanionReviewScreen = () => {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 60, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  iconBtnPlaceholder: { width: 40 },
+  iconBtn: { padding: 8, backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border },
+  skipBtn: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textSecondary, paddingHorizontal: 8 },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary },
   content: { padding: 20 },
   ratingSection: { alignItems: 'center', marginVertical: 24 },
@@ -198,7 +212,7 @@ const styles = StyleSheet.create({
   inputGroup: { marginBottom: 20 },
   inputLabel: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 0.5, marginBottom: 8 },
   textArea: { backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, padding: 16, color: theme.colors.textPrimary, fontSize: 15, minHeight: 100 },
-  footer: { padding: 20, paddingBottom: 32, backgroundColor: theme.colors.background, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  footer: { padding: 16, backgroundColor: theme.colors.background, borderTopWidth: 1, borderTopColor: theme.colors.border },
   submitBtn: { backgroundColor: theme.colors.primary, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center' },
   submitBtnDisabled: { opacity: 0.5 },
   submitBtnText: { color: theme.colors.background, fontSize: 16, fontWeight: 'bold' }

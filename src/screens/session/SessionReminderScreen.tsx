@@ -101,9 +101,16 @@ export const SessionReminderScreen = () => {
         <Text style={styles.bottomHint}>{t('bottomHint', 'Only confirm arrival when you are physically at the venue.')}</Text>
         <TouchableOpacity 
           style={styles.primaryBtn} 
-          onPress={() => navigation.navigate('ArrivalCheckInScreen')} accessibilityRole="button" accessibilityLabel={t('a11ySimulateArrivalAtVenue', 'Simulate Arrival at Venue')}
+          onPress={() => navigation.navigate('ArrivalCheckInScreen', {
+            bookingId: route.params?.bookingId,
+            companionId: route.params?.companionId,
+            companionName,
+            venueName: venue,
+          } as any)} 
+          accessibilityRole="button" 
+          accessibilityLabel="Check-in at Venue"
         >
-          <Text style={styles.primaryBtnText}>{t('primaryBtnText', 'Simulate Arrival at Venue')}</Text>
+          <Text style={styles.primaryBtnText}>Check-in at Venue</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

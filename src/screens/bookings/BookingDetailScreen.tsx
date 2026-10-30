@@ -70,12 +70,21 @@ export const BookingDetailScreen = () => {
     }, [bookingId])
   );
 
-  const rawStatus = apiBooking?.status || route.params?.status || 'pending';
-  const displayStatus = rawStatus === 'accepted' ? 'Accepted' 
-    : rawStatus === 'counter_proposed' || rawStatus === 'countered' ? 'Counter-Proposed'
-    : rawStatus === 'declined' ? 'Declined'
-    : rawStatus === 'completed' ? 'Completed'
-    : rawStatus === 'cancelled' ? 'Cancelled'
+  const rawStatus = (apiBooking?.status || route.params?.status || 'pending').toLowerCase().trim();
+  const isAccepted = ['accepted', 'confirmed'].includes(rawStatus);
+  const isInProgress = ['in_progress', 'active', 'ongoing', 'started'].includes(rawStatus);
+  const isCompleted = ['completed', 'finished', 'history'].includes(rawStatus);
+  const isDeclined = ['declined', 'rejected'].includes(rawStatus);
+  const isCancelled = ['cancelled', 'canceled'].includes(rawStatus);
+  const isCounter = ['counter_proposed', 'countered'].includes(rawStatus);
+  const isPending = ['pending', 'awaiting_reply', 'requested'].includes(rawStatus);
+
+  const displayStatus = isInProgress ? 'In Progress'
+    : isAccepted ? 'Accepted'
+    : isCompleted ? 'Completed'
+    : isCounter ? 'Counter-Proposed'
+    : isDeclined ? 'Declined'
+    : isCancelled ? 'Cancelled'
     : 'Awaiting Reply';
 
   const data = apiBooking
@@ -124,7 +133,7 @@ export const BookingDetailScreen = () => {
 
   const renderStepper = () => {
     if (!data) return null;
-    if (data.status === 'Declined') {
+    if (isDeclined || data.status === 'Declined') {
       return (
         <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.error, marginTop: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
@@ -140,12 +149,12 @@ export const BookingDetailScreen = () => {
 
     const steps = [
       { label: t('timeline.requested', 'Requested'), time: data.createdAt },
-      { label: t('timeline.accepted', 'Accepted'), time: (data.status === 'Accepted' || data.status === 'Completed') ? (data.acceptedAt || 'Confirmed') : '--' },
-      { label: t('timeline.meetup', 'Meetup'), time: data.status === 'Completed' ? `${data.date}` : '--' }
+      { label: t('timeline.accepted', 'Accepted'), time: (isAccepted || isInProgress || isCompleted) ? (data.acceptedAt || 'Confirmed') : '--' },
+      { label: t('timeline.meetup', 'Meetup'), time: (isInProgress || isCompleted) ? (isInProgress ? 'In Progress' : `${data.date}`) : '--' }
     ];
     let activeIndex = 0;
-    if (data.status === 'Accepted') activeIndex = 1;
-    if (data.status === 'Completed' || data.status === 'History') activeIndex = 2;
+    if (isAccepted) activeIndex = 1;
+    if (isInProgress || isCompleted) activeIndex = 2;
 
     return (
       <View style={styles.stepperContainer}>
@@ -178,20 +187,41 @@ export const BookingDetailScreen = () => {
 
   const renderActionButtons = () => {
     if (!data) return null;
-    if (data.status === 'Awaiting Reply' || data.status === 'Pending') {
+
+    if (isInProgress) {
       return (
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => navigation.navigate('CancelBookingScreen', { bookingId: data.id })} accessibilityRole="button" accessibilityLabel={t('a11yCancelRequest', 'Cancel Request')}>
-            <Text style={styles.secondaryBtnText}>{t('cancelRequest', 'Cancel Request')}</Text>
+        <View style={styles.actionCol}>
+          <TouchableOpacity 
+            style={styles.primaryBtn} 
+            onPress={() => {
+              const rootNav = (navigation.getParent() || navigation) as any;
+              rootNav.navigate('LiveSessionStack', {
+                screen: 'ActiveSessionScreen',
+                params: { companionId: data.companionId, companionName: data.companionName, bookingId: data.id } as any,
+              });
+            }} 
+            accessibilityRole="button" 
+            accessibilityLabel="Enter Live Session"
+          >
+            <Icon name="play-circle-outline" size={20} color={theme.colors.background} />
+            <Text style={styles.primaryBtnText}>Enter Live Session</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.primaryBtn, { flex: 1 }]} onPress={() => navigation.navigate('ModifyBookingScreen', { bookingId: data.id })} accessibilityRole="button" accessibilityLabel={t('a11yModify', 'Modify')}>
-            <Text style={styles.primaryBtnText}>{t('modify', 'Modify')}</Text>
-          </TouchableOpacity>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={[styles.secondaryBtn, { flex: 1, backgroundColor: 'rgba(212, 175, 55, 0.1)', borderColor: theme.colors.primary }]} onPress={handleMessage} accessibilityRole="button" accessibilityLabel={t('a11yMessage', 'Message')}>
+              <Icon name="chat" size={18} color={theme.colors.primary} />
+              <Text style={[styles.secondaryBtnText, { color: theme.colors.primary, marginLeft: 4 }]}>{t('message', 'Message')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => navigation.navigate('SafetySupportStack', { screen: 'SafetyHubScreen' })} accessibilityRole="button">
+              <Icon name="shield-alert-outline" size={18} color={theme.colors.error} />
+              <Text style={[styles.secondaryBtnText, { color: theme.colors.error, marginLeft: 4 }]}>Emergency / SOS</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
     
-    if (data.status === 'Accepted') {
+    if (isAccepted) {
       const isPaid = data.paymentStatus === 'completed';
 
       return (
@@ -238,7 +268,7 @@ export const BookingDetailScreen = () => {
       );
     }
 
-    if (data.status === 'Declined') {
+    if (isDeclined || data.status === 'Declined') {
       return (
         <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('DiscoverTab')} accessibilityRole="button" accessibilityLabel={t('a11yFindAnotherCompanion', 'Find Another Companion')}>
           <Icon name="account-search" size={20} color={theme.colors.background} />
@@ -247,7 +277,7 @@ export const BookingDetailScreen = () => {
       );
     }
 
-    if (data.status === 'Completed' || data.status === 'History') {
+    if (isCompleted || data.status === 'Completed' || data.status === 'History') {
       return (
         <View style={styles.actionCol}>
           <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('LiveSessionStack', {
@@ -280,12 +310,25 @@ export const BookingDetailScreen = () => {
       );
     }
 
-    if (data.status === 'Cancelled') {
+    if (data.status === 'Cancelled' || isCancelled) {
       return (
         <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('DiscoverTab')} accessibilityRole="button">
           <Icon name="account-search" size={20} color={theme.colors.background} />
           <Text style={styles.primaryBtnText}>Book Another Companion</Text>
         </TouchableOpacity>
+      );
+    }
+
+    if (isPending || data.status === 'Awaiting Reply' || data.status === 'Pending') {
+      return (
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => navigation.navigate('CancelBookingScreen', { bookingId: data.id })} accessibilityRole="button" accessibilityLabel={t('a11yCancelRequest', 'Cancel Request')}>
+            <Text style={styles.secondaryBtnText}>{t('cancelRequest', 'Cancel Request')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.primaryBtn, { flex: 1 }]} onPress={() => navigation.navigate('ModifyBookingScreen', { bookingId: data.id })} accessibilityRole="button" accessibilityLabel={t('a11yModify', 'Modify')}>
+            <Text style={styles.primaryBtnText}>{t('modify', 'Modify')}</Text>
+          </TouchableOpacity>
+        </View>
       );
     }
     
@@ -351,7 +394,7 @@ export const BookingDetailScreen = () => {
         </View>
 
         {/* Live Session Pass Code Card for Accepted/Upcoming sessions */}
-        {data.sessionPassCode && (data.status === 'Accepted' || data.status === 'in_progress') && (
+        {data.sessionPassCode && (isAccepted || isInProgress || data.status === 'Accepted' || data.status === 'In Progress') && (
           <View style={styles.passCodeCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <Icon name="shield-key" size={22} color={theme.colors.primary} />

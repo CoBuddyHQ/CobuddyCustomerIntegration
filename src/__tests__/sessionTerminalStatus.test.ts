@@ -1,4 +1,4 @@
-import { isConfirmedTerminalSession } from '../utils/sessionTerminalStatus';
+import { isConfirmedCompletedStatus, isConfirmedTerminalSession, isSessionForBooking } from '../utils/sessionTerminalStatus';
 import type { Session } from '../services/api/session.api';
 
 const session = (status: Session['status'], id = 'session-1'): Session => ({
@@ -12,4 +12,10 @@ describe('confirmed customer session termination', () => {
   it('does not treat a missing read as completion', () => expect(isConfirmedTerminalSession(null, 'session-1')).toBe(false));
   it('does not treat a different current session as completion', () => expect(isConfirmedTerminalSession(session('active', 'other'), 'session-1')).toBe(false));
   it('does not treat an ongoing session as completion', () => expect(isConfirmedTerminalSession(session('active'), 'session-1')).toBe(false));
+  it('rejects a session belonging to another booking', () => expect(isSessionForBooking(session('active'), 'booking-2')).toBe(false));
+  it('accepts only an explicitly completed session for the success screen', () => {
+    expect(isConfirmedCompletedStatus('completed')).toBe(true);
+    expect(isConfirmedCompletedStatus('cancelled')).toBe(false);
+    expect(isConfirmedCompletedStatus(undefined)).toBe(false);
+  });
 });

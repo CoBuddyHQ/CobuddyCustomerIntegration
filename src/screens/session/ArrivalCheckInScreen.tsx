@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { sessionApi, bookingApi } from '../../services/api';
+import { isSessionForBooking } from '../../utils/sessionTerminalStatus';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -29,7 +30,7 @@ export const ArrivalCheckInScreen = () => {
     const loadSession = async () => {
       if (!bookingId) return;
       const [sessionResult, bookingResult] = await Promise.allSettled([
-        sessionApi.getCurrentSession(),
+        sessionApi.getSessionForBooking(bookingId),
         bookingApi.getBooking(bookingId),
       ]);
       if (!isMounted) return;
@@ -39,7 +40,7 @@ export const ArrivalCheckInScreen = () => {
       }
       if (sessionResult.status === 'fulfilled') {
         const session = sessionResult.value;
-        if (session && session.bookingId === bookingId && session.passCode) {
+        if (isSessionForBooking(session, bookingId) && session.passCode) {
           setPassCode(session.passCode);
           setCustomerSessionId(session.id);
           setSessionStatus(session.status);
@@ -51,39 +52,73 @@ export const ArrivalCheckInScreen = () => {
     return () => { isMounted = false; };
   }, [bookingId]);
 
-  // ── Auto-transition to ActiveSessionScreen when companion starts session ──
+  const hasNavigatedRef = React.useRef(false);
+
+  // ── Auto-transition to ActiveSessionScreen or SessionCompleteScreen ──
   useEffect(() => {
+    if (hasNavigatedRef.current) return;
     if (sessionStatus === 'active' || sessionStatus === 'extending') {
+      hasNavigatedRef.current = true;
       navigation.replace('ActiveSessionScreen', {
         bookingId,
         companionId,
         companionName,
         sessionId: customerSessionId,
       });
+    } else if (sessionStatus === 'completed' || sessionStatus === 'ended_early') {
+      hasNavigatedRef.current = true;
+      navigation.replace('SessionCompleteScreen', {
+        bookingId,
+        companionId,
+        companionName,
+        sessionId: customerSessionId,
+        sessionStatus,
+      });
+    } else if (sessionStatus === 'cancelled') {
+      hasNavigatedRef.current = true;
+      navigation.replace('BookingDetailScreen', { bookingId, status: sessionStatus });
     }
   }, [sessionStatus, customerSessionId, bookingId, companionId, companionName, navigation]);
 
-  // ── Background Live Polling: Instantly detect session start ────────────────
+  // ── Background Live Polling: Instantly detect session start / completion ────
   useEffect(() => {
-    if (!hasArrived || !bookingId) return;
+    if (!bookingId || hasNavigatedRef.current) return;
+    let isPolling = false;
     const pollId = setInterval(async () => {
+      if (isPolling || hasNavigatedRef.current) {
+        if (hasNavigatedRef.current) clearInterval(pollId);
+        return;
+      }
+      isPolling = true;
       try {
-        const session = await sessionApi.getCurrentSession();
-        if (session && (session.status === 'active' || session.status === 'extending')) {
-          setSessionStatus(session.status);
-          setCustomerSessionId(session.id);
+        const session = customerSessionId
+          ? await sessionApi.getSessionById(customerSessionId)
+          : await sessionApi.getSessionForBooking(bookingId);
+        if (isSessionForBooking(session, bookingId)) {
+          if (['active', 'extending', 'completed', 'ended_early', 'cancelled'].includes(session.status)) {
+            setSessionStatus(session.status);
+            setCustomerSessionId(session.id);
+            clearInterval(pollId);
+          } else if (session.status === 'checked_in') {
+            setHasArrived(true);
+            setCustomerSessionId(session.id);
+          }
         }
-      } catch {}
-    }, 1000);
+      } catch {
+        // Keep the last confirmed state and retry on the next poll.
+      } finally {
+        isPolling = false;
+      }
+    }, 1500);
     return () => clearInterval(pollId);
-  }, [hasArrived, bookingId]);
+  }, [hasArrived, bookingId, customerSessionId]);
 
   const refreshSessionStatus = async () => {
     if (isRefreshingSession || !bookingId) return;
     setIsRefreshingSession(true);
     try {
-      const session = await sessionApi.getCurrentSession();
-      if (!session || session.bookingId !== bookingId) {
+      const session = await sessionApi.getSessionForBooking(bookingId);
+      if (!isSessionForBooking(session, bookingId)) {
         setSessionStatus(null);
         return;
       }

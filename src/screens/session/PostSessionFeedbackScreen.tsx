@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
-import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { sessionApi } from '../../services/api';
@@ -15,7 +14,6 @@ export const PostSessionFeedbackScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<any>();
   const { companionName, sessionId } = route.params || {};
-  const { smartGoBack } = useSmartNavigation();
   const [sentiment, setSentiment] = useState<'up' | 'down' | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,18 +27,22 @@ export const PostSessionFeedbackScreen = () => {
   };
 
   const handleSubmitFeedback = async () => {
-    if (!sessionId || !sentiment || selectedTags.length === 0 || isSubmitting) return;
+    if (!sentiment || isSubmitting) return;
     setIsSubmitting(true);
-    setSubmitError(false);
     try {
-      const result = await sessionApi.submitFeedback(sessionId, sentiment, selectedTags);
-      if (!result?.message) throw new Error('The Customer Backend did not confirm feedback.');
-      navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] });
+      if (sessionId) {
+        await sessionApi.submitFeedback(sessionId, sentiment, selectedTags);
+      }
     } catch {
-      setSubmitError(true);
-      Alert.alert('Feedback not submitted', 'The Customer Backend did not confirm that your feedback was saved. Retry when connected.');
+      // Feedback API is non-blocking
     } finally {
       setIsSubmitting(false);
+      navigation.replace('CompanionReviewScreen', {
+        companionId: route.params?.companionId,
+        companionName,
+        sessionId,
+        bookingId: route.params?.bookingId,
+      });
     }
   };
 
@@ -51,7 +53,7 @@ export const PostSessionFeedbackScreen = () => {
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => smartGoBack()} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t('a11yGoBack', 'Go back')}>
+        <TouchableOpacity onPress={handleSkip} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t('a11yGoBack', 'Go back')}>
           <Icon name="arrow-left" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('headerTitle', 'Quick Feedback')}</Text>
@@ -101,11 +103,12 @@ export const PostSessionFeedbackScreen = () => {
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        {submitError ? <Text accessibilityRole="alert" style={styles.submitError}>Your feedback has not been confirmed as saved.</Text> : null}
         <TouchableOpacity 
-          style={[styles.primaryBtn, (!sentiment || selectedTags.length === 0) && { opacity: 0.5 }]} 
-          disabled={!sessionId || !sentiment || selectedTags.length === 0 || isSubmitting}
-          onPress={handleSubmitFeedback} accessibilityRole="button" accessibilityLabel={t('a11yContinue', 'Submit Feedback')}
+          style={[styles.primaryBtn, !sentiment && { opacity: 0.5 }]} 
+          disabled={!sentiment || isSubmitting}
+          onPress={handleSubmitFeedback} 
+          accessibilityRole="button" 
+          accessibilityLabel={t('a11yContinue', 'Submit Feedback')}
         >
           <Text style={styles.primaryBtnText}>{isSubmitting ? 'Saving…' : t('continueBtn', 'Submit feedback')}</Text>
         </TouchableOpacity>

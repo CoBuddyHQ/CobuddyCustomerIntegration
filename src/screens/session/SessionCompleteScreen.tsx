@@ -12,17 +12,29 @@ export const SessionCompleteScreen = () => {
   const { t } = useTranslation('session.complete');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<any>();
-  const { companionId, companionName } = route.params || {};
-  const isSessionComplete = route.params?.sessionStatus !== 'unconfirmed';
+  const { companionId, companionName, sessionId, bookingId } = route.params || {};
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 1000,
+      duration: 600,
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
+
+  const handleContinueToReview = () => {
+    navigation.replace('CompanionReviewScreen', {
+      companionId,
+      companionName: companionName || 'Companion',
+      sessionId,
+      bookingId,
+    });
+  };
+
+  const handleBackToDashboard = () => {
+    navigation.reset({ index: 0, routes: [{ name: 'MainTabNavigator' }] });
+  };
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right', 'bottom']}>
@@ -32,26 +44,48 @@ export const SessionCompleteScreen = () => {
         
         <View style={styles.mainArea}>
           <View style={styles.iconCircle}>
-            <Icon name={isSessionComplete ? 'check-decagram' : 'alert-circle-outline'} size={64} color={isSessionComplete ? theme.colors.success : theme.colors.warning} />
+            <Icon name="check-decagram" size={68} color={theme.colors.success} />
           </View>
 
           <Text style={styles.title}>
-            {isSessionComplete ? t('title', 'Session end recorded') : t('statusUnavailable', 'Session completion not confirmed')}
+            {t('title', 'Session Completed! 🎉')}
           </Text>
           <Text style={styles.subtitle}>
-            {isSessionComplete
-              ? t('subtitle', 'The Customer Backend recorded the session as completed with {{name}}.', { name: companionName || 'your companion' })
-              : t('statusMessage', 'The Customer Backend did not confirm session completion.')}
+            {companionName 
+              ? `You have successfully completed your meetup with ${companionName}.`
+              : 'Your meetup has been successfully completed.'}
           </Text>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t('cardTitle', 'SESSION STATUS')}</Text>
+            <Text style={styles.cardTitle}>SESSION SUMMARY</Text>
+            
             <View style={styles.row}>
-              <Text style={styles.label}>{t('sessionRecord', 'Customer Backend record')}</Text>
-              <Text style={styles.value}>{isSessionComplete ? 'Completed' : 'Not confirmed'}</Text>
+              <Text style={styles.label}>Companion</Text>
+              <Text style={styles.value}>{companionName || 'Companion'}</Text>
             </View>
-            <Text style={styles.invoiceNote}>
-              <Icon name="information-outline" size={14} color={theme.colors.textSecondary} /> {t('financialNotice', 'This screen does not release funds, issue a refund, or send an invoice. The Companion Backend is not updated by this customer action.')}
+
+            <View style={styles.divider} />
+
+            <View style={styles.row}>
+              <Text style={styles.label}>Status</Text>
+              <View style={styles.statusBadge}>
+                <Icon name="check-circle" size={14} color={theme.colors.success} style={{ marginRight: 4 }} />
+                <Text style={styles.statusBadgeText}>Completed</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.row}>
+              <Text style={styles.label}>Safety & Verification</Text>
+              <Text style={[styles.value, { color: theme.colors.primary }]}>Verified Meetup ✓</Text>
+            </View>
+          </View>
+
+          <View style={styles.ratingPrompt}>
+            <Icon name="star-outline" size={22} color={theme.colors.primary} />
+            <Text style={styles.ratingPromptText}>
+              Share your feedback to help the community and recognize your companion!
             </Text>
           </View>
         </View>
@@ -59,13 +93,21 @@ export const SessionCompleteScreen = () => {
         <View style={styles.footer}>
           <TouchableOpacity 
             style={styles.primaryBtn} 
-            onPress={() => isSessionComplete
-              ? navigation.navigate('PostSessionFeedbackScreen', { companionId, companionName, sessionId: route.params?.sessionId })
-              : navigation.goBack()}
+            onPress={handleContinueToReview}
             accessibilityRole="button"
-            accessibilityLabel={t('a11yContinueToFeedback', isSessionComplete ? 'Continue to Feedback' : 'Back to session')}
+            accessibilityLabel="Rate & Review Companion"
           >
-            <Text style={styles.primaryBtnText}>{isSessionComplete ? t('primaryBtnText', 'Continue to Feedback') : 'Back to session'}</Text>
+            <Icon name="star" size={20} color={theme.colors.background} style={{ marginRight: 8 }} />
+            <Text style={styles.primaryBtnText}>Rate & Review Companion</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.secondaryBtn} 
+            onPress={handleBackToDashboard}
+            accessibilityRole="button"
+            accessibilityLabel="Back to Home"
+          >
+            <Text style={styles.secondaryBtnText}>Back to Home</Text>
           </TouchableOpacity>
         </View>
 
@@ -79,21 +121,27 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, padding: 24, justifyContent: 'space-between' },
   mainArea: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   
-  iconCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(16, 185, 129, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+  iconCircle: { width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(16, 185, 129, 0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   
-  title: { fontSize: 28, fontWeight: '900', color: theme.colors.textPrimary, marginBottom: 8, textAlign: 'center' },
-  subtitle: { fontSize: 15, color: theme.colors.textSecondary, marginBottom: 40, textAlign: 'center' },
+  title: { fontSize: 26, fontWeight: '900', color: theme.colors.textPrimary, marginBottom: 8, textAlign: 'center' },
+  subtitle: { fontSize: 15, color: theme.colors.textSecondary, marginBottom: 30, textAlign: 'center', lineHeight: 22 },
 
-  card: { width: '100%', backgroundColor: theme.colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: theme.colors.border },
-  cardTitle: { fontSize: 12, fontWeight: '900', color: theme.colors.textSecondary, letterSpacing: 1.5, marginBottom: 20, textTransform: 'uppercase' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  label: { fontSize: 15, color: theme.colors.textSecondary },
-  value: { fontSize: 16, color: theme.colors.textPrimary, fontWeight: 'bold' },
+  card: { width: '100%', backgroundColor: theme.colors.surface, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 20 },
+  cardTitle: { fontSize: 12, fontWeight: '900', color: theme.colors.textSecondary, letterSpacing: 1.5, marginBottom: 16, textTransform: 'uppercase' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 },
+  label: { fontSize: 14, color: theme.colors.textSecondary },
+  value: { fontSize: 15, color: theme.colors.textPrimary, fontWeight: 'bold' },
   divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: 12 },
-  
-  invoiceNote: { fontSize: 12, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 },
 
-  footer: { width: '100%', marginTop: 40, paddingBottom: 20 },
-  primaryBtn: { width: '100%', backgroundColor: theme.colors.primary, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  statusBadgeText: { fontSize: 13, fontWeight: 'bold', color: theme.colors.success },
+
+  ratingPrompt: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(212, 175, 55, 0.1)', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.3)', width: '100%' },
+  ratingPromptText: { flex: 1, fontSize: 13, color: theme.colors.textPrimary, lineHeight: 18 },
+
+  footer: { width: '100%', marginTop: 30, paddingBottom: 10 },
+  primaryBtn: { width: '100%', backgroundColor: theme.colors.primary, height: 54, borderRadius: 27, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   primaryBtnText: { color: theme.colors.background, fontSize: 16, fontWeight: 'bold' },
+  secondaryBtn: { width: '100%', backgroundColor: 'transparent', height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, marginTop: 12 },
+  secondaryBtnText: { color: theme.colors.textPrimary, fontSize: 15, fontWeight: '600' },
 });

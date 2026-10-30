@@ -7,3 +7,11 @@ export function isConfirmedTerminalSession(session: Session | null, expectedSess
     (session.status === 'completed' || session.status === 'cancelled'),
   );
 }
+
+export function isSessionForBooking(session: Session | null, expectedBookingId: string): session is Session {
+  return Boolean(session && session.bookingId === expectedBookingId);
+}
+
+export function isConfirmedCompletedStatus(status?: string): boolean {
+  return ['completed', 'ended_early', 'finished'].includes(status?.toLowerCase() ?? '');
+}
