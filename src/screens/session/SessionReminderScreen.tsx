@@ -103,7 +103,7 @@ export const SessionReminderScreen = () => {
           style={styles.primaryBtn} 
           onPress={() => navigation.navigate('ArrivalCheckInScreen', {
             bookingId: route.params?.bookingId,
-            companionId: route.params?.companionId,
+            companionId: (route.params as any)?.companionId,
             companionName,
             venueName: venue,
           } as any)} 

@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -30,10 +32,25 @@ export const NotificationPermissionScreen = () => {
   }, []);
 
   const handleEnableNotifications = async () => {
-    Alert.alert(
-      'Notifications unavailable',
-      'Native notification permission and device-token registration are not configured in this app build. No notifications were enabled.',
-    );
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      if (Platform.OS === 'android' && Number(Platform.Version) >= 33) {
+        const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+        const isGranted = result === PermissionsAndroid.RESULTS.GRANTED;
+        await notificationsApi.updateNotificationPermission({ enabled: isGranted });
+      } else {
+        await notificationsApi.updateNotificationPermission({ enabled: true });
+      }
+      navigation.navigate('BasicProfileSetupScreen');
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Notification Request Failed',
+        onRetry: handleEnableNotifications,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSkipNotifications = async () => {

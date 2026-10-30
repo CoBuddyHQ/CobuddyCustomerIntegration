@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, BackHandler, Alert } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { theme } from '../theme';
 import { FlowTracker } from '../services/flowTracker';
@@ -34,6 +34,22 @@ export const OnboardingStack = () => {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const handleBack = () => {
+      Alert.alert(
+        'Exit Profile Setup?',
+        'Your profile setup progress is saved. You can continue anytime.',
+        [
+          { text: 'Continue Setup', style: 'cancel' },
+          { text: 'Exit', onPress: () => BackHandler.exitApp() },
+        ]
+      );
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', handleBack);
+    return () => sub.remove();
   }, []);
 
   if (!initialRoute) {

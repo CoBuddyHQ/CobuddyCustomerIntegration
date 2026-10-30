@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -30,10 +32,42 @@ export const LocationPermissionScreen = () => {
   }, []);
 
   const handleAllowLocation = async () => {
-    Alert.alert(
-      'Location unavailable',
-      'Device location support is not configured in this app build. No location was read or sent. You can continue without sharing location.',
-    );
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      if (Platform.OS === 'android') {
+        const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+        const coarse = PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION;
+        const granted = await PermissionsAndroid.requestMultiple([fine, coarse]);
+        const isGranted =
+          granted[fine] === PermissionsAndroid.RESULTS.GRANTED ||
+          granted[coarse] === PermissionsAndroid.RESULTS.GRANTED;
+
+        if (isGranted) {
+          await profileApi.updateLocation({ permissionGranted: true });
+          navigation.navigate('NotificationPermissionScreen');
+        } else {
+          Alert.alert(
+            t('location.permissionDeniedTitle', 'Location Access'),
+            t('location.permissionDeniedBody', 'Location access helps show verified companions near you. You can try again or continue without location.'),
+            [
+              { text: t('common.retry', 'Try Again'), onPress: handleAllowLocation },
+              { text: t('common.skip', 'Continue Without Location'), onPress: handleSkipLocation, style: 'cancel' },
+            ]
+          );
+        }
+      } else {
+        await profileApi.updateLocation({ permissionGranted: true });
+        navigation.navigate('NotificationPermissionScreen');
+      }
+    } catch (e: any) {
+      showApiError(e, {
+        title: 'Location Request Failed',
+        onRetry: handleAllowLocation,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSkipLocation = async () => {

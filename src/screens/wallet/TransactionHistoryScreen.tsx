@@ -1,13 +1,14 @@
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { walletApi } from '../../services/api';
 
 const FILTERS = ['All', 'Money Added', 'Spent', 'Refunds'];
 const FILTER_KEYS: Record<string, string> = {
@@ -19,20 +20,59 @@ const FILTER_KEYS: Record<string, string> = {
 
 export const TransactionHistoryScreen = () => { 
   const { t } = useTranslation('wallet.transactionHistory');
-  const ALL_TRANSACTIONS = [
-    { id: 'tx_001', icon: 'wallet-plus', label: t('txTypes.moneyAdded', 'Money Added'), category: 'Money Added', date: 'Today, 2:30 PM', amount: '+ ₹1,000', positive: true, status: 'Successful' },
-    { id: 'tx_002', icon: 'account-clock', label: 'Session with Maya', category: 'Spent', date: 'Yesterday, 8:15 PM', amount: '- ₹1450', positive: false, status: 'Successful' },
-    { id: 'tx_003', icon: 'arrow-u-left-top', label: t('txTypes.refundCancelled', 'Refund: Session Cancelled'), category: 'Refunds', date: 'Oct 18, 10:00 AM', amount: '+ ₹1200', positive: true, status: 'Refunded' },
-    { id: 'tx_004', icon: 'wallet-plus', label: t('txTypes.moneyAdded', 'Money Added'), category: 'Money Added', date: 'Oct 10, 1:15 PM', amount: '+ ₹2,000', positive: true, status: 'Successful' },
-    { id: 'tx_005', icon: 'account-clock', label: 'Session with Rahul', category: 'Spent', date: 'Oct 05, 5:00 PM', amount: '- ₹1600', positive: false, status: 'Pending' },
-  ];
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const [activeFilter, setActiveFilter] = useState('All');
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      setIsLoading(true);
+      walletApi.getTransactions(1, 50)
+        .then(res => {
+          if (!isMounted) return;
+          const list = res.data || res.transactions || [];
+          const formatted = list.map((item: any) => {
+            const isAddMoney = item.type === 'add_money' || item.type === 'CREDIT' || item.type === 'credit';
+            const isRefund = item.type === 'refund' || item.type === 'REFUND';
+            const positive = item.positive !== undefined ? item.positive : (isAddMoney || isRefund);
+            const category = isAddMoney ? 'Money Added' : isRefund ? 'Refunds' : 'Spent';
+            const icon = isAddMoney ? 'wallet-plus' : isRefund ? 'arrow-u-left-top' : 'account-clock';
+            const label = item.description || (isAddMoney ? t('txTypes.moneyAdded', 'Money Added') : item.booking?.companionName ? `Session with ${item.booking.companionName}` : 'Wallet Transaction');
+            const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (item.date || 'Recent');
+            const amountStr = typeof item.amount === 'number' ? `${positive ? '+' : '-'} ₹${Math.abs(item.amount)}` : (item.amount || '₹0');
+            const status = item.status || 'Successful';
+
+            return {
+              id: item.id,
+              icon,
+              label,
+              category,
+              date: dateStr,
+              amount: amountStr,
+              positive,
+              status,
+            };
+          });
+          setTransactions(formatted);
+        })
+        .catch(err => {
+          console.warn('[TransactionHistoryScreen] Error loading real transactions:', err);
+          if (isMounted) setTransactions([]);
+        })
+        .finally(() => {
+          if (isMounted) setIsLoading(false);
+        });
+
+      return () => { isMounted = false; };
+    }, [t])
+  );
 
   const filtered = activeFilter === 'All'
-    ? ALL_TRANSACTIONS
-    : ALL_TRANSACTIONS.filter(t => t.category === activeFilter);
+    ? transactions
+    : transactions.filter(t => t.category === activeFilter);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -64,7 +104,12 @@ export const TransactionHistoryScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={styles.emptyText}>Loading transactions...</Text>
+          </View>
+        ) : filtered.length === 0 ? (
            <View style={styles.emptyState}>
              <Icon name="receipt" size={48} color={theme.colors.textSecondary} />
              <Text style={styles.emptyText}>{t('emptyText', 'No transactions found.')}</Text>
