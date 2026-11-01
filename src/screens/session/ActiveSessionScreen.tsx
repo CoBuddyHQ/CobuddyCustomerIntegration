@@ -45,9 +45,13 @@ export const ActiveSessionScreen = () => {
     const loadSession = async () => {
       try {
         const requestedSessionId = route.params?.sessionId;
+        const requestedBookingId = route.params?.bookingId;
         let specific: Session | null = null;
         if (requestedSessionId) {
           specific = await sessionApi.getSessionById(requestedSessionId);
+        } else if (requestedBookingId) {
+          specific = await sessionApi.getSessionForBooking(requestedBookingId);
+        }
           if (!isMounted) return;
           if (specific && isConfirmedTerminalSession(specific, requestedSessionId)) {
             if (!hasNavigatedRef.current) {

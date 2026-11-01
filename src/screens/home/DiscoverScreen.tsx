@@ -96,10 +96,15 @@ export const DiscoverScreen = () => {
   const { t } = useTranslation(['discover']);
 
   const MODAL_CATEGORIES = React.useMemo(() => [
-    { id: 'coffee', label: t('categories.coffeeMeetups', 'Coffee Meetups') },
-    { id: 'movie', label: t('categories.movieBuffs', 'Movie Buffs') },
-    { id: 'study', label: t('categories.studyBuddy', 'Study Buddy') },
-    { id: 'city', label: t('categories.cityWalk', 'City Walk') },
+    { id: 'coffee', label: t('categories.coffeeMeetups', 'Coffee Meetups'), aliases: ['int-3', 'cafe', 'coffee', 'cafe hopping', 'cafe_conversation'] },
+    { id: 'movie', label: t('categories.movieBuffs', 'Movie Buffs'), aliases: ['int-4', 'movie', 'movies', 'cinema'] },
+    { id: 'study', label: t('categories.studyBuddy', 'Study Buddy'), aliases: ['int-9', 'study', 'bookstore', 'literature'] },
+    { id: 'city', label: t('categories.cityWalk', 'City Walk'), aliases: ['int-7', 'city', 'walk', 'city walks', 'city_walk'] },
+    { id: 'food', label: 'Food & Dining', aliases: ['int-1', 'dining', 'food tastings', 'italian cuisine', 'food_experience'] },
+    { id: 'art', label: 'Art & Culture', aliases: ['int-2', 'art galleries', 'museums', 'art_culture'] },
+    { id: 'events', label: 'Concerts & Events', aliases: ['int-5', 'int-8', 'live music', 'nightlife', 'events'] },
+    { id: 'wellness', label: 'Fitness & Walk', aliases: ['int-6', 'fitness', 'workout', 'parks', 'wellness_walk'] },
+    { id: 'shopping', label: 'Shopping & Style', aliases: ['int-10', 'shopping', 'lifestyle', 'shopping_assistance'] },
   ], [t]);
 
   const selectedInterests = useUserPreferencesStore(selectInterests);
@@ -192,9 +197,14 @@ export const DiscoverScreen = () => {
     useCallback(() => {
       const initialCategory = route.params?.category;
       if (initialCategory) {
-        const cat = MODAL_CATEGORIES.find(c => c.id === initialCategory);
-        if (cat) {
-          setAppliedActivity(cat.label);
+        const lowerInit = String(initialCategory).toLowerCase().trim();
+        const found = MODAL_CATEGORIES.find(c =>
+          c.id === lowerInit ||
+          c.label.toLowerCase() === lowerInit ||
+          (c as any).aliases?.some((a: string) => lowerInit.includes(a) || a.includes(lowerInit))
+        );
+        if (found) {
+          setAppliedActivity(found.label);
         } else {
           setAppliedActivity(initialCategory);
         }
@@ -279,12 +289,16 @@ export const DiscoverScreen = () => {
       // Applied Activity / Category Filter
       if (appliedActivity) {
         const actQ = appliedActivity.toLowerCase();
-        const matchCategory = c.category?.toLowerCase().includes(actQ) ||
-          (actQ.includes('coffee') && c.category === 'coffee') ||
-          (actQ.includes('movie') && c.category === 'movie') ||
-          (actQ.includes('study') && c.category === 'study') ||
-          (actQ.includes('city') && (c.category === 'city' || c.category === 'coffee'));
-        const matchAct = c.activities && c.activities.some(act => act.toLowerCase().includes(actQ) || actQ.includes(act.toLowerCase()));
+        const foundOption = MODAL_CATEGORIES.find(c =>
+          c.label.toLowerCase() === actQ ||
+          c.id === actQ ||
+          (c as any).aliases?.some((a: string) => actQ.includes(a))
+        );
+        const aliases = foundOption ? [foundOption.id, ...((foundOption as any).aliases || [])] : [actQ];
+        const matchCategory = aliases.some(a => (c.category?.toLowerCase() || '').includes(a) || a.includes(c.category?.toLowerCase() || ''));
+        const matchAct = c.activities && c.activities.some(act =>
+          aliases.some(a => act.toLowerCase().includes(a) || a.includes(act.toLowerCase()))
+        );
         if (!matchCategory && !matchAct) return false;
       }
       

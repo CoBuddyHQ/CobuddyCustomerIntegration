@@ -94,6 +94,46 @@ export const BookingDetailScreen = () => {
   const isCancelled = ['cancelled', 'canceled'].includes(rawStatus);
   const isCounter = ['counter_proposed', 'countered'].includes(rawStatus);
   const isPending = ['pending', 'awaiting_reply', 'requested'].includes(rawStatus);
+  // Live ticking countdown for ongoing sessions
+  const [sessionSecondsRemaining, setSessionSecondsRemaining] = useState<number | null>(null);
+  const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState<number>(0);
+
+  useEffect(() => {
+    if (!isInProgress) {
+      setSessionSecondsRemaining(null);
+      return;
+    }
+    const startedAt = (apiBooking as any)?.startedAt || (apiBooking as any)?.checkInTime || (apiBooking as any)?.acceptedAt || (apiBooking as any)?.updatedAt || new Date().toISOString();
+    const startTimeMs = new Date(startedAt).getTime() || Date.now();
+    const durationHours = Number(apiBooking?.durationHours || (apiBooking as any)?.duration || 1);
+    const totalDurationSeconds = Math.max(durationHours * 3600, 1800);
+
+    const updateTimer = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000));
+      const rem = Math.max(0, totalDurationSeconds - elapsed);
+      setSessionElapsedSeconds(elapsed);
+      setSessionSecondsRemaining(rem);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [isInProgress, (apiBooking as any)?.startedAt, (apiBooking as any)?.checkInTime, apiBooking?.durationHours]);
+
+  const formatCountdown = (secs: number | null) => {
+    if (secs === null || secs <= 0) return '00:00:00';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const formatElapsed = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} elapsed`;
+  };
+
 
   const displayStatus = isInProgress ? 'In Progress'
     : isAccepted ? 'Accepted'
@@ -425,21 +465,37 @@ export const BookingDetailScreen = () => {
           </View>
         )}
 
-        {/* Live Active Session Status & Live Timer Widget when in progress */}
+        {/* Live Active Session Status & Live Digital Timer Widget when in progress */}
         {isInProgress && (
-          <View style={[styles.passCodeCard, { borderColor: theme.colors.primary, backgroundColor: 'rgba(212, 175, 55, 0.08)' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.success }} />
-                <Text style={[styles.passCodeLabel, { color: theme.colors.primary, letterSpacing: 1.5 }]}>LIVE SESSION IN PROGRESS</Text>
+          <View style={styles.liveTimerCard}>
+            <View style={styles.liveTimerHeader}>
+              <View style={styles.liveBadgeRow}>
+                <View style={styles.livePulseDot} />
+                <Text style={styles.liveBadgeText}>LIVE SESSION</Text>
               </View>
-              <View style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
-                <Text style={{ color: theme.colors.success, fontSize: 11, fontWeight: '700' }}>ONGOING</Text>
-              </View>
+              <TouchableOpacity 
+                style={styles.liveSosBtn}
+                onPress={() => navigation.navigate('SafetySupportStack', { screen: 'SafetyHubScreen' })}
+                accessibilityRole="button"
+                accessibilityLabel="Emergency SOS"
+              >
+                <Icon name="shield-half-full" size={15} color="#FFFFFF" />
+                <Text style={styles.liveSosText}>SOS</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={{ color: theme.colors.textSecondary, fontSize: 13, marginBottom: 14 }}>
-              Your meetup with {data.companionName} is live now. Tap below to view live timer, safety tools, and session controls.
-            </Text>
+
+            <View style={styles.timerDisplayBox}>
+              <Text style={styles.timerSubLabel}>TIME REMAINING</Text>
+              <Text style={styles.timerBigDigits}>
+                {formatCountdown(sessionSecondsRemaining)}
+              </Text>
+              <Text style={styles.timerMetaSubtitle}>
+                {sessionSecondsRemaining !== null && sessionSecondsRemaining > 0
+                  ? `${Math.floor(sessionSecondsRemaining / 3600)}h ${Math.floor((sessionSecondsRemaining % 3600) / 60)}m remaining · ${formatElapsed(sessionElapsedSeconds)}`
+                  : `Session meetup complete · ${formatElapsed(sessionElapsedSeconds)}`}
+              </Text>
+            </View>
+
             <TouchableOpacity 
               style={styles.primaryBtn}
               onPress={() => {
@@ -451,10 +507,10 @@ export const BookingDetailScreen = () => {
               }}
               activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel="Open Live Session & Timer"
+              accessibilityLabel="Open Fullscreen Live Session & Controls"
             >
-              <Icon name="timer-outline" size={20} color={theme.colors.background} />
-              <Text style={styles.primaryBtnText}>Open Live Session & Timer</Text>
+              <Icon name="fullscreen" size={20} color={theme.colors.background} />
+              <Text style={styles.primaryBtnText}>Open Fullscreen Session</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -716,6 +772,93 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: theme.colors.primary,
     letterSpacing: 6,
+  },
+
+  liveTimerCard: {
+    backgroundColor: '#0F1A1C',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: '#26A69A',
+    shadowColor: '#26A69A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  liveTimerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  liveBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(38, 166, 154, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(38, 166, 154, 0.4)',
+  },
+  livePulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#00E676',
+  },
+  liveBadgeText: {
+    color: '#80CBC4',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  liveSosBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#D32F2F',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  liveSosText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  timerDisplayBox: {
+    alignItems: 'center',
+    backgroundColor: '#081113',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1D3B3E',
+    marginBottom: 18,
+  },
+  timerSubLabel: {
+    color: '#80CBC4',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+  },
+  timerBigDigits: {
+    color: '#E0F2F1',
+    fontSize: 44,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 3,
+    marginBottom: 8,
+  },
+  timerMetaSubtitle: {
+    color: '#80CBC4',
+    fontSize: 12,
+    fontWeight: '600',
   },
   passCodeSubtext: {
     fontSize: 12,
