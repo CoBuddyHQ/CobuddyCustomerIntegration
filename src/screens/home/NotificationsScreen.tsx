@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -6,9 +6,12 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { SmartHeader } from '../../components/ui/SmartHeader';
-import { notificationsApi, bookingApi, Notification as ApiNotification } from '../../services/api';
+import { notificationsApi, Notification as ApiNotification } from '../../services/api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { openNotification } from '../../services/notificationNavigation';
+import { useAuthStore } from '../../store/slices/authStore';
+import { createUserScopedCache } from '../../services/userScopedCache';
 
 export type NotificationCategory = 'All' | 'request' | 'session' | 'safety' | 'payout' | 'support' | 'policy' | 'training' | 'system' | 'wallet' | 'promotion' | 'reminder';
 
@@ -40,21 +43,62 @@ const formatRelativeTime = (dateString?: string): string => {
   return `${days}d ago`;
 };
 
+// Keep the in-memory cache scoped to the authenticated customer. A module-wide
+// unkeyed array could show the previous account's notifications after logout.
+const notificationCache = createUserScopedCache<NotificationItem[]>();
+const notificationFetches = new Set<string>();
+
 export const NotificationsScreen = () => { 
   const { t } = useTranslation('home.notifications');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const userId = useAuthStore(state => state.user?.id);
+  const cacheKey = userId ? String(userId) : 'unauthenticated';
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [notificationState, setNotificationState] = useState(() => ({
+    cacheKey,
+    items: notificationCache.get(cacheKey) ?? [],
+  }));
+  const notifications = notificationState.cacheKey === cacheKey
+    ? notificationState.items
+    : notificationCache.get(cacheKey) ?? [];
+  const [loading, setLoading] = useState((notificationCache.get(cacheKey)?.length ?? 0) === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const activeCacheKeyRef = useRef(cacheKey);
+  activeCacheKeyRef.current = cacheKey;
 
-  const fetchNotifications = useCallback(async () => {
+  const updateNotifications = useCallback((update: NotificationItem[] | ((current: NotificationItem[]) => NotificationItem[])) => {
+    setNotificationState(previous => {
+      const current = previous.cacheKey === cacheKey
+        ? previous.items
+        : notificationCache.get(cacheKey) ?? [];
+      const next = typeof update === 'function' ? update(current) : update;
+      notificationCache.set(cacheKey, next);
+      return { cacheKey, items: next };
+    });
+  }, [cacheKey]);
+
+  useEffect(() => {
+    const cached = notificationCache.get(cacheKey) ?? [];
+    setNotificationState({ cacheKey, items: cached });
+    setLoading(cached.length === 0);
+    setLoadError(false);
+    setErrorMessage('');
+    setRefreshing(false);
+  }, [cacheKey]);
+
+  const fetchNotifications = useCallback(async (isUserRefresh = false) => {
+    if (notificationFetches.has(cacheKey)) return;
+    notificationFetches.add(cacheKey);
+    const cached = notificationCache.get(cacheKey) ?? [];
+    if (cached.length === 0 && !isUserRefresh && activeCacheKeyRef.current === cacheKey) {
+      setLoading(true);
+    }
     try {
       const list = await notificationsApi.listNotifications();
       if (list && Array.isArray(list)) {
-        setNotifications(list.map((n: ApiNotification) => ({
+        const mapped = list.map((n: ApiNotification) => ({
           id: n.id,
           category: (n.category || ((n.data?.category as string) || 'All')) as NotificationCategory,
           title: n.title,
@@ -66,40 +110,51 @@ export const NotificationsScreen = () => {
           route: n.route || 'HomeTab',
           stack: n.stack,
           routeParams: (n.routeParams || n.data || {}) as Record<string, unknown>,
-        })));
+        }));
+        notificationCache.set(cacheKey, mapped);
+        if (activeCacheKeyRef.current === cacheKey) {
+          setNotificationState({ cacheKey, items: mapped });
+        }
       }
-      setLoadError(false);
-      setErrorMessage('');
+      if (activeCacheKeyRef.current === cacheKey) {
+        setLoadError(false);
+        setErrorMessage('');
+      }
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || String(err);
       console.error('[NotificationsScreen] fetchNotifications error:', msg);
-      setErrorMessage(msg);
-      setLoadError(true);
+      if ((notificationCache.get(cacheKey)?.length ?? 0) === 0 && activeCacheKeyRef.current === cacheKey) {
+        setErrorMessage(msg);
+        setLoadError(true);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      notificationFetches.delete(cacheKey);
+      if (activeCacheKeyRef.current === cacheKey) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [cacheKey]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchNotifications();
+      fetchNotifications(false);
       const interval = setInterval(() => {
-        fetchNotifications();
-      }, 5000);
+        fetchNotifications(false);
+      }, 15000);
       return () => clearInterval(interval);
     }, [fetchNotifications])
   );
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchNotifications();
+    fetchNotifications(true);
   };
 
   const filteredNotifications = notifications.filter(n => activeCategory === 'All' || n.category === activeCategory);
 
   const handleMarkAllRead = async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    updateNotifications(previous => previous.map(n => ({ ...n, isRead: true })));
     try {
       await notificationsApi.markAllNotificationsAsRead();
     } catch {
@@ -107,53 +162,27 @@ export const NotificationsScreen = () => {
     }
   };
 
-  const handleNotificationPress = async (notification: NotificationItem) => {
+  const handleNotificationPress = (notification: NotificationItem) => {
     // Mark as read locally
-    setNotifications(prev => 
+    updateNotifications(prev => 
       prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
     );
-    try {
-      await notificationsApi.markNotificationAsRead(notification.id);
-    } catch {
-      // Ignored
-    }
-
-    const title = (notification.title || '').toLowerCase();
-    const routeParams = (notification.routeParams || {}) as Record<string, any>;
-    let targetRoute = notification.route;
-
-    // Resolve bookingId if missing in notification params
-    let targetBookingId = routeParams.bookingId || routeParams.id;
-    if (!targetBookingId && (title.includes('booking') || title.includes('session') || notification.category === 'booking' || notification.category === 'session')) {
-      try {
-        const bookings = await bookingApi.listBookings();
-        if (bookings && bookings.length > 0) {
-          targetBookingId = bookings[0].id;
-        }
-      } catch {
-        // Fallback
-      }
-    }
-
-    const rootNav = (navigation.getParent() || navigation) as any;
-
-    if (title.includes('review') || targetRoute === 'SessionFeedbackScreen' || targetRoute === 'CompanionReviewScreen') {
-      const reviewParams = { ...routeParams, bookingId: targetBookingId || routeParams.bookingId };
-      rootNav.navigate('LiveSessionStack', { screen: 'CompanionReviewScreen', params: reviewParams });
-    } else if (title.includes('started') || (targetRoute === 'ActiveSessionScreen' && !title.includes('accepted'))) {
-      const sessionParams = { ...routeParams, bookingId: targetBookingId || routeParams.bookingId };
-      rootNav.navigate('LiveSessionStack', { screen: 'ActiveSessionScreen', params: sessionParams });
-    } else if (title.includes('counter') || targetRoute === 'BookingCounterOfferScreen') {
-      const counterParams = { ...routeParams, bookingId: targetBookingId || routeParams.bookingId };
-      rootNav.navigate('BookingFlowStack', { screen: 'BookingCounterOfferScreen', params: counterParams });
-    } else {
-      // Booking acceptance, booking request sent, status update, cancelled, etc.
-      if (targetBookingId) {
-        navigation.navigate('BookingDetailScreen' as any, { bookingId: targetBookingId, status: routeParams.status });
+    openNotification(notification, notificationsApi.markNotificationAsRead, (destination) => {
+      const rootNav = (navigation.getParent() || navigation) as any;
+      if (destination.kind === 'nested') {
+        rootNav.navigate(destination.navigator, {
+          screen: destination.screen,
+          params: destination.params,
+        });
+      } else if (destination.kind === 'booking') {
+        navigation.navigate('BookingDetailScreen' as any, {
+          bookingId: destination.bookingId,
+          status: destination.status,
+        });
       } else {
         rootNav.navigate('BookingsTab', { screen: 'BookingsListScreen' });
       }
-    }
+    });
   };
 
   return (

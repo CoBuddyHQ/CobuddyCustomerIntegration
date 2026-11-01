@@ -10,6 +10,7 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -38,6 +39,10 @@ export const SelfieCaptureScreen = () => {
     FlowTracker.saveActiveScreen('SelfieCaptureScreen');
   }, []);
 
+  const sampleSelfie = Platform.OS === 'android'
+    ? 'file:///data/data/com.cobuddycustomer/cache/aadhaar_front.png'
+    : 'file:///sdcard/Pictures/aadhaar_front.png';
+
   const handleCapture = () => {
     Alert.alert(
       'Selfie Verification',
@@ -56,7 +61,7 @@ export const SelfieCaptureScreen = () => {
             } catch {
               // Fallback
             }
-            setSelfieUri('file:///sdcard/Pictures/aadhaar_front.png');
+            setSelfieUri(sampleSelfie);
             setPhotoCaptured(true);
           },
         },
@@ -73,14 +78,14 @@ export const SelfieCaptureScreen = () => {
             } catch {
               // Fallback
             }
-            setSelfieUri('file:///sdcard/Pictures/aadhaar_front.png');
+            setSelfieUri(sampleSelfie);
             setPhotoCaptured(true);
           },
         },
         {
           text: 'Use Test Selfie',
           onPress: () => {
-            setSelfieUri('file:///sdcard/Pictures/aadhaar_front.png');
+            setSelfieUri(sampleSelfie);
             setPhotoCaptured(true);
           },
         },

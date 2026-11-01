@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { sessionApi } from '../../services/api';
 import { isConfirmedTerminalSession } from '../../utils/sessionTerminalStatus';
+import { resolveSessionClock } from '../../utils/sessionClock';
 import type { Session } from '../../services/api/session.api';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -44,8 +45,9 @@ export const ActiveSessionScreen = () => {
     const loadSession = async () => {
       try {
         const requestedSessionId = route.params?.sessionId;
+        let specific: Session | null = null;
         if (requestedSessionId) {
-          const specific = await sessionApi.getSessionById(requestedSessionId);
+          specific = await sessionApi.getSessionById(requestedSessionId);
           if (!isMounted) return;
           if (specific && isConfirmedTerminalSession(specific, requestedSessionId)) {
             if (!hasNavigatedRef.current) {
@@ -63,22 +65,23 @@ export const ActiveSessionScreen = () => {
           }
         }
 
-        const session = await sessionApi.getCurrentSession();
+        const session = (specific && ['active', 'extending'].includes(specific.status))
+          ? specific
+          : await sessionApi.getCurrentSession();
         if (!isMounted) return;
         if (requestedSessionId && session?.id !== requestedSessionId) {
           setSessionLoadState('unavailable');
           return;
         }
         const isActive = session && ['active', 'extending'].includes(session.status);
-        const startedAt = session?.startedAt ? new Date(session.startedAt) : null;
-        const durationMinutes = Number(session?.durationMinutes);
-        if (!session || !isActive || !startedAt || !Number.isFinite(startedAt.getTime()) || !Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+        const clock = resolveSessionClock(session);
+        if (!session || !isActive || !clock) {
           setSessionLoadState('unavailable');
           return;
         }
 
-        const durationSeconds = (durationMinutes + Math.max(0, session.extensionMinutes || 0)) * 60;
-        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 1000));
+        const durationSeconds = clock.durationSeconds;
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - clock.startedAtMs) / 1000));
         const remainingSeconds = Math.max(0, durationSeconds - elapsedSeconds);
         setSessionData(session);
         setTotalSeconds(durationSeconds);
@@ -102,28 +105,34 @@ export const ActiveSessionScreen = () => {
     ).start();
 
     return () => { isMounted = false; };
-  }, [pulseAnim, route.params?.sessionId]);
+  }, [pulseAnim, route.params?.sessionId, route.params?.bookingId, route.params?.companionId, companionName, navigation]);
 
   useEffect(() => {
-    if (sessionLoadState !== 'ready') return;
-    const interval = setInterval(() => {
-      if (hasNavigatedRef.current) {
-        clearInterval(interval);
-        return;
+    if (sessionLoadState !== 'ready' || !sessionData) return;
+    const clock = resolveSessionClock(sessionData);
+    if (!clock) {
+      setSessionLoadState('unavailable');
+      setTotalSeconds(0);
+      setTimeLeft(0);
+      return;
+    }
+    const { startedAtMs: startTimeMs, durationSeconds: durSecs } = clock;
+
+    const tick = () => {
+      if (hasNavigatedRef.current) return;
+      const elapsed = Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000));
+      const remaining = Math.max(0, durSecs - elapsed);
+      setTimeLeft(remaining);
+      if (remaining === 0 && !timeoutPromptedRef.current) {
+        timeoutPromptedRef.current = true;
+        setTimeoutModalVisible(true);
       }
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          if (!timeoutPromptedRef.current) {
-            timeoutPromptedRef.current = true;
-            setTimeoutModalVisible(true);
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [sessionLoadState]);
+  }, [sessionLoadState, sessionData]);
 
   // ── Auto-sync when session is completed or ended by Companion ─────────────
   useEffect(() => {
@@ -144,32 +153,33 @@ export const ActiveSessionScreen = () => {
       });
     };
 
-    const pollId = setInterval(async () => {
-      if (hasNavigatedRef.current) {
-        clearInterval(pollId);
-        return;
-      }
+    let isPolling = false;
+    const poll = async () => {
+      if (isPolling || hasNavigatedRef.current) return;
+      isPolling = true;
       try {
+        let statusSession: Session | null = null;
         if (currentSessionId) {
-          const specific = await sessionApi.getSessionById(currentSessionId);
-          if (specific && (specific.status === 'completed' || specific.status === 'cancelled' || specific.status === 'ended_early')) {
-            navigateToComplete(specific.status);
-            return;
-          }
+          statusSession = await sessionApi.getSessionById(currentSessionId);
         }
 
-        const current = await sessionApi.getCurrentSession();
+        if (!statusSession) statusSession = await sessionApi.getCurrentSession();
         // Absence from /sessions/current is not proof of completion: it may be a
         // transient read failure or a different active booking. Only a terminal
         // status returned by this session's owner can complete this screen.
-        if (current && isConfirmedTerminalSession(current, currentSessionId)) {
-          navigateToComplete(current.status);
-          return;
+        if (statusSession && isConfirmedTerminalSession(statusSession, currentSessionId)) {
+          navigateToComplete(statusSession.status);
         }
-      } catch {}
-    }, 1000);
+      } catch {
+        // Preserve the last confirmed session state and retry on the next interval.
+      } finally {
+        isPolling = false;
+      }
+    };
+    poll();
+    const pollId = setInterval(() => { poll(); }, 2000);
     return () => clearInterval(pollId);
-  }, [sessionLoadState, companionName, navigation, route.params?.sessionId, route.params?.bookingId, sessionData?.id, sessionData?.bookingId, sessionData?.companionId]);
+  }, [sessionLoadState, companionName, navigation, route.params?.sessionId, route.params?.bookingId, route.params?.companionId, sessionData?.id, sessionData?.bookingId, sessionData?.companionId]);
 
   // Format Time (HH:MM:SS)
   const formatTime = (seconds: number) => {
@@ -186,10 +196,13 @@ export const ActiveSessionScreen = () => {
   const formatAmPm = (d: Date) => {
     return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   };
-  const startDate = sessionData?.startedAt ? new Date(sessionData.startedAt) : new Date(0);
-  const endDate = new Date(startDate.getTime() + totalSeconds * 1000);
-  const startedLabel = `Started: ${formatAmPm(startDate)}`;
-  const endsLabel = isTimedOut ? `Ended: ${formatAmPm(endDate)}` : `Ends: ${formatAmPm(endDate)}`;
+  const clock = resolveSessionClock(sessionData);
+  const startDate = clock ? new Date(clock.startedAtMs) : null;
+  const endDate = startDate ? new Date(startDate.getTime() + totalSeconds * 1000) : null;
+  const startedLabel = startDate ? `Started: ${formatAmPm(startDate)}` : 'Start time unavailable';
+  const endsLabel = endDate
+    ? (isTimedOut ? `Ended: ${formatAmPm(endDate)}` : `Ends: ${formatAmPm(endDate)}`)
+    : 'End time unavailable';
 
   const elapsedSeconds = Math.max(0, totalSeconds - timeLeft);
   const completedMins = Math.max(1, Math.floor(elapsedSeconds / 60));
@@ -201,27 +214,21 @@ export const ActiveSessionScreen = () => {
     setIsEndingSession(true);
     setEndSessionError(false);
     try {
-      const history = await sessionApi.getSessionHistory();
-      const confirmed = history.find((session) => session.id === sessionData.id);
-      if (!confirmed || confirmed.status !== 'completed') {
-        setEndSessionError(true);
-        Alert.alert(
-          'Waiting for companion confirmation',
-          'The Companion Backend must record session completion. No completion or payment action was performed by this screen. Ask your companion to finish the session, then refresh its status.',
-        );
-        return;
-      }
+      const res = await sessionApi.endSession(sessionData.id);
       setEndEarlyModalVisible(false);
       setTimeoutModalVisible(false);
       navigation.navigate('SessionCompleteScreen', {
         companionId,
         companionName,
-        sessionId: confirmed.id,
-        sessionStatus: confirmed.status,
+        sessionId: sessionData.id,
+        sessionStatus: res?.status || 'completed',
       });
-    } catch {
+    } catch (e: any) {
       setEndSessionError(true);
-      Alert.alert('Session status unavailable', 'The Customer Backend could not confirm session completion. No completion or payment action was performed by this screen.');
+      Alert.alert(
+        'Session end failed',
+        e?.response?.data?.message || 'The session could not be completed. Please retry.',
+      );
     } finally {
       setIsEndingSession(false);
     }
@@ -454,14 +461,25 @@ export const ActiveSessionScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('extendSession', 'Extend Session')}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="clock-plus-outline" size={24} color={theme.colors.primary} />
+                <Text style={styles.modalTitle}>{t('extendSession', 'Extend Session')}</Text>
+              </View>
               <TouchableOpacity onPress={() => setExtendModalVisible(false)} style={styles.modalCloseBtn} accessibilityRole="button" accessibilityLabel={t('a11yClose', 'Close')}>
                 <Icon name="close" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalDesc}>
-              Companion approval and payment processing are not configured for extensions in this app build. The session duration will not change.
+              Session extension is unavailable until companion approval and secure payment processing are connected.
             </Text>
+
+            <View style={styles.warningBox}>
+              <Icon name="alert-circle-outline" size={20} color={theme.colors.warning} />
+              <Text style={styles.warningBoxText}>
+                This screen will not change the session time, booking amount, or companion earnings.
+              </Text>
+            </View>
+
             <TouchableOpacity style={styles.primaryBtn} onPress={() => setExtendModalVisible(false)} accessibilityRole="button">
               <Text style={styles.primaryBtnText}>Close</Text>
             </TouchableOpacity>
@@ -482,7 +500,7 @@ export const ActiveSessionScreen = () => {
             
             <View style={styles.warningBox}>
               <Icon name="alert-circle-outline" size={20} color={theme.colors.warning} />
-              <Text style={styles.warningBoxText}>{t('endingNowWillReleaseEscrow', 'The Customer Backend can record this session as ended. The Companion Backend and payment provider are not coordinated by this action.')}</Text>
+              <Text style={styles.warningBoxText}>{t('endingNowWillReleaseEscrow', 'Ending the session now will finalize your meetup and notify your companion.')}</Text>
             </View>
 
             <View style={{ gap: 8, marginBottom: 24 }}>

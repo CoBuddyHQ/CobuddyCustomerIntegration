@@ -85,6 +85,13 @@ export const DocumentVerificationScreen = () => {
     }
   };
 
+  const getSampleDocUri = (side: 'front' | 'back') => {
+    const filename = side === 'front' ? 'aadhaar_front.png' : 'aadhaar_back.png';
+    return Platform.OS === 'android'
+      ? `file:///data/data/com.cobuddycustomer/cache/${filename}`
+      : `file:///sdcard/Pictures/${filename}`;
+  };
+
   const handleSelectFile = (side: 'front' | 'back') => {
     Alert.alert(
       side === 'front' ? 'Upload Front Side' : 'Upload Back Side',
@@ -103,7 +110,7 @@ export const DocumentVerificationScreen = () => {
             } catch {
               // Fallback to local sample image on emulator
             }
-            const sample = side === 'front' ? 'file:///sdcard/Pictures/aadhaar_front.png' : 'file:///sdcard/Pictures/aadhaar_back.png';
+            const sample = getSampleDocUri(side);
             if (side === 'front') setFrontUri(sample);
             else setBackUri(sample);
           },
@@ -121,7 +128,7 @@ export const DocumentVerificationScreen = () => {
             } catch {
               // Fallback
             }
-            const sample = side === 'front' ? 'file:///sdcard/Pictures/aadhaar_front.png' : 'file:///sdcard/Pictures/aadhaar_back.png';
+            const sample = getSampleDocUri(side);
             if (side === 'front') setFrontUri(sample);
             else setBackUri(sample);
           },
@@ -129,7 +136,7 @@ export const DocumentVerificationScreen = () => {
         {
           text: 'Use Test Sample Document',
           onPress: () => {
-            const sample = side === 'front' ? 'file:///sdcard/Pictures/aadhaar_front.png' : 'file:///sdcard/Pictures/aadhaar_back.png';
+            const sample = getSampleDocUri(side);
             if (side === 'front') setFrontUri(sample);
             else setBackUri(sample);
           },

@@ -59,15 +59,31 @@ export const BookingDetailScreen = () => {
   useFocusEffect(
     useCallback(() => {
       if (!bookingId) return;
+      let hasAutoNavigated = false;
       const interval = setInterval(() => {
         bookingApi.getBooking(bookingId)
           .then(res => {
-            if (res) setApiBooking(res);
+            if (res) {
+              setApiBooking(res);
+              const st = (res.status || '').toLowerCase().trim();
+              if (['in_progress', 'active', 'started'].includes(st) && !hasAutoNavigated) {
+                hasAutoNavigated = true;
+                const rootNav = (navigation.getParent() || navigation) as any;
+                rootNav.navigate('LiveSessionStack', {
+                  screen: 'ActiveSessionScreen',
+                  params: {
+                    companionId: res.companionId,
+                    companionName: res.companionName,
+                    bookingId: res.id,
+                  } as any,
+                });
+              }
+            }
           })
           .catch(() => {});
       }, 4000);
       return () => clearInterval(interval);
-    }, [bookingId])
+    }, [bookingId, navigation])
   );
 
   const rawStatus = (apiBooking?.status || route.params?.status || 'pending').toLowerCase().trim();
@@ -394,7 +410,7 @@ export const BookingDetailScreen = () => {
         </View>
 
         {/* Live Session Pass Code Card for Accepted/Upcoming sessions */}
-        {data.sessionPassCode && (isAccepted || isInProgress || data.status === 'Accepted' || data.status === 'In Progress') && (
+        {data.sessionPassCode && isAccepted && !isInProgress && (
           <View style={styles.passCodeCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <Icon name="shield-key" size={22} color={theme.colors.primary} />
@@ -406,6 +422,40 @@ export const BookingDetailScreen = () => {
             <Text style={styles.passCodeSubtext}>
               Share this 4-digit code with {data.companionName} when you meet to verify identity and start your session safely.
             </Text>
+          </View>
+        )}
+
+        {/* Live Active Session Status & Live Timer Widget when in progress */}
+        {isInProgress && (
+          <View style={[styles.passCodeCard, { borderColor: theme.colors.primary, backgroundColor: 'rgba(212, 175, 55, 0.08)' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.success }} />
+                <Text style={[styles.passCodeLabel, { color: theme.colors.primary, letterSpacing: 1.5 }]}>LIVE SESSION IN PROGRESS</Text>
+              </View>
+              <View style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                <Text style={{ color: theme.colors.success, fontSize: 11, fontWeight: '700' }}>ONGOING</Text>
+              </View>
+            </View>
+            <Text style={{ color: theme.colors.textSecondary, fontSize: 13, marginBottom: 14 }}>
+              Your meetup with {data.companionName} is live now. Tap below to view live timer, safety tools, and session controls.
+            </Text>
+            <TouchableOpacity 
+              style={styles.primaryBtn}
+              onPress={() => {
+                const rootNav = (navigation.getParent() || navigation) as any;
+                rootNav.navigate('LiveSessionStack', {
+                  screen: 'ActiveSessionScreen',
+                  params: { companionId: data.companionId, companionName: data.companionName, bookingId: data.id } as any,
+                });
+              }}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Open Live Session & Timer"
+            >
+              <Icon name="timer-outline" size={20} color={theme.colors.background} />
+              <Text style={styles.primaryBtnText}>Open Live Session & Timer</Text>
+            </TouchableOpacity>
           </View>
         )}
 

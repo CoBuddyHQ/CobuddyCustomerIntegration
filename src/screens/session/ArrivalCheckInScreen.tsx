@@ -91,10 +91,17 @@ export const ArrivalCheckInScreen = () => {
       }
       isPolling = true;
       try {
-        const session = customerSessionId
+        let session = customerSessionId
           ? await sessionApi.getSessionById(customerSessionId)
-          : await sessionApi.getSessionForBooking(bookingId);
-        if (isSessionForBooking(session, bookingId)) {
+          : null;
+        if (!session && bookingId) {
+          session = await sessionApi.getSessionForBooking(bookingId);
+        }
+        if (!session) {
+          session = await sessionApi.getCurrentSession();
+        }
+
+        if (session && (session.bookingId === bookingId || session.id === customerSessionId)) {
           if (['active', 'extending', 'completed', 'ended_early', 'cancelled'].includes(session.status)) {
             setSessionStatus(session.status);
             setCustomerSessionId(session.id);
@@ -102,6 +109,7 @@ export const ArrivalCheckInScreen = () => {
           } else if (session.status === 'checked_in') {
             setHasArrived(true);
             setCustomerSessionId(session.id);
+            if (session.passCode) setPassCode(session.passCode);
           }
         }
       } catch {
@@ -109,7 +117,7 @@ export const ArrivalCheckInScreen = () => {
       } finally {
         isPolling = false;
       }
-    }, 1500);
+    }, 1200);
     return () => clearInterval(pollId);
   }, [hasArrived, bookingId, customerSessionId]);
 
@@ -117,17 +125,24 @@ export const ArrivalCheckInScreen = () => {
     if (isRefreshingSession || !bookingId) return;
     setIsRefreshingSession(true);
     try {
-      const session = await sessionApi.getSessionForBooking(bookingId);
-      if (!isSessionForBooking(session, bookingId)) {
-        setSessionStatus(null);
-        return;
+      let session = customerSessionId
+        ? await sessionApi.getSessionById(customerSessionId)
+        : null;
+      if (!session && bookingId) {
+        session = await sessionApi.getSessionForBooking(bookingId);
       }
-      setCustomerSessionId(session.id);
-      setSessionStatus(session.status);
-      if (session.passCode) setPassCode(session.passCode);
-      setHasArrived(['checked_in', 'active', 'extending'].includes(session.status));
-    } catch {
-      Alert.alert('Session status unavailable', 'The Customer Backend could not refresh the session status. Try again when connected.');
+      if (!session) {
+        session = await sessionApi.getCurrentSession();
+      }
+
+      if (session && (session.bookingId === bookingId || session.id === customerSessionId)) {
+        setCustomerSessionId(session.id);
+        setSessionStatus(session.status);
+        if (session.passCode) setPassCode(session.passCode);
+        setHasArrived(['checked_in', 'active', 'extending'].includes(session.status));
+      }
+    } catch (err) {
+      console.warn('[ArrivalCheckIn] refreshSessionStatus error:', err);
     } finally {
       setIsRefreshingSession(false);
     }
@@ -141,15 +156,16 @@ export const ArrivalCheckInScreen = () => {
     setIsLocating(true);
     try {
       const result = await sessionApi.checkIn(bookingId);
-      if (result.bookingId !== bookingId || !result.passCode || !['checked_in', 'active', 'extending'].includes(result.status)) {
+      if (result.bookingId !== bookingId || !result.passCode || !['checked_in', 'active', 'extending', 'completed'].includes(result.status)) {
         throw new Error('The Customer Backend did not confirm check-in.');
       }
       setPassCode(result.passCode);
       setCustomerSessionId(result.id);
       setSessionStatus(result.status);
       setHasArrived(true);
-    } catch {
-      Alert.alert('Check-in failed', 'The server did not confirm your arrival. Please retry.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'The server did not confirm your arrival. Please retry.';
+      Alert.alert('Check-in Status', msg);
     } finally {
       setIsLocating(false);
     }

@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Animated, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Animated, Alert, ActivityIndicator, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
 import { AppBottomSheet } from '../../components/ui/AppBottomSheet';
 import { discoveryApi, accountApi, CompanionDetail as CompanionDetailType } from '../../services/api';
 
@@ -107,6 +106,8 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
 
   useEffect(() => {
     let isMounted = true;
+    setLoading(true);
+    setApiProfile(null);
     const fetchDetail = async () => {
       if (!companionId) {
         setLoading(false);
@@ -119,6 +120,9 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
         ]);
         if (isMounted && dataRes.status === 'fulfilled' && dataRes.value) {
           setApiProfile(dataRes.value);
+        } else if (isMounted) {
+          // Never keep a previous profile visible after a blocked/removed profile returns 404.
+          setApiProfile(null);
         }
         if (isMounted && favsRes.status === 'fulfilled' && Array.isArray(favsRes.value)) {
           setIsFavorite(favsRes.value.some((f: any) => f.id === companionId));
@@ -427,14 +431,44 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
         title={t('title.Options', 'Options')}
       >
         <View style={styles.sheetContent}>
-          <TouchableOpacity style={styles.sheetRow} activeOpacity={0.7} onPress={() => setShowMenuSheet(false)} accessibilityRole="button" accessibilityLabel={t('a11yShareProfile', 'Share Profile')}>
+          <TouchableOpacity
+            style={styles.sheetRow}
+            activeOpacity={0.7}
+            onPress={async () => {
+              setShowMenuSheet(false);
+              try {
+                await Share.share({
+                  message: `Check out ${profile.name}'s profile on CoBuddy!`,
+                });
+              } catch {
+                // Ignored
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11yShareProfile', 'Share Profile')}
+          >
             <View style={styles.sheetIconWrap}>
               <Icon name="share-variant-outline" size={20} color={theme.colors.textPrimary} />
             </View>
             <Text style={styles.sheetRowText}>{t('shareProfile', 'Share Profile')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.sheetRow} activeOpacity={0.7} onPress={() => setShowMenuSheet(false)} accessibilityRole="button" accessibilityLabel={t('a11yReportName', 'Report {{name}}', { name: profile.name })}>
+          <TouchableOpacity
+            style={styles.sheetRow}
+            activeOpacity={0.7}
+            onPress={() => {
+              setShowMenuSheet(false);
+              (navigation as any).navigate('SafetySupportStack', {
+                screen: 'IncidentReportScreen',
+                params: {
+                  companionId,
+                  companionName: profile.name,
+                },
+              });
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11yReportName', 'Report {{name}}', { name: profile.name })}
+          >
             <View style={styles.sheetIconWrap}>
               <Icon name="flag-outline" size={20} color={theme.colors.textPrimary} />
             </View>
@@ -458,15 +492,23 @@ export const CompanionProfileScreen = ({ route }: { route: RouteProp<RootStackPa
                         text: t('block', 'Block'), 
                         style: "destructive",
                         onPress: async () => {
-                          if (companionId) {
-                            try {
-                              await accountApi.blockUser(companionId);
-                            } catch {
-                              // Ignored
-                            }
+                          if (!companionId) {
+                            Alert.alert(t('blockFailedTitle', 'Block failed'), t('blockFailedMessage', 'This profile is unavailable. Please return to Discover and try again.'));
+                            return;
                           }
-                          Alert.alert(t('blockedTitle', 'Blocked'), t('blockedMessage', '{{name}} has been blocked.', { name: profile.name }));
-                          smartGoBack('DiscoverTab');
+                          try {
+                            await accountApi.blockUser(companionId);
+                            Alert.alert(
+                              t('blockedTitle', 'Blocked'),
+                              t('blockedMessage', '{{name}} has been blocked.', { name: profile.name }),
+                              [{ text: t('okBtn', 'OK'), onPress: () => smartGoBack('DiscoverTab') }],
+                            );
+                          } catch {
+                            Alert.alert(
+                              t('blockFailedTitle', 'Block failed'),
+                              t('blockFailedMessage', 'We could not block this profile. Check your connection and try again.'),
+                            );
+                          }
                         }
                       }
                     ]

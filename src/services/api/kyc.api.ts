@@ -49,14 +49,20 @@ export const submitKycDocument = async (data: {
   formData.append('docNumber', num);
   formData.append('legalName', name);
   const frontUri = data.frontDocUri!;
-  const frontFilename = frontUri.split('/').pop() || 'front.jpg';
+  let frontFilename = frontUri.split('/').pop() || 'front.jpg';
+  if (!frontFilename.includes('.')) {
+    frontFilename += '.jpg';
+  }
   formData.append('frontDoc', {
     uri: frontUri,
     name: frontFilename,
     type: frontFilename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
   } as unknown as Blob);
   if (isLocalFile(data.backDocUri)) {
-    const backFilename = data.backDocUri!.split('/').pop() || 'back.jpg';
+    let backFilename = data.backDocUri!.split('/').pop() || 'back.jpg';
+    if (!backFilename.includes('.')) {
+      backFilename += '.jpg';
+    }
     formData.append('backDoc', {
       uri: data.backDocUri,
       name: backFilename,
@@ -64,9 +70,7 @@ export const submitKycDocument = async (data: {
     } as unknown as Blob);
   }
 
-  const res = await apiClient.post<{ message: string }>('/kyc/document', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const res = await apiClient.post<{ message: string }>('/kyc/document', formData, { timeout: 60_000 });
   return res.data;
 };
 
@@ -78,16 +82,17 @@ export const submitKycSelfie = async (localUri: string): Promise<{ message: stri
   }
 
   const formData = new FormData();
-  const filename = localUri.split('/').pop() || 'selfie.jpg';
+  let filename = localUri.split('/').pop() || 'selfie.jpg';
+  if (!filename.includes('.')) {
+    filename += '.jpg';
+  }
   formData.append('file', {
     uri: localUri,
     name: filename,
     type: filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
   } as unknown as Blob);
 
-  const res = await apiClient.post<{ message: string }>('/kyc/selfie', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const res = await apiClient.post<{ message: string }>('/kyc/selfie', formData, { timeout: 60_000 });
   return res.data;
 };
 
@@ -99,12 +104,17 @@ export const submitKycLiveness = async (localUri: string): Promise<{ message: st
   }
 
   const formData = new FormData();
-  const filename = localUri.split('/').pop() || 'liveness.mp4';
-  formData.append('file', { uri: localUri, name: filename, type: 'video/mp4' } as unknown as Blob);
+  let filename = localUri.split('/').pop() || 'liveness.mp4';
+  if (!filename.includes('.')) {
+    filename += '.mp4';
+  }
+  formData.append('file', {
+    uri: localUri,
+    name: filename,
+    type: filename.toLowerCase().endsWith('.mov') ? 'video/quicktime' : 'video/mp4',
+  } as unknown as Blob);
 
-  const res = await apiClient.post<{ message: string }>('/kyc/liveness', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const res = await apiClient.post<{ message: string }>('/kyc/liveness', formData, { timeout: 60_000 });
   return res.data;
 };
 

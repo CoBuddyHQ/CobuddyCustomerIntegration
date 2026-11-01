@@ -82,6 +82,7 @@ export const deleteTrustedContact = async (id: string): Promise<{ message: strin
 export const createIncidentReport = async (data: {
   companionId?: string;
   bookingId?: string;
+  incidentType?: string;
   description: string;
   evidenceUrls?: string[];
 }): Promise<IncidentReport> => {

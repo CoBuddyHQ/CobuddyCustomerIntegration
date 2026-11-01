@@ -86,9 +86,14 @@ customerApiClient.interceptors.request.use(
     }
     if (
       config.data instanceof FormData ||
-      (config.headers && config.headers['Content-Type'] === 'multipart/form-data')
+      (config.headers && (config.headers['Content-Type'] === 'multipart/form-data' || (config.headers as any)['content-type'] === 'multipart/form-data'))
     ) {
-      delete config.headers['Content-Type'];
+      if (typeof config.headers.delete === 'function') {
+        config.headers.delete('Content-Type');
+        config.headers.delete('content-type');
+      }
+      delete (config.headers as any)['Content-Type'];
+      delete (config.headers as any)['content-type'];
     }
     if (ENV.enableLogging && typeof __DEV__ !== 'undefined' && __DEV__) {
       console.log(`[Customer API] ${config.method?.toUpperCase()} request`);

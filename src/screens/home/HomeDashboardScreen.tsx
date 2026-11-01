@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -65,8 +65,14 @@ export const HomeDashboardScreen = () => {
     });
   }, [selectedInterests, categories]);
 
-  const loadHomeData = useCallback(async () => {
-    setLoading(true);
+  const isFetchingRef = useRef(false);
+
+  const loadHomeData = useCallback(async (isInitial = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    if (isInitial) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const homeData = await discoveryApi.getHomeDashboardData();
@@ -86,7 +92,12 @@ export const HomeDashboardScreen = () => {
         setBookingCount(homeData.quickAccess?.bookingCount || 0);
         setActiveBooking(homeData.activeBooking || null);
 
-        if (homeData.profile?.name) {
+        if (
+          homeData.profile?.name &&
+          (user?.name !== homeData.profile.name ||
+            user?.avatar !== (homeData.profile.photoUrl || null) ||
+            user?.city !== (homeData.profile.city || null))
+        ) {
           updateUser({
             name: homeData.profile.name,
             avatar: homeData.profile.photoUrl || null,
@@ -99,24 +110,30 @@ export const HomeDashboardScreen = () => {
       console.error('[HomeDashboardScreen] Error loading home data:', err);
       setError('Unable to load home data. Tap to retry.');
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
-  }, [updateUser]);
+  }, [updateUser, user?.name, user?.avatar, user?.city]);
+
+  const loadHomeDataRef = useRef(loadHomeData);
+  useEffect(() => {
+    loadHomeDataRef.current = loadHomeData;
+  }, [loadHomeData]);
 
   useFocusEffect(
     useCallback(() => {
-      loadHomeData();
+      loadHomeDataRef.current(false);
       const interval = setInterval(() => {
-        loadHomeData();
-      }, 8000);
+        loadHomeDataRef.current(false);
+      }, 15000);
       return () => clearInterval(interval);
-    }, [loadHomeData])
+    }, [])
   );
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadHomeData();
+    loadHomeData(false);
   };
 
   const hasActiveBooking = !!activeBooking;
@@ -167,7 +184,7 @@ export const HomeDashboardScreen = () => {
           <View style={styles.errorCard}>
             <Icon name="alert-circle-outline" size={32} color={theme.colors.error} />
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={loadHomeData}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => loadHomeData(true)}>
               <Text style={styles.retryBtnText}>Retry</Text>
             </TouchableOpacity>
           </View>

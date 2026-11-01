@@ -13,11 +13,15 @@ import { RootStackParamList } from '../../types/navigation';
 export const IncidentReportScreen = () => { 
   const { t } = useTranslation('safety.report');
   const INCIDENT_TYPES = adminValues.incidentTypes;
-  const route = useRoute<RouteProp<RootStackParamList, 'IncidentReportScreen'>>();
+  const route = useRoute<any>();
   const { smartGoBack } = useSmartNavigation();
+
+  const companionId = route.params?.companionId;
+  const companionName = route.params?.companionName;
+  const bookingId = route.params?.bookingId;
   
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [bookingRef, setBookingRef] = useState('');
+  const [bookingRef, setBookingRef] = useState(companionName ? `Companion: ${companionName}` : '');
   const [description, setDescription] = useState('');
   const [evidenceUris, setEvidenceUris] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,23 +46,25 @@ export const IncidentReportScreen = () => {
     setIsSubmitting(true);
     try {
       await safetyApi.createIncidentReport({
-        companionId: route.params?.companionId,
-        bookingId: route.params?.bookingId,
+        companionId: companionId,
+        bookingId: bookingId,
+        incidentType: selectedType,
         description: [
-          `[${selectedType}] ${description.trim()}`,
-          bookingRef.trim() ? `Reference supplied by customer: ${bookingRef.trim()}` : '',
+          `[${selectedType.toUpperCase()}] ${description.trim()}`,
+          bookingRef.trim() ? `Reference: ${bookingRef.trim()}` : (companionName ? `Reported Companion: ${companionName}` : ''),
         ].filter(Boolean).join('\n'),
         evidenceUrls: evidenceUris,
       });
       Alert.alert(
-        'Report recorded',
-        'The Customer service stored the report. External emergency dispatch and Admin review were not confirmed.',
+        'Report Submitted',
+        'Your report has been submitted to the CoBuddy Trust & Safety team. Our moderation team will review it shortly.',
         [{ text: t('okBtn', 'OK'), onPress: () => smartGoBack() }],
       );
-    } catch {
+    } catch (err) {
+      console.error('Report submission failed:', err);
       Alert.alert(
         'Report not submitted',
-        'The Customer service did not confirm the report. Please retry when connected.',
+        'Could not submit report at this time. Please check your connection and try again.',
       );
     } finally {
       setIsSubmitting(false);
@@ -86,6 +92,22 @@ export const IncidentReportScreen = () => {
               {t('confidentialAlert', 'All reports are strictly confidential. In case of immediate physical danger, please contact local authorities (112) first.')}
             </Text>
           </View>
+
+          {companionName ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A2332', borderWidth: 1, borderColor: '#2A3B50', borderRadius: 12, padding: 12, marginBottom: 16 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(239, 68, 68, 0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                <Icon name="flag-outline" size={22} color="#EF4444" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' }}>
+                  Reporting Companion
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.textPrimary, marginTop: 2 }}>
+                  {companionName}
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
           <Text style={styles.sectionTitle}>{t('whatHappened', 'WHAT HAPPENED?')}</Text>
           <View style={styles.typeContainer}>

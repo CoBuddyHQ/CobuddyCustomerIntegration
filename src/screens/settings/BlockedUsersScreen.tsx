@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -13,9 +13,14 @@ export const BlockedUsersScreen = () => {
   const { smartGoBack } = useSmartNavigation();
   const [blockedUsers, setBlockedUsers] = useState<{ id: string; name: string; date: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [unblockingId, setUnblockingId] = useState<string | null>(null);
 
   React.useEffect(() => {
     let isMounted = true;
+    setIsLoading(true);
+    setLoadFailed(false);
     accountApi.getBlockedUsers().then(list => {
       if (isMounted) {
         setBlockedUsers((list || []).map(u => ({
@@ -24,9 +29,11 @@ export const BlockedUsersScreen = () => {
           date: u.blockedAt ? new Date(u.blockedAt).toLocaleDateString() : 'Recently',
         })));
       }
-    }).catch(() => {}).finally(() => { if (isMounted) setIsLoading(false); });
+    }).catch(() => {
+      if (isMounted) setLoadFailed(true);
+    }).finally(() => { if (isMounted) setIsLoading(false); });
     return () => { isMounted = false; };
-  }, []);
+  }, [retryCount]);
 
   const handleUnblock = (user: { id: string; name: string; date: string }) => {
     Alert.alert(
@@ -38,11 +45,17 @@ export const BlockedUsersScreen = () => {
           text: t('unblockBtn', 'Unblock'), 
           style: "destructive",
           onPress: async () => {
-            setBlockedUsers(prev => prev.filter(u => u.id !== user.id));
+            setUnblockingId(user.id);
             try {
               await accountApi.unblockUser(user.id);
+              setBlockedUsers(prev => prev.filter(u => u.id !== user.id));
             } catch {
-              // Ignored
+              Alert.alert(
+                t('unblockFailedTitle', 'Could not unblock user'),
+                t('unblockFailedMessage', 'Check your connection and try again. The blocked status has not been changed.'),
+              );
+            } finally {
+              setUnblockingId(null);
             }
           }
         }
@@ -70,7 +83,15 @@ export const BlockedUsersScreen = () => {
         </View>
 
         {isLoading ? (
-          <Text style={styles.emptySub}>Loading blocked users…</Text>
+          <View style={styles.emptyState}><ActivityIndicator color={theme.colors.primary} /></View>
+        ) : loadFailed ? (
+          <View style={styles.emptyState}>
+            <Text accessibilityRole="alert" style={styles.emptyTitle}>{t('loadFailedTitle', 'Could not load blocked users')}</Text>
+            <Text style={styles.emptySub}>{t('loadFailedMessage', 'Check your connection and retry. We will not treat a loading failure as an empty list.')}</Text>
+            <TouchableOpacity style={styles.unblockBtn} onPress={() => setRetryCount(count => count + 1)} accessibilityRole="button">
+              <Text style={styles.unblockText}>{t('retry', 'Retry')}</Text>
+            </TouchableOpacity>
+          </View>
         ) : blockedUsers.length > 0 ? (
             <View style={styles.listContainer}>
                 {blockedUsers.map((user, index) => (
@@ -85,11 +106,11 @@ export const BlockedUsersScreen = () => {
                             </View>
                         </View>
                         <TouchableOpacity 
-                            style={styles.unblockBtn}
+                            style={[styles.unblockBtn, unblockingId === user.id && { opacity: 0.6 }]}
                             activeOpacity={0.7}
-                            onPress={() => handleUnblock(user)} accessibilityRole="button" accessibilityLabel={t('a11yUnblock', 'Unblock')}
+                            onPress={() => handleUnblock(user)} disabled={unblockingId !== null} accessibilityRole="button" accessibilityLabel={t('a11yUnblock', 'Unblock')}
                         >
-                            <Text style={styles.unblockText}>{t('unblock', 'Unblock')}</Text>
+                            <Text style={styles.unblockText}>{unblockingId === user.id ? t('unblocking', 'Unblocking…') : t('unblock', 'Unblock')}</Text>
                         </TouchableOpacity>
                     </View>
                 ))}
