@@ -66,7 +66,8 @@ export const BookingDetailScreen = () => {
             if (res) {
               setApiBooking(res);
               const st = (res.status || '').toLowerCase().trim();
-              if (['in_progress', 'active', 'started'].includes(st) && !hasAutoNavigated) {
+              const sst = ((res as any)?.sessions?.[0]?.status || '').toLowerCase().trim();
+              if ((['in_progress', 'active', 'started'].includes(st) || ['active', 'in_progress', 'started', 'extending'].includes(sst)) && !hasAutoNavigated) {
                 hasAutoNavigated = true;
                 const rootNav = (navigation.getParent() || navigation) as any;
                 rootNav.navigate('LiveSessionStack', {
@@ -87,8 +88,10 @@ export const BookingDetailScreen = () => {
   );
 
   const rawStatus = (apiBooking?.status || route.params?.status || 'pending').toLowerCase().trim();
-  const isAccepted = ['accepted', 'confirmed'].includes(rawStatus);
-  const isInProgress = ['in_progress', 'active', 'ongoing', 'started'].includes(rawStatus);
+  const sessionStatus = ((apiBooking as any)?.sessions?.[0]?.status || '').toLowerCase().trim();
+  const isInProgress = ['in_progress', 'active', 'ongoing', 'started'].includes(rawStatus) ||
+                       ['active', 'in_progress', 'started', 'extending'].includes(sessionStatus);
+  const isAccepted = (['accepted', 'confirmed'].includes(rawStatus) || !rawStatus) && !isInProgress;
   const isCompleted = ['completed', 'finished', 'history'].includes(rawStatus);
   const isDeclined = ['declined', 'rejected'].includes(rawStatus);
   const isCancelled = ['cancelled', 'canceled'].includes(rawStatus);

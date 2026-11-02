@@ -52,21 +52,20 @@ export const ActiveSessionScreen = () => {
         } else if (requestedBookingId) {
           specific = await sessionApi.getSessionForBooking(requestedBookingId);
         }
-          if (!isMounted) return;
-          if (specific && isConfirmedTerminalSession(specific, requestedSessionId)) {
-            if (!hasNavigatedRef.current) {
-              hasNavigatedRef.current = true;
-              setTimeLeft(0);
-              navigation.replace('SessionCompleteScreen', {
-                bookingId: route.params?.bookingId || specific?.bookingId,
-                companionId: route.params?.companionId || specific?.companionId,
-                companionName,
-                sessionId: requestedSessionId,
-                sessionStatus: specific.status,
-              });
-            }
-            return;
+        if (!isMounted) return;
+        if (specific && isConfirmedTerminalSession(specific, requestedSessionId)) {
+          if (!hasNavigatedRef.current) {
+            hasNavigatedRef.current = true;
+            setTimeLeft(0);
+            navigation.replace('SessionCompleteScreen', {
+              bookingId: route.params?.bookingId || specific?.bookingId,
+              companionId: route.params?.companionId || specific?.companionId,
+              companionName,
+              sessionId: requestedSessionId,
+              sessionStatus: specific.status,
+            });
           }
+          return;
         }
 
         const session = (specific && ['active', 'extending'].includes(specific.status))

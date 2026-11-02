@@ -23,8 +23,8 @@ export interface Notification {
 }
 
 // ─── List notifications ───────────────────────────────────────────────────────
-export const listNotifications = async (): Promise<Notification[]> => {
-  const res = await apiClient.get<any>('/notifications');
+export const listNotifications = async (page = 1, limit = 20): Promise<Notification[]> => {
+  const res = await apiClient.get<any>('/notifications?page=' + page + '&limit=' + limit);
   const data = res.data;
   if (Array.isArray(data)) return data;
   if (data?.notifications && Array.isArray(data.notifications)) return data.notifications;
