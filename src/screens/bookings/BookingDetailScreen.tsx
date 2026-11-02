@@ -66,7 +66,7 @@ export const BookingDetailScreen = () => {
             if (res) {
               setApiBooking(res);
               const st = (res.status || '').toLowerCase().trim();
-              const sst = ((res as any)?.sessions?.[0]?.status || '').toLowerCase().trim();
+              const sst = ((res as any)?.sessionStatus || (res as any)?.sessions?.[0]?.status || '').toLowerCase().trim();
               if ((['in_progress', 'active', 'started'].includes(st) || ['active', 'in_progress', 'started', 'extending'].includes(sst)) && !hasAutoNavigated) {
                 hasAutoNavigated = true;
                 const rootNav = (navigation.getParent() || navigation) as any;
@@ -88,7 +88,11 @@ export const BookingDetailScreen = () => {
   );
 
   const rawStatus = (apiBooking?.status || route.params?.status || 'pending').toLowerCase().trim();
-  const sessionStatus = ((apiBooking as any)?.sessions?.[0]?.status || '').toLowerCase().trim();
+  const sessionStatus = (
+    (apiBooking as any)?.sessionStatus ||
+    (apiBooking as any)?.sessions?.[0]?.status ||
+    ''
+  ).toLowerCase().trim();
   const isInProgress = ['in_progress', 'active', 'ongoing', 'started'].includes(rawStatus) ||
                        ['active', 'in_progress', 'started', 'extending'].includes(sessionStatus);
   const isAccepted = (['accepted', 'confirmed'].includes(rawStatus) || !rawStatus) && !isInProgress;
@@ -106,7 +110,13 @@ export const BookingDetailScreen = () => {
       setSessionSecondsRemaining(null);
       return;
     }
-    const startedAt = (apiBooking as any)?.startedAt || (apiBooking as any)?.checkInTime || (apiBooking as any)?.acceptedAt || (apiBooking as any)?.updatedAt || new Date().toISOString();
+    const startedAt =
+      (apiBooking as any)?.startedAt ||
+      (apiBooking as any)?.checkInTime ||
+      (apiBooking as any)?.sessions?.[0]?.checkInTime ||
+      (apiBooking as any)?.acceptedAt ||
+      (apiBooking as any)?.updatedAt ||
+      new Date().toISOString();
     const startTimeMs = new Date(startedAt).getTime() || Date.now();
     const durationHours = Number(apiBooking?.durationHours || (apiBooking as any)?.duration || 1);
     const totalDurationSeconds = Math.max(durationHours * 3600, 1800);
@@ -121,7 +131,13 @@ export const BookingDetailScreen = () => {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [isInProgress, (apiBooking as any)?.startedAt, (apiBooking as any)?.checkInTime, apiBooking?.durationHours]);
+  }, [
+    isInProgress,
+    (apiBooking as any)?.startedAt,
+    (apiBooking as any)?.checkInTime,
+    (apiBooking as any)?.sessionStatus,
+    apiBooking?.durationHours,
+  ]);
 
   const formatCountdown = (secs: number | null) => {
     if (secs === null || secs <= 0) return '00:00:00';
