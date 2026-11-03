@@ -27,22 +27,33 @@ export const CompanionChatScreen = () => {
   );
   const bookingId = route.params?.bookingId || '';
   const companionId = route.params?.companionId || '';
-  const initialConversationId = route.params?.conversationId || '';
+  const paramConversationId = route.params?.conversationId || '';
   const initialIsOnline = route.params?.isOnline || false;
   
-  const [conversationId, setConversationId] = useState<string>(initialConversationId);
+  const [conversationId, setConversationId] = useState<string>(paramConversationId);
   const [isOnline, setIsOnline] = useState<boolean>(initialIsOnline);
   const [isOptionsMenuVisible, setOptionsMenuVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const [messages, setMessages] = useState<any[]>([]);
 
+  // Sync state if route params change on navigation
+  React.useEffect(() => {
+    if (paramConversationId && paramConversationId !== conversationId) {
+      setConversationId(paramConversationId);
+    }
+    if (rawName && rawName !== 'Unavailable') {
+      setCompanionName(rawName);
+    }
+  }, [paramConversationId, rawName]);
+
   // Bootstrap conversation and fetch messages
   React.useEffect(() => {
     let isMounted = true;
+    let pollInterval: any = null;
 
     async function initChat() {
-      let activeConvId = conversationId;
+      let activeConvId = paramConversationId || conversationId;
       let activeCompId = companionId;
       let activeBookId = bookingId;
 
@@ -121,6 +132,27 @@ export const CompanionChatScreen = () => {
             setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
           }
         });
+
+        // Fallback polling every 3 seconds to keep chat in sync
+        pollInterval = setInterval(async () => {
+          if (!isMounted) return;
+          try {
+            const apiMsgs = await chatApi.getMessages(activeConvId);
+            if (isMounted && apiMsgs?.data) {
+              setMessages(
+                apiMsgs.data.map(m => ({
+                  id: m.id,
+                  type: 'text',
+                  text: m.text || '',
+                  sender: m.senderType === 'companion' ? 'them' : m.senderType === 'staff' ? 'staff' : 'me',
+                  time: m.createdAt
+                    ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : 'Now',
+                })),
+              );
+            }
+          } catch {}
+        }, 3000);
       }
     }
 
@@ -128,9 +160,10 @@ export const CompanionChatScreen = () => {
 
     return () => {
       isMounted = false;
+      if (pollInterval) clearInterval(pollInterval);
       chatSocketService.disconnect();
     };
-  }, [conversationId, companionId, bookingId]);
+  }, [conversationId, companionId, bookingId, paramConversationId]);
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
@@ -243,10 +276,10 @@ export const CompanionChatScreen = () => {
           <Text style={styles.dateText}>{t('dateText', 'TODAY')}</Text>
         </View>
 
-        {messages.map((msg) => {
+        {messages.map((msg, index) => {
           if (msg.type === 'system') {
             return (
-              <View key={msg.id} style={styles.systemBubble}>
+              <View key={`${msg.id || 'sys'}-${index}`} style={styles.systemBubble}>
                 <Text style={styles.systemText}>{msg.text}</Text>
                 <Text style={styles.systemTime}>{msg.time}</Text>
               </View>
@@ -255,7 +288,7 @@ export const CompanionChatScreen = () => {
 
           const isMe = msg.sender === 'me';
           return (
-            <View key={msg.id} style={[styles.messageRow, isMe ? styles.messageRowMe : styles.messageRowThem]}>
+            <View key={`${msg.id || 'msg'}-${index}`} style={[styles.messageRow, isMe ? styles.messageRowMe : styles.messageRowThem]}>
               <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
                 <Text style={[styles.bubbleText, isMe && { color: theme.colors.background }]}>{msg.text}</Text>
                 <Text style={[styles.msgTime, isMe && { color: 'rgba(0,0,0,0.5)' }]}>{msg.time}</Text>

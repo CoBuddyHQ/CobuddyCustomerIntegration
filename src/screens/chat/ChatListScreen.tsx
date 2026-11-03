@@ -11,7 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { chatApi, bookingApi, Conversation } from '../../services/api';
@@ -62,9 +62,11 @@ export const ChatListScreen = () => {
     } catch {}
   }, []);
 
-  React.useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchConversations();
+    }, [fetchConversations])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
