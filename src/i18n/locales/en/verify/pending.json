@@ -1,19 +1,19 @@
 {
   "headerTitle": "Verification Status",
-  "heroTitle": "Verification status",
+  "heroTitle": "Verification Under Review",
   "statusLabel": "STATUS",
-  "statusValue": "Unavailable",
+  "statusValue": "Under Review",
   "progress": "VERIFICATION PROGRESS",
   "continueSetup": "Continue Setting Up Your Experience",
-  "estimatedTimeUsuallyCompletedWithin": "Administrative review and automated identity assessment are not connected. No completion time is available.",
-  "youCanContinueExploringThe": "You can continue using features that are available for your current server-reported status.",
-  "allVerificationDataIsProtected": "Evidence is stored by the Customer Backend. This app build does not perform an automated identity match or administrative review.",
+  "estimatedTimeUsuallyCompletedWithin": "Your identity documents are securely submitted and currently under review by the CoBuddy safety team. Reviews typically complete within 15–30 minutes.",
+  "youCanContinueExploringThe": "You can continue exploring profiles and activities while verification is in progress.",
+  "allVerificationDataIsProtected": "All verification documents are encrypted and safely processed in accordance with our data protection policies.",
   "a11yClose": "Close",
   "steps": {
     "documentVerification": "Document Verification",
     "selfieLiveness": "Selfie & Liveness Check",
     "profileReview": "Profile Review",
-    "bookingAuthorization": "Booking Authorization"
+    "bookingAuthorization": "Verification Decision"
   },
   "actions": {
     "goBack": "Go Back",

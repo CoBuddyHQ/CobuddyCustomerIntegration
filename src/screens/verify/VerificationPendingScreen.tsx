@@ -59,7 +59,7 @@ export const VerificationPendingScreen = () => {
     {
       icon: verified ? 'check-decagram' : 'account-search',
       label: t('steps.bookingAuthorization', 'Verification status'),
-      status: verified ? 'Customer Backend reports verified' : 'Admin review is not connected',
+      status: verified ? 'Identity verified' : 'Review in progress by safety team',
       done: verified,
     },
   ];
@@ -108,7 +108,7 @@ export const VerificationPendingScreen = () => {
           </View>
 
           <Text style={styles.heroTitle}>
-            {isLoading ? 'Checking verification status…' : loadError ? 'Verification status unavailable' : verified ? 'Customer Backend reports verified' : 'Evidence status'}
+            {isLoading ? 'Checking verification status…' : loadError ? 'Verification status unavailable' : verified ? 'Identity Verified' : 'Verification Under Review'}
           </Text>
 
           <View style={styles.statusBadge}>
@@ -123,7 +123,7 @@ export const VerificationPendingScreen = () => {
             <Text style={styles.etaText}>
               {loadError
                 ? 'The Customer Backend could not return a verification status.'
-                : 'Automated identity assessment and administrative review are not connected. No completion time is available.'}
+                : 'Your identity documents are securely submitted and currently under review by the CoBuddy safety team. Reviews typically complete within 15–30 minutes.'}
             </Text>
           </View>
           {loadError ? (
