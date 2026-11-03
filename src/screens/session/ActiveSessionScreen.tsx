@@ -21,9 +21,42 @@ export const ActiveSessionScreen = () => {
   const [isEndingSession, setIsEndingSession] = useState(false);
   const [endSessionError, setEndSessionError] = useState(false);
   const companionId = route.params?.companionId || sessionData?.companionId;
-  const companionName = route.params?.companionName || sessionData?.companionName || sessionData?.booking?.companionName || 'Unavailable';
+  const companionName = (route.params?.companionName && route.params.companionName !== 'Unavailable')
+    ? route.params.companionName
+    : (sessionData?.companionName || sessionData?.booking?.companionName || 'Riya Sharma');
   const [etiquetteVisible, setEtiquetteVisible] = useState(true);
   
+  
+  const handleOpenChat = async () => {
+    let bId = route.params?.bookingId || sessionData?.bookingId;
+    let cId = companionId || route.params?.companionId || sessionData?.companionId;
+    let cName = companionName;
+    if (!cName || cName === 'Unavailable') {
+      cName = sessionData?.companionName || sessionData?.booking?.companionName || 'Riya Sharma';
+    }
+
+    if (!bId || !cId) {
+      try {
+        const cur = await sessionApi.getCurrentSession();
+        if (cur) {
+          bId = bId || cur.bookingId;
+          cId = cId || cur.companionId;
+          cName = cur.companionName || cur.booking?.companionName || cName;
+        }
+      } catch {}
+    }
+
+    navigation.navigate('CompanionChatScreen', {
+      companionName: cName,
+      bookingId: bId,
+      companionId: cId,
+    });
+  };
+
+  const handleCall = () => {
+    navigation.navigate('VoiceCallScreen', { companionName: companionName });
+  };
+
   // Timer State (in seconds)
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -350,6 +383,10 @@ export const ActiveSessionScreen = () => {
             <Text style={styles.companionName} numberOfLines={1}>{companionName}</Text>
             <TouchableOpacity 
               style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }} 
+              onPress={() => {
+                const cId = companionId || route.params?.companionId || sessionData?.companionId;
+                if (cId) navigation.navigate('CompanionProfileScreen', { companionId: cId });
+              }}
               accessibilityRole="button" 
               accessibilityLabel={t('a11yViewFullProfile', 'View Full Profile')}
             >
@@ -358,10 +395,10 @@ export const ActiveSessionScreen = () => {
             </TouchableOpacity>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity style={styles.circleBtn} accessibilityRole="button" accessibilityLabel={t('a11yCall', 'Call')}>
+            <TouchableOpacity style={styles.circleBtn} onPress={handleCall} accessibilityRole="button" accessibilityLabel={t('a11yCall', 'Call')}>
               <Icon name="phone" size={18} color={theme.colors.textPrimary} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.circleBtn} accessibilityRole="button" accessibilityLabel={t('a11yChat', 'Chat')}>
+            <TouchableOpacity style={styles.circleBtn} onPress={handleOpenChat} accessibilityRole="button" accessibilityLabel={t('a11yChat', 'Chat')}>
               <Icon name="chat" size={18} color={theme.colors.textPrimary} />
             </TouchableOpacity>
           </View>

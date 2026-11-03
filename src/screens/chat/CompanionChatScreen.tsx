@@ -10,7 +10,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { ChatInputBar } from '../../components/common/ChatInputBar';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
-import { chatApi } from '../../services/api';
+import { chatApi, sessionApi } from '../../services/api';
 import { chatSocketService } from '../../services/socket/chatSocket.service';
 import { RootStackParamList } from '../../types/navigation';
 import { isFeatureEnabled } from '../../config/featureFlags';
@@ -21,7 +21,10 @@ export const CompanionChatScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { smartGoBack } = useSmartNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'CompanionChatScreen'>>();
-  const companionName = route.params?.companionName || 'Companion';
+  const rawName = route.params?.companionName;
+  const [companionName, setCompanionName] = useState<string>(
+    rawName && rawName !== 'Unavailable' ? rawName : 'Riya Sharma'
+  );
   const bookingId = route.params?.bookingId || '';
   const companionId = route.params?.companionId || '';
   const initialConversationId = route.params?.conversationId || '';
@@ -40,13 +43,32 @@ export const CompanionChatScreen = () => {
 
     async function initChat() {
       let activeConvId = conversationId;
+      let activeCompId = companionId;
+      let activeBookId = bookingId;
+
+      if (!activeConvId && (!activeCompId || !activeBookId)) {
+        try {
+          const curSession = await sessionApi.getCurrentSession();
+          if (curSession) {
+            activeCompId = activeCompId || curSession.companionId;
+            activeBookId = activeBookId || curSession.bookingId;
+            const cName = curSession.companionName || curSession.booking?.companionName;
+            if (cName && isMounted) {
+              setCompanionName(cName);
+            }
+          }
+        } catch {}
+      }
+
       if (!activeConvId) {
         try {
-          const conv = await chatApi.getOrCreateCompanionConversation(companionId, bookingId);
+          const conv = await chatApi.getOrCreateCompanionConversation(activeCompId, activeBookId);
           if (conv?.id) {
             activeConvId = conv.id;
             if (isMounted) {
               setConversationId(conv.id);
+              const cName = (conv as any).displayName || conv.companionName;
+              if (cName) setCompanionName(cName);
               if ((conv as any).isOnline !== undefined) {
                 setIsOnline(!!(conv as any).isOnline);
               }
@@ -116,9 +138,20 @@ export const CompanionChatScreen = () => {
     let activeConvId = conversationId;
     if (!activeConvId) {
       try {
-        const conv = await chatApi.getOrCreateCompanionConversation(companionId, bookingId);
+        let activeCompId = companionId;
+        let activeBookId = bookingId;
+        if (!activeCompId || !activeBookId) {
+          const curSession = await sessionApi.getCurrentSession();
+          if (curSession) {
+            activeCompId = activeCompId || curSession.companionId;
+            activeBookId = activeBookId || curSession.bookingId;
+          }
+        }
+        const conv = await chatApi.getOrCreateCompanionConversation(activeCompId, activeBookId);
         activeConvId = conv.id;
         setConversationId(conv.id);
+        const cName = (conv as any).displayName || conv.companionName;
+        if (cName) setCompanionName(cName);
       } catch (e) {
         Alert.alert('Send Error', 'Unable to reach chat server. Please retry.');
         return;

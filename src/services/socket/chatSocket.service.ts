@@ -24,11 +24,14 @@ class ChatSocketService {
       this.socket?.emit('join_conversation', { conversationId });
     });
 
-    this.socket.on('receive_message', (msg: any) => {
+    const handleIncoming = (msg: any) => {
       if (msg && (!msg.conversationId || msg.conversationId === this.currentConversationId)) {
         onMessage(msg);
       }
-    });
+    };
+
+    this.socket.on('receive_message', handleIncoming);
+    this.socket.on('new_message', handleIncoming);
   }
 
   disconnect() {
@@ -44,3 +47,4 @@ class ChatSocketService {
 }
 
 export const chatSocketService = new ChatSocketService();
+
