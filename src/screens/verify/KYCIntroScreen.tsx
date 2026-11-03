@@ -28,14 +28,14 @@ export const KYCIntroScreen = () => {
         </View>
 
         <Text style={styles.title}>{t('verifyIdentity', 'Identity verification')}</Text>
-        <Text style={styles.subtitle}>{t('toEnsureASafeAnd', 'The Customer Backend requires a server-reported verification status for booking. Document upload and identity review are unavailable in this app build.')}</Text>
+        <Text style={styles.subtitle}>{t('toEnsureASafeAnd', 'To ensure a safe and trusted community for everyone, please verify your government ID and selfie.')}</Text>
 
         <View style={styles.features}>
           <View style={styles.featureRow}>
             <Icon name="card-account-details-outline" size={24} color={theme.colors.primary} />
             <View style={styles.featureTextWrap}>
               <Text style={styles.featureTitle}>{t('govId', 'Identity document evidence')}</Text>
-              <Text style={styles.featureDesc}>{t('govIdDesc', 'A real document picker is not installed. No identity document can be uploaded from this app build.')}</Text>
+              <Text style={styles.featureDesc}>{t('govIdDesc', 'Upload a clear photo of your government-issued ID (Aadhaar, PAN, Passport, DL, or Voter ID).')}</Text>
             </View>
           </View>
 
@@ -43,7 +43,7 @@ export const KYCIntroScreen = () => {
             <Icon name="face-recognition" size={24} color={theme.colors.primary} />
             <View style={styles.featureTextWrap}>
               <Text style={styles.featureTitle}>{t('livenessCheck', 'Selfie evidence')}</Text>
-              <Text style={styles.featureDesc}>{t('livenessDesc', 'Camera support and automated identity matching are unavailable in this app build.')}</Text>
+              <Text style={styles.featureDesc}>{t('livenessDesc', 'Take a quick selfie to verify that your ID document belongs to you.')}</Text>
             </View>
           </View>
         </View>
@@ -51,7 +51,7 @@ export const KYCIntroScreen = () => {
 
       <View style={styles.bottomBar}>
         <Text style={styles.privacyText}>
-          <Icon name="information-outline" size={12} color={theme.colors.textSecondary} /> {t('dataSecureNotice', 'Do not enter sensitive identity details while document upload is unavailable.')}
+          <Icon name="information-outline" size={12} color={theme.colors.textSecondary} /> {t('dataSecureNotice', 'Your identity documents are encrypted and securely reviewed by our verification team.')}
         </Text>
         <TouchableOpacity
           style={styles.nextBtn}

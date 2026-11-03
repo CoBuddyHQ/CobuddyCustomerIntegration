@@ -1,12 +1,12 @@
 {
   "verifyIdentity": "Identity verification",
   "govId": "Identity document evidence",
-  "govIdDesc": "A real document picker is not installed. No identity document can be uploaded from this app build.",
+  "govIdDesc": "Upload a clear photo of your government-issued ID (Aadhaar, PAN, Passport, DL, or Voter ID).",
   "livenessCheck": "Selfie evidence",
-  "livenessDesc": "Camera support and automated identity matching are unavailable in this app build.",
+  "livenessDesc": "Take a quick selfie to verify that your ID document belongs to you.",
   "startVerify": "Start Verification",
-  "toEnsureASafeAnd": "The Customer Backend requires a server-reported verification status for booking. Document upload and identity review are unavailable in this app build.",
+  "toEnsureASafeAnd": "To ensure a safe and trusted community for everyone, please verify your government ID and selfie.",
   "a11yClose": "Close",
   "a11yStartVerification": "Start Verification",
-  "dataSecureNotice": "Do not enter sensitive identity details while document upload is unavailable."
+  "dataSecureNotice": "Your identity documents are encrypted and securely reviewed by our verification team."
 }

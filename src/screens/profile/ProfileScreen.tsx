@@ -248,18 +248,45 @@ export const ProfileScreen = () => {
             </View> : null}
 
             {/* Govt ID (Conditional) */}
-            <View style={[styles.verifyItem, user.kycStatus !== 'verified' && { borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
-              <View style={[styles.verifyIconBox, user.kycStatus !== 'verified' && { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+            <View style={[
+              styles.verifyItem,
+              user.kycStatus === 'verified' && { borderColor: 'rgba(16, 185, 129, 0.3)', backgroundColor: 'rgba(16, 185, 129, 0.05)' },
+              user.kycStatus === 'pending' && { borderColor: 'rgba(245, 158, 11, 0.3)', backgroundColor: 'rgba(245, 158, 11, 0.05)' },
+              (user.kycStatus === 'unverified' || user.kycStatus === 'rejected') && { borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.05)' },
+            ]}>
+              <View style={[
+                styles.verifyIconBox,
+                user.kycStatus === 'verified' && { backgroundColor: 'rgba(16, 185, 129, 0.1)' },
+                user.kycStatus === 'pending' && { backgroundColor: 'rgba(245, 158, 11, 0.1)' },
+                (user.kycStatus === 'unverified' || user.kycStatus === 'rejected') && { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
+              ]}>
                 <Icon 
-                  name={user.kycStatus === 'verified' ? "card-account-details-outline" : "alert-circle-outline"} 
+                  name={
+                    user.kycStatus === 'verified' ? 'check-decagram' :
+                    user.kycStatus === 'pending' ? 'clock-outline' : 'alert-circle-outline'
+                  } 
                   size={18} 
-                  color={user.kycStatus === 'verified' ? theme.colors.primary : theme.colors.error} 
+                  color={
+                    user.kycStatus === 'verified' ? theme.colors.primary :
+                    user.kycStatus === 'pending' ? '#F59E0B' : theme.colors.error
+                  } 
                 />
               </View>
               <View style={styles.verifyMeta}>
                 <Text style={styles.verifyTitle}>{t('govId', 'Government ID')}</Text>
-                <Text style={[styles.verifySub, user.kycStatus !== 'verified' && {color: theme.colors.error}]}>
-                  {user.kycStatus === 'verified' ? t('kycDocumentsReviewed', 'Verification status confirmed by CoBuddy') : t('kycPending', 'Not verified yet')}
+                <Text style={[
+                  styles.verifySub,
+                  user.kycStatus === 'verified' && { color: theme.colors.primary },
+                  user.kycStatus === 'pending' && { color: '#F59E0B' },
+                  (user.kycStatus === 'unverified' || user.kycStatus === 'rejected') && { color: theme.colors.error },
+                ]}>
+                  {user.kycStatus === 'verified'
+                    ? t('kycDocumentsReviewed', 'Identity verified • Confirmed by CoBuddy')
+                    : user.kycStatus === 'pending'
+                    ? t('kycUnderReview', 'Under review • Submitted documents being verified')
+                    : user.kycStatus === 'rejected'
+                    ? t('kycRejected', 'Verification rejected • Resubmission required')
+                    : t('kycPending', 'Required for booking • Not verified yet')}
                 </Text>
               </View>
             </View>
@@ -268,22 +295,53 @@ export const ProfileScreen = () => {
 
           {/* KYC Contextual CTA */}
           <TouchableOpacity 
-            style={[styles.kycBtn, user.kycStatus !== 'verified' && styles.kycBtnPrimary]}
+            style={[
+              styles.kycBtn,
+              user.kycStatus === 'verified' && { borderColor: theme.colors.primary, borderWidth: 1 },
+              user.kycStatus === 'pending' && { borderColor: '#F59E0B', borderWidth: 1, backgroundColor: 'rgba(245, 158, 11, 0.1)' },
+              (user.kycStatus === 'unverified' || user.kycStatus === 'rejected') && styles.kycBtnPrimary,
+            ]}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('KYCStack')} accessibilityRole="button" accessibilityLabel={user.kycStatus === 'verified' ? t('a11yKycVerified', 'KYC Verified') : t('a11yKycUnverified', 'Complete KYC verification')}
+            onPress={() => navigation.navigate('KYCStack')}
+            accessibilityRole="button"
+            accessibilityLabel={
+              user.kycStatus === 'verified' ? t('a11yKycVerified', 'KYC Verified') :
+              user.kycStatus === 'pending' ? t('a11yKycPending', 'Verification under review') :
+              t('a11yKycUnverified', 'Complete KYC verification')
+            }
           >
             <Icon 
-              name="shield-account" 
+              name={
+                user.kycStatus === 'verified' ? 'shield-check' :
+                user.kycStatus === 'pending' ? 'shield-sync-outline' :
+                user.kycStatus === 'rejected' ? 'refresh' : 'shield-account'
+              } 
               size={18} 
-              color={user.kycStatus === 'verified' ? theme.colors.primary : theme.colors.background} 
+              color={
+                user.kycStatus === 'verified' ? theme.colors.primary :
+                user.kycStatus === 'pending' ? '#F59E0B' :
+                theme.colors.background
+              } 
             />
-            <Text style={[styles.kycBtnText, user.kycStatus !== 'verified' && { color: theme.colors.background }]}>
-              {user.kycStatus === 'verified' ? t('kycViewDetails', 'View Identity Details') : t('kycComplete', 'Complete KYC Verification')}
+            <Text style={[
+              styles.kycBtnText,
+              user.kycStatus === 'verified' && { color: theme.colors.primary },
+              user.kycStatus === 'pending' && { color: '#F59E0B' },
+              (user.kycStatus === 'unverified' || user.kycStatus === 'rejected') && { color: theme.colors.background },
+            ]}>
+              {user.kycStatus === 'verified' ? t('kycViewDetails', 'View Identity Details') :
+               user.kycStatus === 'pending' ? t('kycCheckStatus', 'Verification Under Review') :
+               user.kycStatus === 'rejected' ? t('kycResubmit', 'Resubmit Verification') :
+               t('kycComplete', 'Complete KYC Verification')}
             </Text>
             <Icon 
               name="chevron-right" 
               size={20} 
-              color={user.kycStatus === 'verified' ? theme.colors.primary : theme.colors.background} 
+              color={
+                user.kycStatus === 'verified' ? theme.colors.primary :
+                user.kycStatus === 'pending' ? '#F59E0B' :
+                theme.colors.background
+              } 
             />
           </TouchableOpacity>
         </View>

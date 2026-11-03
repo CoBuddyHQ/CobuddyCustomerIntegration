@@ -84,16 +84,25 @@ customerApiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    if (
+    const isFormData =
       config.data instanceof FormData ||
-      (config.headers && (config.headers['Content-Type'] === 'multipart/form-data' || (config.headers as any)['content-type'] === 'multipart/form-data'))
-    ) {
-      if (typeof config.headers.delete === 'function') {
-        config.headers.delete('Content-Type');
-        config.headers.delete('content-type');
+      (config.data && typeof config.data === 'object' && Array.isArray((config.data as any)._parts)) ||
+      (config.headers && (
+        config.headers['Content-Type'] === 'multipart/form-data' ||
+        (config.headers as any)['content-type'] === 'multipart/form-data' ||
+        String(config.headers['Content-Type'] || '').startsWith('multipart/form-data')
+      ));
+
+    if (isFormData) {
+      if (config.headers) {
+        if (typeof (config.headers as any).delete === 'function') {
+          (config.headers as any).delete('Content-Type');
+          (config.headers as any).delete('content-type');
+        }
+        delete (config.headers as any)['Content-Type'];
+        delete (config.headers as any)['content-type'];
       }
-      delete (config.headers as any)['Content-Type'];
-      delete (config.headers as any)['content-type'];
+      config.transformRequest = [(data) => data];
     }
     if (ENV.enableLogging && typeof __DEV__ !== 'undefined' && __DEV__) {
       console.log(`[Customer API] ${config.method?.toUpperCase()} request`);
