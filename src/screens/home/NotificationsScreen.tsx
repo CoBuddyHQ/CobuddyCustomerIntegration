@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, StatusBar, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -234,41 +234,47 @@ export const NotificationsScreen = () => {
       </View>
 
       {/* Notifications List */}
-      <ScrollView 
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-            colors={[theme.colors.primary]}
-          />
-        }
-      >
-        {loading ? (
-          <View style={styles.emptyState}>
-            <ActivityIndicator color={theme.colors.primary} />
-          </View>
-        ) : loadError ? (
-          <View style={styles.emptyState}>
-            <Text accessibilityRole="alert" style={styles.emptyTitle}>Notifications are unavailable</Text>
-            {errorMessage ? <Text style={[styles.emptySub, { color: theme.colors.error, marginTop: 8 }]}>{errorMessage}</Text> : null}
-            <TouchableOpacity 
-              onPress={() => { setLoading(true); setLoadError(false); fetchNotifications(); }} 
-              style={{ marginTop: 16, backgroundColor: theme.colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 }}
-            >
-              <Text style={{ color: '#000', fontWeight: 'bold' }}>Tap to Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : filteredNotifications.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Icon name="bell-sleep-outline" size={64} color="rgba(255,255,255,0.1)" />
-            <Text style={styles.emptyTitle}>{t('emptyTitle', 'All Caught Up!')}</Text>
-            <Text style={styles.emptySub}>{t('emptySub', 'You have no notifications in this category right now.')}</Text>
-          </View>
-        ) : (
-          filteredNotifications.map((notif, index) => (
+      {loading ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
+      ) : loadError ? (
+        <View style={styles.emptyState}>
+          <Text accessibilityRole="alert" style={styles.emptyTitle}>Notifications are unavailable</Text>
+          {errorMessage ? <Text style={[styles.emptySub, { color: theme.colors.error, marginTop: 8 }]}>{errorMessage}</Text> : null}
+          <TouchableOpacity 
+            onPress={() => { setLoading(true); setLoadError(false); fetchNotifications(); }} 
+            style={{ marginTop: 16, backgroundColor: theme.colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 }}
+          >
+            <Text style={{ color: '#000', fontWeight: 'bold' }}>Tap to Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredNotifications}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+              colors={[theme.colors.primary]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Icon name="bell-sleep-outline" size={64} color="rgba(255,255,255,0.1)" />
+              <Text style={styles.emptyTitle}>{t('emptyTitle', 'All Caught Up!')}</Text>
+              <Text style={styles.emptySub}>{t('emptySub', 'You have no notifications in this category right now.')}</Text>
+            </View>
+          }
+          renderItem={({ item: notif, index }) => (
             <TouchableOpacity 
               key={notif.id}
               activeOpacity={0.7}
@@ -277,7 +283,9 @@ export const NotificationsScreen = () => {
                 styles.notifCard,
                 !notif.isRead && styles.notifCardUnread,
                 index === filteredNotifications.length - 1 && styles.lastCard
-              ]} accessibilityRole="button" accessibilityLabel={t('a11yOpenNotification', 'Open notification')}
+              ]} 
+              accessibilityRole="button" 
+              accessibilityLabel={t('a11yOpenNotification', 'Open notification')}
             >
               {/* Unread Indicator */}
               {!notif.isRead && <View style={styles.unreadDot} />}
@@ -300,9 +308,9 @@ export const NotificationsScreen = () => {
                 </Text>
               </View>
             </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
+          )}
+        />
+      )}
 
     </SafeAreaView>
   );

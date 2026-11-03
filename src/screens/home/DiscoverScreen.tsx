@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Pressable, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Pressable, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -26,6 +26,9 @@ const GENDER_OPTIONS = ['Any', 'Male', 'Female'];
 const RATING_PILLS = [4.0, 4.5, 5.0];
 const PRICE_PILLS = [500, 1000, 2000];
 const DISTANCE_PILLS = [5, 15, 50];
+
+// In-memory discovery cache with TTL for ultra-fast instant screen switching
+const discoveryScreenCache = new Map<string, { data: CompanionCardType[]; hasMore: boolean; timestamp: number }>();
 
 const EmptyCompanions = ({ onClear }: { onClear: () => void }) => {
   const { t } = useTranslation(['discover']);
@@ -113,6 +116,18 @@ export const DiscoverScreen = () => {
   
   const [activeStatus, setActiveStatus] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Debounce search input to prevent firing redundant backend calls on every keystroke
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
   
   // Applied Filters State
   const [appliedActivity, setAppliedActivity] = useState('');
@@ -213,13 +228,44 @@ export const DiscoverScreen = () => {
     }, [route.params?.category, MODAL_CATEGORIES, navigation])
   );
 
-  const fetchCompanions = useCallback(async () => {
+  const fetchCompanions = useCallback(async (pageNumber = 1, isRefresh = false) => {
     const currentRequest = ++requestVersion.current;
-    setLoading(true);
+    const isFirstPage = pageNumber === 1;
+
+    const cacheKey = JSON.stringify({
+      search: debouncedSearchQuery.trim(),
+      category: appliedActivity,
+      gender: appliedGender,
+      maxPrice: appliedMaxPrice,
+      rating: appliedRating,
+      distance: appliedDistance,
+      status: activeStatus,
+    });
+
+    if (isFirstPage && !isRefresh) {
+      const cached = discoveryScreenCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < 180_000) {
+        setApiCompanions(cached.data);
+        setHasMore(cached.hasMore);
+        setPage(1);
+        setLoading(false);
+        setRefreshing(false);
+        setLoadFailed(false);
+        return;
+      }
+      setLoading(true);
+    } else if (!isFirstPage) {
+      setLoadingMore(true);
+    }
+
     setLoadFailed(false);
+
     try {
-      const params: any = {};
-      if (searchQuery.trim()) params.search = searchQuery.trim();
+      const params: any = {
+        page: pageNumber,
+        limit: 12,
+      };
+      if (debouncedSearchQuery.trim()) params.search = debouncedSearchQuery.trim();
       if (appliedActivity) params.category = appliedActivity;
       if (appliedGender !== 'Any') params.gender = appliedGender.toLowerCase();
       if (appliedMaxPrice < 2000) params.maxPrice = appliedMaxPrice;
@@ -230,25 +276,47 @@ export const DiscoverScreen = () => {
       const res = await discoveryApi.getCompanions(params);
       const list = res?.data || res?.companions || [];
       if (!Array.isArray(list)) throw new Error('Companion discovery returned an invalid response.');
-      if (currentRequest === requestVersion.current) setApiCompanions(list);
+
+      if (currentRequest === requestVersion.current) {
+        const canLoadMore = list.length >= 12;
+        setHasMore(canLoadMore);
+        setPage(pageNumber);
+
+        if (isFirstPage) {
+          setApiCompanions(list);
+          discoveryScreenCache.set(cacheKey, {
+            data: list,
+            hasMore: canLoadMore,
+            timestamp: Date.now(),
+          });
+        } else {
+          setApiCompanions(prev => {
+            const existingIds = new Set(prev.map(c => c.id));
+            const uniqueIncoming = list.filter((c: any) => !existingIds.has(c.id));
+            return [...prev, ...uniqueIncoming];
+          });
+        }
+      }
     } catch {
       if (currentRequest === requestVersion.current) {
-        setApiCompanions([]);
-        setLoadFailed(true);
+        if (isFirstPage) {
+          setApiCompanions([]);
+          setLoadFailed(true);
+        }
       }
     } finally {
       if (currentRequest === requestVersion.current) {
         setLoading(false);
         setRefreshing(false);
+        setLoadingMore(false);
       }
     }
-  }, [searchQuery, appliedActivity, appliedGender, appliedMaxPrice, appliedRating, appliedDistance, activeStatus]);
+  }, [debouncedSearchQuery, appliedActivity, appliedGender, appliedMaxPrice, appliedRating, appliedDistance, activeStatus]);
 
   useFocusEffect(
     useCallback(() => {
-      const timer = setTimeout(() => { fetchCompanions(); }, 250);
+      fetchCompanions(1, false);
       return () => {
-        clearTimeout(timer);
         requestVersion.current += 1;
       };
     }, [fetchCompanions])
@@ -256,7 +324,13 @@ export const DiscoverScreen = () => {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchCompanions();
+    fetchCompanions(1, true);
+  };
+
+  const handleLoadMore = () => {
+    if (!loading && !loadingMore && hasMore) {
+      fetchCompanions(page + 1, false);
+    }
   };
 
   const filteredCompanions = React.useMemo(() => {
@@ -486,7 +560,7 @@ export const DiscoverScreen = () => {
         <View style={styles.emptyContainer}>
           <Icon name="wifi-alert" size={48} color={theme.colors.border} />
           <Text style={styles.emptyText}>{t('loadError', 'Companion discovery is temporarily unavailable.')}</Text>
-          <TouchableOpacity style={styles.clearAllBtn} onPress={() => { fetchCompanions(); }} accessibilityRole="button" accessibilityLabel={t('a11yRetry', 'Retry discovery')}>
+          <TouchableOpacity style={styles.clearAllBtn} onPress={() => { fetchCompanions(1, true); }} accessibilityRole="button" accessibilityLabel={t('a11yRetry', 'Retry discovery')}>
             <Text style={styles.clearAllBtnText}>{t('retry', 'Try again')}</Text>
           </TouchableOpacity>
         </View>
@@ -496,6 +570,12 @@ export const DiscoverScreen = () => {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          removeClippedSubviews={true}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -510,6 +590,14 @@ export const DiscoverScreen = () => {
               onPress={(id) => navigation.navigate('CompanionProfileScreen', { companionId: id })}
             />
           )}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator color={theme.colors.primary} size="small" />
+                <Text style={styles.footerLoaderText}>{t('discover.loadingMore', 'Loading more companions...')}</Text>
+              </View>
+            ) : null
+          }
           ListEmptyComponent={<EmptyCompanions onClear={clearAllFilters} />}
         />
       )}
@@ -1008,5 +1096,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3, 
     shadowRadius: 3, 
     elevation: 5,
-  }
+  },
+  footerLoader: {
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  footerLoaderText: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
 });
