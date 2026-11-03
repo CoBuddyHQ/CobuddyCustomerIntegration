@@ -15,6 +15,7 @@ import { theme } from '../../theme';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { RootStackParamList } from '../../types/navigation';
 import { bookingApi, Booking as BookingApiType } from '../../services/api';
+import { confirmBookingPayment } from '../../services/api/payment.api';
 import { FlowTracker } from '../../services/flowTracker';
 import { formatBookingAmount, normalizePaymentState } from '../../utils/bookingPresentation';
 
@@ -29,6 +30,30 @@ export const PaymentScreen: React.FC = () => {
   const [booking, setBooking] = useState<BookingApiType | null>(null);
   const [isLoadingBooking, setIsLoadingBooking] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const handlePay = async () => {
+    if (!bookingId || isProcessing) return;
+    setIsProcessing(true);
+    setPaymentError(null);
+    try {
+      const res = await confirmBookingPayment(bookingId);
+      if (res.success) {
+        setPaymentSuccess(true);
+        setTimeout(() => {
+          smartGoBack();
+        }, 1500);
+      } else {
+        setPaymentError(res.message || 'Payment could not be processed.');
+      }
+    } catch (err: any) {
+      setPaymentError(err?.response?.data?.message || err?.message || 'Payment failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   useEffect(() => {
     FlowTracker.saveActiveScreen('PaymentScreen');

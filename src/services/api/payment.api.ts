@@ -38,6 +38,12 @@ export const createBookingOrder = async (bookingId: string): Promise<RazorpayOrd
   return res.data;
 };
 
+// ─── Direct confirm booking payment ──────────────────────────────────────────
+export const confirmBookingPayment = async (bookingId: string): Promise<{ success: boolean; message: string; bookingStatus: string }> => {
+  const res = await apiClient.post<{ success: boolean; message: string; bookingStatus: string }>('/payments/confirm-booking', { bookingId });
+  return res.data;
+};
+
 // ─── Verify booking payment ────────────────────────────────────────────────────
 export const verifyBookingPayment = async (data: PaymentVerificationData): Promise<{ message: string; success: boolean }> => {
   const res = await apiClient.post<{ message: string; success: boolean }>('/payments/verify', data);
