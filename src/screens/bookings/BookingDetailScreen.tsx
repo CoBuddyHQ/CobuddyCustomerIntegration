@@ -169,7 +169,7 @@ export const BookingDetailScreen = () => {
         companionId: apiBooking.companionId,
         activity: apiBooking.activityName || apiBooking.activity || t('unavailable', 'Unavailable'),
         date: apiBooking.date && Number.isFinite(new Date(apiBooking.date).getTime())
-          ? new Date(apiBooking.date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+          ? new Date(apiBooking.date).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
           : t('unavailable', 'Unavailable'),
         time: apiBooking.time || t('unavailable', 'Unavailable'),
         duration: Number.isFinite(apiBooking.durationHours ?? apiBooking.duration)
@@ -185,10 +185,10 @@ export const BookingDetailScreen = () => {
         total: formatBookingAmount(apiBooking.pricing?.totalAmount ?? apiBooking.totalAmount),
         paymentStatus: normalizePaymentState(apiBooking.paymentStatus),
         createdAt: apiBooking.createdAt && Number.isFinite(new Date(apiBooking.createdAt).getTime())
-          ? new Date(apiBooking.createdAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+          ? new Date(apiBooking.createdAt).toLocaleDateString('en-IN', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
           : t('unavailable', 'Unavailable'),
         acceptedAt: apiBooking.acceptedAt && Number.isFinite(new Date(apiBooking.acceptedAt).getTime())
-          ? new Date(apiBooking.acceptedAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+          ? new Date(apiBooking.acceptedAt).toLocaleDateString('en-IN', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
           : t('unavailable', 'Unavailable'),
         declineReason: apiBooking.declineReason || t('reasonUnavailable', 'No reason was provided.'),
         sessionPassCode: apiBooking.sessionPassCode || (apiBooking as any).sessions?.[0]?.passCode || null,
