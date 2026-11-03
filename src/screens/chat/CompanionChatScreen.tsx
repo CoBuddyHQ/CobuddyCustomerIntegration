@@ -11,6 +11,7 @@ import { theme } from '../../theme';
 import { ChatInputBar } from '../../components/common/ChatInputBar';
 import { useSmartNavigation } from '../../hooks/useSmartNavigation';
 import { chatApi } from '../../services/api';
+import { chatSocketService } from '../../services/socket/chatSocket.service';
 import { RootStackParamList } from '../../types/navigation';
 import { isFeatureEnabled } from '../../config/featureFlags';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,47 +24,127 @@ export const CompanionChatScreen = () => {
   const companionName = route.params?.companionName || 'Companion';
   const bookingId = route.params?.bookingId || '';
   const companionId = route.params?.companionId || '';
+  const initialConversationId = route.params?.conversationId || '';
+  const initialIsOnline = route.params?.isOnline || false;
   
+  const [conversationId, setConversationId] = useState<string>(initialConversationId);
+  const [isOnline, setIsOnline] = useState<boolean>(initialIsOnline);
   const [isOptionsMenuVisible, setOptionsMenuVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const [messages, setMessages] = useState<any[]>([]);
 
+  // Bootstrap conversation and fetch messages
   React.useEffect(() => {
     let isMounted = true;
-    chatApi.getMessages(companionId).then(apiMsgs => {
-      if (isMounted && apiMsgs?.data) {
-        setMessages(apiMsgs.data.map(m => ({
-          id: m.id,
-          type: 'text',
-          text: m.text || '',
-          sender: m.senderId === companionId ? 'them' : 'me',
-          time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now',
-        })));
-        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 200);
+
+    async function initChat() {
+      let activeConvId = conversationId;
+      if (!activeConvId) {
+        try {
+          const conv = await chatApi.getOrCreateCompanionConversation(companionId, bookingId);
+          if (conv?.id) {
+            activeConvId = conv.id;
+            if (isMounted) {
+              setConversationId(conv.id);
+              if ((conv as any).isOnline !== undefined) {
+                setIsOnline(!!(conv as any).isOnline);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to get/create conversation:', e);
+        }
       }
-    }).catch(() => {});
-    return () => { isMounted = false; };
-  }, [companionId]);
+
+      if (activeConvId) {
+        try {
+          const apiMsgs = await chatApi.getMessages(activeConvId);
+          if (isMounted && apiMsgs?.data) {
+            setMessages(
+              apiMsgs.data.map(m => ({
+                id: m.id,
+                type: 'text',
+                text: m.text || '',
+                sender: m.senderType === 'companion' ? 'them' : m.senderType === 'staff' ? 'staff' : 'me',
+                time: m.createdAt
+                  ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : 'Now',
+              })),
+            );
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 200);
+          }
+        } catch (e) {
+          console.warn('Failed to load messages:', e);
+        }
+
+        // Connect real-time socket
+        chatSocketService.connect(activeConvId, (incoming) => {
+          if (isMounted && incoming) {
+            setMessages(prev => {
+              if (prev.some(m => m.id === incoming.id)) return prev;
+              return [
+                ...prev,
+                {
+                  id: incoming.id || String(Date.now()),
+                  type: 'text',
+                  text: incoming.text || '',
+                  sender: incoming.senderType === 'companion' ? 'them' : incoming.senderType === 'staff' ? 'staff' : 'me',
+                  time: incoming.createdAt
+                    ? new Date(incoming.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : 'Now',
+                },
+              ];
+            });
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+          }
+        });
+      }
+    }
+
+    initChat();
+
+    return () => {
+      isMounted = false;
+      chatSocketService.disconnect();
+    };
+  }, [conversationId, companionId, bookingId]);
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
-    
+
+    let activeConvId = conversationId;
+    if (!activeConvId) {
+      try {
+        const conv = await chatApi.getOrCreateCompanionConversation(companionId, bookingId);
+        activeConvId = conv.id;
+        setConversationId(conv.id);
+      } catch (e) {
+        Alert.alert('Send Error', 'Unable to reach chat server. Please retry.');
+        return;
+      }
+    }
+
+    const tempId = 'temp_' + Date.now();
     const newMsg = {
-      id: Date.now().toString(),
+      id: tempId,
       type: 'text',
-      text: text,
+      text: text.trim(),
       sender: 'me',
-      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-    
+
     setMessages(prev => [...prev, newMsg]);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      await chatApi.sendMessage(companionId, text.trim());
-    } catch {
-      // Optimistic update retained
+      const saved = await chatApi.sendMessage(activeConvId, text.trim());
+      if (saved?.id) {
+        setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, id: saved.id } : m)));
+      }
+    } catch (e: any) {
+      console.warn('Message send failed:', e);
+      Alert.alert('Message not sent', 'Could not deliver message. Please retry.');
     }
   };
 
@@ -91,7 +172,7 @@ export const CompanionChatScreen = () => {
               onPress={() => navigation.navigate('CompanionProfileScreen', { companionId })} accessibilityRole="button" accessibilityLabel={t('a11yGoToDiscovertab', 'Go to DiscoverTab')}
             >
               <Text style={styles.avatarInitials}>{companionName.charAt(0)}</Text>
-              <View style={styles.onlineDot} />
+              {isOnline && <View style={styles.onlineDot} />}
             </TouchableOpacity>
             <View style={{ marginLeft: 12, flexShrink: 1 }}>
               <Text style={styles.headerTitle} numberOfLines={1}>{companionName}</Text>

@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
   StatusBar,
   Modal,
@@ -36,40 +37,56 @@ export const ChatListScreen = () => {
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeBookings, setActiveBookings] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  React.useEffect(() => {
-    let isMounted = true;
-    chatApi.listConversations().then(list => {
-      if (isMounted && list && list.length > 0) {
+  const fetchConversations = React.useCallback(async () => {
+    try {
+      const list = await chatApi.listConversations();
+      if (list && Array.isArray(list)) {
         setConversations(list);
       }
-    }).catch(() => {});
+    } catch {}
 
-    bookingApi.listBookings('accepted').then(list => {
-      if (isMounted && list && list.length > 0) {
-        setActiveBookings(list.map(b => ({
-          id: b.id,
-          name: b.companionName || 'Companion',
-          role: b.activityName || b.activity || 'Meetup Experience',
-          online: true,
-          companionId: b.companionId,
-        })));
+    try {
+      const list = await bookingApi.listBookings('accepted');
+      if (list && Array.isArray(list)) {
+        setActiveBookings(
+          list.map(b => ({
+            id: b.id,
+            name: b.companionName || 'Companion',
+            role: b.activityName || b.activity || 'Meetup Experience',
+            companionId: b.companionId,
+          })),
+        );
       }
-    }).catch(() => {});
-
-    return () => { isMounted = false; };
+    } catch {}
   }, []);
 
-  const displayChats = conversations.map(c => ({
+  React.useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchConversations();
+    setRefreshing(false);
+  };
+
+  const displayChats = conversations.map((c: any) => ({
     id: c.id,
-    name: c.companionName || 'Companion',
+    conversationId: c.id,
+    bookingId: c.bookingId,
+    name: c.displayName || c.companionName || 'Companion',
     companionId: c.companionId || '',
     lastMessage: c.lastMessage || 'Tap to chat',
-    time: c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now',
+    time: c.lastMessageAt
+      ? new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : 'Now',
     unread: c.unreadCount || 0,
-    isOnline: true,
+    isOnline: !!c.isOnline,
+    activity: c.activity || c.activityName,
     isTyping: false,
-    readReceipt: 'read',
+    readReceipt: (c.unreadCount === 0 ? "read" : "sent") as string,
   }));
 
 
@@ -91,7 +108,8 @@ export const ChatListScreen = () => {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}>
 
         {/* ── Live Support Card (Pinned Concierge) ── */}
         <View style={styles.liveCardShadow}>
@@ -141,7 +159,7 @@ export const ChatListScreen = () => {
           <React.Fragment key={chat.id}>
             <TouchableOpacity
               style={styles.convoItem}
-              onPress={() => navigation.navigate('CompanionChatScreen', { companionName: chat.name, bookingId: chat.id, companionId: chat.companionId })}
+              onPress={() => navigation.navigate('CompanionChatScreen', { conversationId: chat.id, companionName: chat.name, bookingId: chat.bookingId, companionId: chat.companionId, isOnline: chat.isOnline })}
               activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('a11yGoToCompanionchat', 'Go to CompanionChat')}>
               
               <View style={styles.convoAvatar}>
@@ -218,9 +236,24 @@ export const ChatListScreen = () => {
                   key={bk.id} 
                   style={styles.newChatOption}
                   activeOpacity={0.8}
-                  onPress={() => {
+                  onPress={async () => {
                     setShowNewMessageModal(false);
-                    navigation.navigate('CompanionChatScreen', { companionName: bk.name, bookingId: bk.id, companionId: bk.companionId });
+                    try {
+                      const conv = await chatApi.getOrCreateCompanionConversation(bk.companionId, bk.id);
+                      navigation.navigate('CompanionChatScreen', {
+                        conversationId: conv?.id,
+                        companionName: bk.name,
+                        bookingId: bk.id,
+                        companionId: bk.companionId,
+                        isOnline: (conv as any)?.isOnline || false,
+                      });
+                    } catch {
+                      navigation.navigate('CompanionChatScreen', {
+                        companionName: bk.name,
+                        bookingId: bk.id,
+                        companionId: bk.companionId,
+                      });
+                    }
                   }} accessibilityRole="button" accessibilityLabel={t('a11yStartChatWith', 'Start chat with {{name}}', { name: bk.name })}
                 >
                   <View style={styles.newChatAvatar}>

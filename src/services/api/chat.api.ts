@@ -21,7 +21,7 @@ export interface ChatMessage {
   id: string;
   conversationId: string;
   senderId: string;
-  senderType: 'customer' | 'companion' | 'concierge';
+  senderType: 'customer' | 'companion' | 'concierge' | 'staff';
   text?: string;
   attachmentUrl?: string;
   isRead: boolean;
