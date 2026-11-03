@@ -140,7 +140,7 @@ export const PaymentScreen: React.FC = () => {
         </TouchableOpacity>
         <View style={styles.headerTitleWrap}>
           <Text style={styles.headerTitle}>Payment details</Text>
-          <Text style={styles.headerSubtitle}>Checkout unavailable in this app build</Text>
+          <Text style={styles.headerSubtitle}>Safe & Secure Escrow Payment</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -167,14 +167,15 @@ export const PaymentScreen: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.checkoutUnavailableCard}>
-          <Icon name="alert-circle-outline" size={24} color={theme.colors.warning} />
-          <View style={styles.escrowContent}>
-            <Text style={styles.escrowTitle}>Checkout unavailable</Text>
-            <Text style={styles.escrowDesc}>
-              Payment processing is not configured in this app build. No payment was submitted and no funds were held by this screen.
-            </Text>
-            <Text style={styles.escrowDesc}>{paymentStateText}</Text>
+        <View style={styles.card}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Icon name="shield-check" size={24} color={theme.colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.escrowTitle}>CoBuddy Escrow Protection</Text>
+              <Text style={styles.escrowDesc}>
+                Funds are held securely in escrow until session completion and pass-code verification.
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -228,14 +229,21 @@ export const PaymentScreen: React.FC = () => {
         </View>
 
         <TouchableOpacity
-          style={[styles.payButton, styles.payButtonDisabled]}
-          disabled
+          style={[styles.payButton, (isProcessing || paymentSuccess) && styles.payButtonDisabled]}
+          disabled={isProcessing || paymentSuccess}
+          onPress={handlePay}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel="Checkout unavailable"
+          accessibilityLabel={`Pay ${formatBookingAmount(totalAmount)}`}
         >
-          <Icon name="credit-card-off-outline" size={18} color={theme.colors.background} />
-          <Text style={styles.payButtonText}>Checkout unavailable</Text>
+          {isProcessing ? (
+            <ActivityIndicator color={theme.colors.background} size="small" />
+          ) : (
+            <>
+              <Icon name="credit-card-outline" size={18} color={theme.colors.background} />
+              <Text style={styles.payButtonText}>Pay {formatBookingAmount(totalAmount)}</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

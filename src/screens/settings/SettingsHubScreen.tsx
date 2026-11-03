@@ -177,6 +177,7 @@ export const SettingsHubScreen = () => {
         ))}
 
         {/* DEV ZONE FOR TESTING SYSTEM SCREENS — kept intentionally, remove manually before final handoff */}
+        {__DEV__ ? (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, {color: theme.colors.warning}]}>{t('devZone', 'DEV ZONE (TEMPORARY)')}</Text>
           <View style={[styles.card, {borderColor: 'rgba(245, 158, 11, 0.2)'}]}>
@@ -205,6 +206,7 @@ export const SettingsHubScreen = () => {
           </View>
         </View>
 
+        ) : null}
         {/* Danger Zone */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, {color: theme.colors.error}]}>{t('dangerZone', 'DANGER ZONE')}</Text>
