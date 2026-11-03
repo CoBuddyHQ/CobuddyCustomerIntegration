@@ -1,5 +1,8 @@
-import { io, Socket } from 'socket.io-client';
+// @ts-ignore
+import io from 'socket.io-client/dist/socket.io.js';
 import { BASE_URL, TokenStorage } from '../api';
+
+type Socket = any;
 
 class ChatSocketService {
   private socket: Socket | null = null;
