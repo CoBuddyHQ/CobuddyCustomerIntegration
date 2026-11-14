@@ -244,7 +244,7 @@ export const DiscoverScreen = () => {
 
     if (isFirstPage && !isRefresh) {
       const cached = discoveryScreenCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < 180_000) {
+      if (cached && cached.data.length > 0 && Date.now() - cached.timestamp < 180_000) {
         setApiCompanions(cached.data);
         setHasMore(cached.hasMore);
         setPage(1);
