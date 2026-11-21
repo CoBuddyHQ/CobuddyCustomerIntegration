@@ -4,6 +4,7 @@
  */
 
 import { customerApiClient } from './apiClient';
+import { updateAdminValues } from '../../config/adminValues';
 
 export interface CompanionCard {
   id: string;
@@ -297,4 +298,18 @@ export const getVenues = async (params?: { cityId?: string; placeType?: string }
   } catch {
     return [];
   }
+};
+
+export const getMasterData = async (): Promise<any> => {
+  try {
+    const res: any = await customerApiClient.get<any>('/discovery/master-data');
+    const data = res?.data?.data || res?.data;
+    if (data && (data.cities || data.interests)) {
+      updateAdminValues(data);
+      return data;
+    }
+  } catch (error) {
+    console.warn('[API ERROR] [Customer API] GET /discovery/master-data failed.', error);
+  }
+  return null;
 };

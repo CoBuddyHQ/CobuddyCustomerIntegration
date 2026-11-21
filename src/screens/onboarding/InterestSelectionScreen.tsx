@@ -15,6 +15,7 @@ import { useUserPreferencesStore } from '../../store/slices/userPreferencesStore
 import { adminValues } from '../../config/adminValues';
 import { selectInterests, selectSetInterests } from '../../store/selectors/userPreferencesSelectors';
 import { profileApi } from '../../services/api';
+import { getMasterData } from '../../services/api/discovery.api';
 import { showApiError } from '../../utils/errorHandler';
 import { FlowTracker } from '../../services/flowTracker';
 
@@ -27,7 +28,7 @@ export const InterestSelectionScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'InterestSelectionScreen'>>();
   const { t } = useTranslation(['onboarding']);
 
-  const INTERESTS_DATA = adminValues.activityCategories;
+  const [interestsData, setInterestsData] = useState(adminValues.activityCategories);
 
   
   const isEditMode = route.params?.isEditMode || false;
@@ -41,6 +42,9 @@ export const InterestSelectionScreen = () => {
 
   React.useEffect(() => {
     FlowTracker.saveActiveScreen('InterestSelectionScreen');
+    getMasterData().then(() => {
+      setInterestsData([...adminValues.activityCategories]);
+    });
   }, []);
 
   const toggle = (id: string) => {
@@ -61,7 +65,7 @@ export const InterestSelectionScreen = () => {
     const newInterests = Array.from(selected);
     // Convert IDs to real names/labels for backend storage
     const interestLabels = newInterests.map(id => {
-      const item = INTERESTS_DATA.find(i => i.id === id);
+      const item = interestsData.find(i => i.id === id);
       return item ? item.label : id;
     });
     setIsSaving(true);
@@ -105,7 +109,7 @@ export const InterestSelectionScreen = () => {
         <Text style={styles.subheadline}>{t('interests.subtitle')}</Text>
 
         <View style={styles.grid}>
-          {INTERESTS_DATA.map(item => {
+          {interestsData.map(item => {
             const active = selected.has(item.id);
             return (
               <TouchableOpacity key={item.id} style={[styles.tile, active && styles.tileActive]} onPress={() => toggle(item.id)} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={item.label}>

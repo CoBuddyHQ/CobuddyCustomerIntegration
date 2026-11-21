@@ -140,3 +140,37 @@ export const adminValues = {
     { id: 'INT-13', label: 'Gaming', type: 'ACTIVITY', multiplier: 1.0, icon: 'controller-classic', title: 'Gaming' },
   ] as ActivityCategory[],
 };
+
+export function updateAdminValues(bundle: any) {
+  if (!bundle) return;
+  if (Array.isArray(bundle.interests) && bundle.interests.length > 0) {
+    adminValues.activityCategories = bundle.interests.map((item: any, idx: number) => {
+      const id = item.id || `INT-${idx + 1}`;
+      const name = typeof item.name === 'object' ? item.name.en || item.name : item.name || item.label || id;
+      return {
+        id,
+        label: name,
+        title: name,
+        type: item.category || 'ACTIVITY',
+        multiplier: item.multiplier || 1.0,
+        icon: item.icon || 'star',
+        description: item.description,
+      };
+    });
+  }
+  if (Array.isArray(bundle.languages) && bundle.languages.length > 0) {
+    adminValues.spokenLanguages = bundle.languages.map((l: any) => l.code || l.id || l.name);
+  }
+  if (Array.isArray(bundle.cancellationReasons) && bundle.cancellationReasons.length > 0) {
+    adminValues.cancellationReasons = bundle.cancellationReasons.map((r: any) => r.code || r.reason);
+  }
+  if (Array.isArray(bundle.disputeReasons) && bundle.disputeReasons.length > 0) {
+    adminValues.disputeReasons = bundle.disputeReasons.map((r: any) => r.code || r.reason);
+  }
+  if (Array.isArray(bundle.ticketCategories) && bundle.ticketCategories.length > 0) {
+    adminValues.ticketCategories = bundle.ticketCategories.map((t: any) => t.code || t.name);
+  }
+  if (Array.isArray(bundle.incidentTypes) && bundle.incidentTypes.length > 0) {
+    adminValues.incidentTypes = bundle.incidentTypes.map((i: any) => i.code || i.name);
+  }
+}
