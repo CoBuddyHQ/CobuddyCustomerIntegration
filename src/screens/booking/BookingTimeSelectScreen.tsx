@@ -33,7 +33,6 @@ const generateNext7Days = () => {
   }
   return dates;
 };
-const DATES = generateNext7Days();
 
 // Available booking time slots
 const TIME_SLOTS: string[] = ['10:00 AM', '11:30 AM', '02:00 PM', '04:00 PM', '06:00 PM', '07:30 PM'];
@@ -45,6 +44,7 @@ export const BookingTimeSelectScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'BookingTimeSelectScreen'>>();
   const setDraftBooking = useBookingStore(selectSetDraftBooking);
 
+  const DATES = React.useMemo(() => generateNext7Days(), []);
   const { activity, venue, companionId, companionName } = route.params || {};
 
   const [selectedDateId, setSelectedDateId] = useState<string>(DATES[0].id);
