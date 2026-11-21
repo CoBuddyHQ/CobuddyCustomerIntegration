@@ -256,6 +256,7 @@ export const getHomeDashboardData = async (): Promise<HomeDashboardResponse['dat
   }
 };
 
+
 // ─── Get active campaigns through the Customer Backend ────────────────────────
 export const getCampaigns = async (): Promise<Campaign[]> => {
   console.log('[API REQUEST] [Customer API] GET /discovery/campaigns');
@@ -275,3 +276,25 @@ export const getCampaigns = async (): Promise<Campaign[]> => {
 };
 
 
+
+export interface VenueItem {
+  id: string;
+  name: string;
+  address: string;
+  placeType: string;
+  cityId?: string;
+  lat?: number;
+  lng?: number;
+  icon?: string;
+  area?: string;
+}
+
+export const getVenues = async (params?: { cityId?: string; placeType?: string }): Promise<VenueItem[]> => {
+  try {
+    const res: any = await customerApiClient.get<any>('/discovery/venues', { params });
+    const data = res?.data?.data || res?.data || [];
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+};

@@ -70,7 +70,10 @@ export const submitKycDocument = async (data: {
     } as unknown as Blob);
   }
 
-  const res = await apiClient.post<{ message: string }>('/kyc/document', formData, { timeout: 60_000 });
+  const res = await apiClient.post<{ message: string }>('/kyc/document', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60_000,
+  });
   return res.data;
 };
 
@@ -92,7 +95,10 @@ export const submitKycSelfie = async (localUri: string): Promise<{ message: stri
     type: filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
   } as unknown as Blob);
 
-  const res = await apiClient.post<{ message: string }>('/kyc/selfie', formData, { timeout: 60_000 });
+  const res = await apiClient.post<{ message: string }>('/kyc/selfie', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60_000,
+  });
   return res.data;
 };
 
@@ -114,7 +120,10 @@ export const submitKycLiveness = async (localUri: string): Promise<{ message: st
     type: filename.toLowerCase().endsWith('.mov') ? 'video/quicktime' : 'video/mp4',
   } as unknown as Blob);
 
-  const res = await apiClient.post<{ message: string }>('/kyc/liveness', formData, { timeout: 60_000 });
+  const res = await apiClient.post<{ message: string }>('/kyc/liveness', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60_000,
+  });
   return res.data;
 };
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,15 +18,18 @@ import { adminValues } from '../../config/adminValues';
 import { selectSetDraftBooking } from '../../store/selectors/bookingSelectors';
 import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { getVenues, VenueItem } from '../../services/api/discovery.api';
 
 // Curated verified safe public venues in accordance with CoBuddy Safety Architecture
-const SAFE_VENUES: { id: string; name: string; address: string; icon: string; type: string }[] = [
+const SAFE_VENUES: { id: string; name: string; address: string; icon: string; type: string; placeType?: string; area?: string }[] = [
   {
     id: 'venue-ngma-blr',
     name: 'National Gallery of Modern Art (NGMA)',
     address: '49, Manikyavelu Mansion, Palace Rd, Vasanth Nagar, Bengaluru',
     icon: 'museum',
     type: 'museum',
+    placeType: 'GALLERY',
+    area: 'Vasanth Nagar',
   },
   {
     id: 'venue-thirdwave-koramangala',
@@ -34,6 +37,8 @@ const SAFE_VENUES: { id: string; name: string; address: string; icon: string; ty
     address: '80 Feet Rd, 4th Block, Koramangala, Bengaluru',
     icon: 'coffee',
     type: 'cafe',
+    placeType: 'CAFE',
+    area: 'Koramangala',
   },
   {
     id: 'venue-cubbon-park',
@@ -41,6 +46,8 @@ const SAFE_VENUES: { id: string; name: string; address: string; icon: string; ty
     address: 'Kasturba Rd, Sampangi Rama Nagara, Bengaluru',
     icon: 'tree',
     type: 'park',
+    placeType: 'PARK',
+    area: 'Sampangi Rama Nagara',
   },
   {
     id: 'venue-starbucks-indiranagar',
@@ -48,6 +55,8 @@ const SAFE_VENUES: { id: string; name: string; address: string; icon: string; ty
     address: '100 Feet Rd, HAL 2nd Stage, Indiranagar, Bengaluru',
     icon: 'coffee',
     type: 'cafe',
+    placeType: 'CAFE',
+    area: 'Indiranagar',
   },
   {
     id: 'venue-forum-mall',
@@ -55,6 +64,8 @@ const SAFE_VENUES: { id: string; name: string; address: string; icon: string; ty
     address: 'Hosur Rd, Chikku Lakshmaiah Layout, Koramangala, Bengaluru',
     icon: 'shopping',
     type: 'shopping_mall',
+    placeType: 'MALL',
+    area: 'Koramangala',
   },
 ];
 
@@ -67,9 +78,28 @@ export const BookingVenueSelectScreen = () => {
 
   const { activity, companionId, companionName } = route.params || {};
 
+  const [venues, setVenues] = useState<any[]>(SAFE_VENUES);
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlaceType, setSelectedPlaceType] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    getVenues().then((remoteVenues) => {
+      if (isMounted && remoteVenues && remoteVenues.length > 0) {
+        const formatted = remoteVenues.map((v) => ({
+          ...v,
+          type: (v.placeType || 'cafe').toLowerCase(),
+          icon: (v.placeType || '').toUpperCase() === 'CAFE' ? 'coffee' :
+                (v.placeType || '').toUpperCase() === 'MALL' ? 'shopping' :
+                (v.placeType || '').toUpperCase() === 'GALLERY' ? 'museum' :
+                (v.placeType || '').toUpperCase() === 'PARK' ? 'tree' : 'map-marker',
+        }));
+        setVenues(formatted);
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
 
   const handleBack = () => {
     smartGoBack();
@@ -78,7 +108,7 @@ export const BookingVenueSelectScreen = () => {
   const handleNext = () => {
     if (!selectedVenueId) return;
     
-    const venue = SAFE_VENUES.find(v => v.id === selectedVenueId);
+    const venue = venues.find(v => v.id === selectedVenueId) || SAFE_VENUES.find(v => v.id === selectedVenueId);
     if (!venue) return;
 
     setDraftBooking({
@@ -87,8 +117,8 @@ export const BookingVenueSelectScreen = () => {
         name: venue.name,
         area: (venue as any).area || 'Central',
         city: (venue as any).city || 'Mumbai',
-        isApproved: false,
-        venueType: venue.type,
+        isApproved: true,
+        venueType: venue.type || venue.placeType || 'cafe',
         meetingPoint: venue.name,
         landmark: venue.address,
       }
@@ -102,10 +132,12 @@ export const BookingVenueSelectScreen = () => {
     });
   };
 
-  const filteredVenues = SAFE_VENUES.filter(venue => {
+  const filteredVenues = venues.filter(venue => {
     const matchesSearch = venue.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           venue.address.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = selectedPlaceType ? venue.type === selectedPlaceType : true;
+    const venueType = (venue.type || venue.placeType || '').toLowerCase();
+    const filterType = (selectedPlaceType || '').toLowerCase();
+    const matchesType = selectedPlaceType ? venueType === filterType || (venue.placeType || '').toUpperCase() === (selectedPlaceType || '').toUpperCase() : true;
     return matchesSearch && matchesType;
   });
 
